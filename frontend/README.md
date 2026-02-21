@@ -2,11 +2,11 @@
 
 This is the **frontend** service for the PeerPrep project, built with **Next.js** and **TypeScript**.
 
-## 🚀 Prerequisites
+## Prerequisites
 
 Make sure you have **Node.js** (v18 or v20 recommended) and **npm** installed.
 
-## ⚡ Getting Started
+## Getting Started
 
 1. **Clone the repository**
 
