@@ -1,0 +1,26 @@
+# Dependencies & build output
+node_modules
+.next
+
+# Version control
+.git
+.gitignore
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Misc
+README.md
+*.md
