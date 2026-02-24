@@ -11,7 +11,7 @@ const COOKIE_OPTIONS = {
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
     if (!email || !password) {
       res.status(400).json({ error: 'Email and password are required' });
       return;
@@ -23,7 +23,21 @@ export async function register(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const user = await User.create({ email, password });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Please provide a valid email address' });
+      return;
+    }
+
+    const passwordUppercaseValid = /[A-Z]/.test(password);
+    if (password.length < 8 || !passwordUppercaseValid) {
+      res.status(400).json({ 
+        error: 'Password must be at least 8 characters long and contain an uppercase letter' 
+      });
+      return;
+    }
+
+    const user = await User.create({ username, email, password });
     res.status(201).json({ message: 'User registered', id: user._id });
   } catch (err) {
     console.error(err);

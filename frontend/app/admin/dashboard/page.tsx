@@ -36,10 +36,33 @@ export default function AdminDashboardPage() {
         return data;
       } else {
         setFetchError(true);;
+        return [];
       }
     } catch {
       setFetchError(true);
     } finally {
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+  
+      if (res.ok) {
+        setUsers((prev) => prev.filter((u) => u._id !== userId));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('A network error occurred.');
     }
   };
 
@@ -110,7 +133,7 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <AdminUserTable users={users} />
+            <AdminUserTable users={users} onDelete={deleteUser}/>
           </CardContent>
         </Card>
       </div>

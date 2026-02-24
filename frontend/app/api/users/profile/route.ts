@@ -2,26 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
 
-/**
- * DELETE /api/users/:id
- * Deletes a user by ID. Admin only — enforced by the user service.
- */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest) {
   try {
-    const res = await fetch(`${USER_SERVICE_URL}/users/${params.id}`, {
-      method: 'DELETE',
-      headers: {
-        Cookie: request.headers.get('cookie') ?? '',
-        Authorization: request.headers.get('Authorization') ?? '',
-      },
-    });
+    const body = await request.json();
 
-    if (res.status === 204) {
-      return new NextResponse(null, { status: 204 });
-    }
+    const res = await fetch(`${USER_SERVICE_URL}/users/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: request.headers.get('Authorization') ?? '',
+        Cookie: request.headers.get('cookie') ?? '',
+      },
+      body: JSON.stringify(body),
+    });
 
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });

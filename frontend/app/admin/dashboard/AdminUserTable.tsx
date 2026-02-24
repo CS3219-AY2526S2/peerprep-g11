@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -9,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Trash2 } from 'lucide-react';
 
 interface User {
   _id: string;
@@ -17,7 +19,12 @@ interface User {
   createdAt: string;
 }
 
-export function AdminUserTable({ users }: { users: User[] }) {
+interface AdminUserTableProps {
+  users: User[];
+  onDelete: (id: string) => void;
+}
+
+export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
   if (users.length === 0) {
     return (
       <div className="px-6 py-12 text-center text-[12.5px] text-muted-foreground">
@@ -41,6 +48,9 @@ export function AdminUserTable({ users }: { users: User[] }) {
           </TableHead>
           <TableHead className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wide">
             Joined
+          </TableHead>
+          <TableHead className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wide">
+            Actions
           </TableHead>
         </TableRow>
       </TableHeader>
@@ -76,6 +86,19 @@ export function AdminUserTable({ users }: { users: User[] }) {
                 month: 'short',
                 year: 'numeric',
               })}
+            </TableCell>
+            <TableCell className="py-3">
+              {user.role !== "admin" &&
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(user._id)}
+                  className="h-8 w-8 p-0 text-muted-foreground  hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete user</span>
+                </Button>
+              }
             </TableCell>
           </TableRow>
         ))}
