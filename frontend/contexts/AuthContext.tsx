@@ -1,12 +1,13 @@
 'use client';
 
+import { Role } from '@/lib/auth';
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 
 export interface AuthUser {
   id: string;
   username: string;
   email: string;
-  role: 'user' | 'admin';
+  role: Role;
 }
 
 interface AuthContextValue {

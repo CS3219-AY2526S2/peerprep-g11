@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 import { NavBar } from '@/components/ui/navBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { Role } from '@/lib/auth';
 
 export default function AdminDashboardPage() {
-  const { user, isLoading } = useRequireAuth('admin');
+  const { user, isLoading } = useRequireAuth(Role.ADMIN);
 
   useEffect(() => {
     // Don't fetch until auth is resolved

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { Role } from '@/lib/auth';
 
 /**
  * Use in protected pages. Redirects to /login if the user is not authenticated.
@@ -15,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
  *   ...
  * }
  */
-export function useRequireAuth(requiredRole?: 'user' | 'admin') {
+export function useRequireAuth(requiredRole?: Role) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 

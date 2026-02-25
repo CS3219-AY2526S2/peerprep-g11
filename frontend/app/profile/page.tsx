@@ -9,10 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { NavBar } from '@/components/ui/navBar';
+import { 
+    passwordLengthValid,
+    passwordUppercaseValid,
+    PasswordCriteria
+} from '@/lib/passwordValidation'
 
 export default function ProfilePage() {
   const { user, refresh } = useAuth(); 
-  const router = useRouter();
 
   const [username, setUsername] = useState(user?.username ?? '');
   const [password, setPassword] = useState('');
@@ -22,15 +26,12 @@ export default function ProfilePage() {
   const [apiMessage, setApiMessage] = useState('');
   const [apiError, setApiError] = useState('');
 
-  const passwordLengthValid = password.length === 0 || password.length >= 8;
-  const passwordUppercaseValid =
-    password.length === 0 || /[A-Z]/.test(password);
   const passwordsMatch = password === confirmPassword;
 
   const isFormValid =
     username.trim() !== '' &&
-    passwordLengthValid &&
-    passwordUppercaseValid &&
+    passwordLengthValid(password) &&
+    passwordUppercaseValid(password) &&
     passwordsMatch;
 
   const handleBlur = (field: string) =>
@@ -185,14 +186,7 @@ export default function ProfilePage() {
 
                     {password.length > 0 && (
                     <div className="grid gap-1 mt-0.5 pl-0.5">
-                        <CriterionRow
-                        met={passwordLengthValid}
-                        label="Minimum 8 characters"
-                        />
-                        <CriterionRow
-                        met={passwordUppercaseValid}
-                        label="At least one uppercase letter"
-                        />
+                        <PasswordCriteria password={password} />
                     </div>
                     )}
                 </div>

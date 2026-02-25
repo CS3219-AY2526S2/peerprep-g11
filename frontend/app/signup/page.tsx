@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  passwordLengthValid,
+  passwordUppercaseValid,
+  PasswordCriteria
+} from '@/lib/passwordValidation'
 
 export default function CreateAccountPage() {
   const router = useRouter();
@@ -21,15 +26,13 @@ export default function CreateAccountPage() {
   const [apiError, setApiError] = useState('');
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const passwordLengthValid = password.length >= 8;
-  const passwordUppercaseValid = /[A-Z]/.test(password);
   const passwordsMatch = password === confirmPassword;
 
   const isFormValid =
     username.trim() !== '' &&
     emailValid &&
-    passwordLengthValid &&
-    passwordUppercaseValid &&
+    passwordLengthValid(password) &&
+    passwordUppercaseValid(password) &&
     passwordsMatch;
 
   const handleBlur = (field: string) =>
@@ -146,12 +149,11 @@ export default function CreateAccountPage() {
                   placeholder="Create a password"
                   className="h-9 text-[12.5px] border-input focus-visible:ring-ring"
                 />
-                {touched.password && (!passwordLengthValid || !passwordUppercaseValid) && (
+                {touched.password && (!passwordLengthValid(password) || !passwordUppercaseValid(password)) && (
                   <p className="text-[11px] text-destructive">* Password must meet all criteria</p>
                 )}
                 <div className="grid gap-1 mt-0.5 pl-0.5">
-                  <CriterionRow met={passwordLengthValid} label="Minimum 8 characters" />
-                  <CriterionRow met={passwordUppercaseValid} label="At least one uppercase letter" />
+                  <PasswordCriteria password={password} />
                 </div>
               </div>
 

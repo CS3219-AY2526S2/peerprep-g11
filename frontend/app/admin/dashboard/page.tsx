@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Role } from '@/lib/auth';
 
 interface User {
   _id: string;
@@ -17,7 +18,7 @@ interface User {
 }
 
 export default function AdminDashboardPage() {
-  const { user, isLoading } = useRequireAuth('admin');
+  const { user, isLoading } = useRequireAuth(Role.ADMIN);
 
   const [users, setUsers] = useState<User[]>([]);
   const [fetchError, setFetchError] = useState(false);
