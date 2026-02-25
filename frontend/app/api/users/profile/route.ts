@@ -1,3 +1,4 @@
+import { fetchWithAuth, forwardAuthHeaders } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
@@ -6,12 +7,11 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const res = await fetch(`${USER_SERVICE_URL}/users/profile`, {
+    const res = await fetchWithAuth(`${USER_SERVICE_URL}/users/profile`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: request.headers.get('Authorization') ?? '',
-        Cookie: request.headers.get('cookie') ?? '',
+        ...forwardAuthHeaders(request)
       },
       body: JSON.stringify(body),
     });

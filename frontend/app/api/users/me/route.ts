@@ -1,3 +1,4 @@
+import { fetchWithAuth, forwardAuthHeaders } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
@@ -9,13 +10,10 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001'
  */
 export async function GET(request: NextRequest) {
   try {
-    const res = await fetch(`${USER_SERVICE_URL}/users/me`, {
+    const res = await fetchWithAuth(`${USER_SERVICE_URL}/users/me`, {
       method: 'GET',
       headers: {
-        // Forward the cookie header so the auth service can validate the JWT
-        Cookie: request.headers.get('cookie') ?? '',
-        // Also forward Authorization header for Bearer-token-based services
-        Authorization: request.headers.get('Authorization') ?? '',
+        ...forwardAuthHeaders(request)
       },
     });
 

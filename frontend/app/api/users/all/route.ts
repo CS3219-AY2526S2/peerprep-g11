@@ -1,3 +1,4 @@
+import { fetchWithAuth, forwardAuthHeaders } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
@@ -8,10 +9,9 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001'
  */
 export async function GET(request: NextRequest) {
   try {
-    const res = await fetch(`${USER_SERVICE_URL}/users`, {
+    const res = await fetchWithAuth(`${USER_SERVICE_URL}/users`, {
       headers: {
-        Cookie: request.headers.get('cookie') ?? '',
-        Authorization: request.headers.get('Authorization') ?? '',
+        ...forwardAuthHeaders(request)
       },
     });
 

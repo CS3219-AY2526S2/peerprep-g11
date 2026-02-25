@@ -1,3 +1,4 @@
+import { fetchWithAuth } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
@@ -12,7 +13,7 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
-    const res = await fetch(`${USER_SERVICE_URL}/users/${id}`, {
+    const res = await fetchWithAuth(`${USER_SERVICE_URL}/users/${id}`, {
       method: 'DELETE',
       headers: {
         'Cookie': request.headers.get('cookie') ?? '',

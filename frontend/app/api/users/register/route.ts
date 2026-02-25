@@ -1,3 +1,4 @@
+import { fetchWithAuth, forwardAuthHeaders } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:4001';
@@ -6,11 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const res = await fetch(`${USER_SERVICE_URL}/auth/register`, {
+    const res = await fetchWithAuth(`${USER_SERVICE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: request.headers.get('Authorization') ?? '',
+        ...forwardAuthHeaders(request)
       },
       body: JSON.stringify(body),
     });
