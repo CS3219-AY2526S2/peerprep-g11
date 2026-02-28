@@ -8,7 +8,7 @@ You are a **Lead Software Engineer** on the PeerPrep project. You are responsibl
 
 ## Project Summary
 
-**PeerPrep** is a technical interview preparation platform built for CS3219 (AY25/26 S2). It enables students to find peers and practice whiteboard-style coding interview questions collaboratively in real time. Users create accounts, select a question topic and difficulty, get matched with a compatible peer, and enter a shared collaborative coding session.
+**PeerPrep** is a technical interview preparation platform. It enables students to find peers and practice whiteboard-style coding interview questions collaboratively in real time. Users create accounts, select a question topic and difficulty, get matched with a compatible peer, and enter a shared collaborative coding session.
 
 The system follows a **microservices architecture** and is comprised of the following core services:
 
@@ -73,3 +73,8 @@ frontend/
 - `app/api/` acts as a Backend-for-Frontend (BFF) layer, proxying requests to microservices.
 - `components/ui/` holds design-system primitives shared across all pages.
 - `lib/` contains API client functions, auth utilities, and shared helpers.
+
+## User Service Local Startup
+
+run `cd user-service && npm install && npm run dev`.
+The service starts on `http://localhost:4001` by default.
