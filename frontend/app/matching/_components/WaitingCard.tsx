@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PreferenceSummaryBadge } from './PreferenceSummaryBadge';
 import type { MatchingPreferences } from '@/app/matching/types';
+import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
 
 interface WaitingCardProps {
     preferences: MatchingPreferences;
@@ -48,7 +49,10 @@ export function WaitingCard({ preferences, elapsedSeconds, onCancel, isCancellin
             <div className="grid grid-cols-3 gap-3 w-full">
                 <PreferenceSummaryBadge label="Topic" value={preferences.topic} />
                 <PreferenceSummaryBadge label="Difficulty" value={preferences.difficulty} />
-                <PreferenceSummaryBadge label="Language" value={preferences.language} />
+                <PreferenceSummaryBadge
+                    label="Language"
+                    value={PROGRAMMING_LANGUAGE_LABELS[preferences.language]}
+                />
             </div>
 
             {/* Timer */}

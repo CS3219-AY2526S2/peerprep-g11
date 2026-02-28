@@ -15,10 +15,14 @@ import {
 } from '@/components/ui/select';
 import type { Difficulty } from '@/lib/types';
 import type { MatchingPreferences } from '@/app/matching/types';
+import {
+    PROGRAMMING_LANGUAGES,
+    PROGRAMMING_LANGUAGE_LABELS,
+    type ProgrammingLanguage,
+} from '@/lib/programming-languages';
 
 // TODO: Fetch from question service
 const TOPICS = ['Arrays', 'Graphs', 'Dynamic Programming', 'System Design', 'Data Structures'];
-const LANGUAGES = ['Python', 'JavaScript', 'Java', 'C++', 'Go'];
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
 
 interface MatchingPreferencesFormProps {
@@ -29,7 +33,7 @@ interface MatchingPreferencesFormProps {
 export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPreferencesFormProps) {
     const [topic, setTopic] = useState<string>(TOPICS[0]);
     const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
-    const [language, setLanguage] = useState<string>(LANGUAGES[0]);
+    const [language, setLanguage] = useState<ProgrammingLanguage>(PROGRAMMING_LANGUAGES[0]);
 
     const handleSubmit = () => {
         onSubmit({ topic, difficulty, language });
@@ -91,14 +95,17 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                     <Label className="text-[11.5px] font-semibold text-muted-foreground whitespace-nowrap">
                         Programming Language
                     </Label>
-                    <Select value={language} onValueChange={setLanguage}>
+                    <Select
+                        value={language}
+                        onValueChange={(value) => setLanguage(value as ProgrammingLanguage)}
+                    >
                         <SelectTrigger className="border-none shadow-none p-0 h-auto text-[12.5px] text-foreground focus:ring-0 w-auto gap-1.5 [&>svg]:opacity-50">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {LANGUAGES.map((l) => (
+                            {PROGRAMMING_LANGUAGES.map((l) => (
                                 <SelectItem key={l} value={l} className="text-[12.5px]">
-                                    {l}
+                                    {PROGRAMMING_LANGUAGE_LABELS[l]}
                                 </SelectItem>
                             ))}
                         </SelectContent>

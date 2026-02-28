@@ -53,8 +53,8 @@ frontend/
 │   ├── login/                  # Login page
 │   ├── signup/                 # Registration page
 │   ├── dashboard/              # Post-login dashboard (nav hub, recent activity)
-│   ├── questions/              # Question list & detail pages
-│   ├── matching/               # Matching lobby & waiting state UI
+│   ├── questions/              # Question list & detail pages + route-local `_components/`
+│   ├── matching/               # Matching lobby & waiting state UI + route-local `_components/`
 │   ├── sessions/               # Collaboration session page (editor, chat, AI panel)
 │   ├── settings/               # User profile & preferences
 │   ├── permission-denied/      # 403 error page
@@ -70,6 +70,7 @@ frontend/
 
 **Key conventions:**
 - Each route folder under `app/` contains a `page.tsx` as the page component.
+- Route-specific components should be colocated under `app/<route>/_components/`; use `components/ui/` only for shared design-system primitives and broadly reused UI.
 - `app/api/` acts as a Backend-for-Frontend (BFF) layer, proxying requests to microservices.
 - `components/ui/` holds design-system primitives shared across all pages.
 - `lib/` contains API client functions, auth utilities, and shared helpers.

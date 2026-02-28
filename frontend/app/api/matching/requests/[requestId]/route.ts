@@ -27,7 +27,11 @@ export async function GET(
     return NextResponse.json({
       requestId,
       status: isMatched ? 'matched' : 'pending',
-      preferences: { topic: 'Arrays', difficulty: 'Easy', language: 'Python' },
+      preferences: {
+        topic: 'Arrays',
+        difficulty: 'Easy',
+        language: 'python',
+      },
       ...(isMatched && { matchId: 'mock-match-001', partnerName: 'Alex P.' }),
     });
   } catch {

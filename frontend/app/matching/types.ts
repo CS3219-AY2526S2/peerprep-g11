@@ -3,13 +3,14 @@
  */
 
 import type { Difficulty } from '@/lib/types';
+import type { ProgrammingLanguage } from '@/lib/programming-languages';
 
 export type MatchRequestStatus = 'pending' | 'matched' | 'timed_out' | 'cancelled';
 
 export interface MatchingPreferences {
     topic: string;
     difficulty: Difficulty;
-    language: string;
+    language: ProgrammingLanguage;
 }
 
 export interface MatchRequest {
