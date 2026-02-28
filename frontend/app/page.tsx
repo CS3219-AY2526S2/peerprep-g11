@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LandingNavbar } from "@/components/landing-navbar";
+import { getCurrentServerUser } from "@/lib/server-auth";
 import {
   QuestionBankIcon,
   SmartMatchingIcon,
@@ -26,7 +30,19 @@ const features = [
   },
 ] as const;
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  noStore();
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  const user = await getCurrentServerUser(token);
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <LandingNavbar />
