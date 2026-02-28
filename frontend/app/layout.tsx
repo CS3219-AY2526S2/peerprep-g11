@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Open_Sans, Source_Serif_4, IBM_Plex_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const openSans = Open_Sans({
   variable: "--font-sans",
@@ -38,7 +39,9 @@ export default function RootLayout({
       <body
         className={`${openSans.variable} ${sourceSerif.variable} ${ibmPlexMono.variable} antialiased`}
       >
-        <TooltipProvider>{children}</TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </AuthProvider>
       </body>
     </html>
   );
