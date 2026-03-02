@@ -8,7 +8,7 @@ You are a **Lead Software Engineer** on the PeerPrep project. You are responsibl
 
 ## Project Summary
 
-**PeerPrep** is a technical interview preparation platform built for CS3219 (AY25/26 S2). It enables students to find peers and practice whiteboard-style coding interview questions collaboratively in real time. Users create accounts, select a question topic and difficulty, get matched with a compatible peer, and enter a shared collaborative coding session.
+**PeerPrep** is a technical interview preparation platform. It enables students to find peers and practice whiteboard-style coding interview questions collaboratively in real time. Users create accounts, select a question topic and difficulty, get matched with a compatible peer, and enter a shared collaborative coding session.
 
 The system follows a **microservices architecture** and is comprised of the following core services:
 
@@ -53,8 +53,8 @@ frontend/
 │   ├── login/                  # Login page
 │   ├── signup/                 # Registration page
 │   ├── dashboard/              # Post-login dashboard (nav hub, recent activity)
-│   ├── questions/              # Question list & detail pages
-│   ├── matching/               # Matching lobby & waiting state UI
+│   ├── questions/              # Question list & detail pages + route-local `_components/`
+│   ├── matching/               # Matching lobby & waiting state UI + route-local `_components/`
 │   ├── sessions/               # Collaboration session page (editor, chat, AI panel)
 │   ├── settings/               # User profile & preferences
 │   ├── permission-denied/      # 403 error page
@@ -70,6 +70,12 @@ frontend/
 
 **Key conventions:**
 - Each route folder under `app/` contains a `page.tsx` as the page component.
+- Route-specific components should be colocated under `app/<route>/_components/`; use `components/ui/` only for shared design-system primitives and broadly reused UI.
 - `app/api/` acts as a Backend-for-Frontend (BFF) layer, proxying requests to microservices.
 - `components/ui/` holds design-system primitives shared across all pages.
 - `lib/` contains API client functions, auth utilities, and shared helpers.
+
+## User Service Local Startup
+
+run `cd user-service && npm install && npm run dev`.
+The service starts on `http://localhost:4001` by default.

@@ -42,85 +42,84 @@ export function NavBar({ activePage }: NavBarProps) {
 
   return (
     <nav className="grid grid-cols-3 items-center px-6 py-3.5 bg-card border-b border-border" >
-    {/* Brand */}
-    <Link
+      {/* Brand */}
+      <Link
         href="/dashboard"
         className="flex items-center gap-2.5 font-semibold text-foreground no-underline"
-    >
+      >
         <PeerPrepLogo />
         <span style={{ fontFamily: 'var(--font-serif)' }}>PeerPrep</span>
-    </Link>
+      </Link>
 
-    {/* Middle Nav Links */}
-    <div className="flex justify-center gap-1">
+      {/* Middle Nav Links */}
+      <div className="flex justify-center gap-1">
         {navLinks.map(({ href, label, key }) => {
-        const isActive = activePage === key;
-        return (
+          const isActive = activePage === key;
+          return (
             <Button
-            key={key}
-            asChild
-            variant="ghost"
-            size="sm"
-            className={`rounded-2xl text-[12.5px] transition-colors ${
-                isActive
-                ? 'bg-accent-soft text-accent font-semibold hover:bg-accent-soft'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-            }`}
+              key={key}
+              asChild
+              variant="ghost"
+              size="sm"
+              className={`rounded-2xl text-[12.5px] transition-colors ${isActive
+                  ? 'bg-accent-soft text-accent font-semibold hover:bg-accent-soft hover:text-accent'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                }`}
             >
-            <Link href={href}>{label}</Link>
+              <Link href={href}>{label}</Link>
             </Button>
-        );
+          );
         })}
-    </div>
+      </div>
 
-    <div className="flex justify-end">
+      <div className="flex justify-end">
         {/* User dropdown */}
         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 text-[12.5px] text-foreground hover:opacity-80 transition-opacity min-w-0">
-                <span className="flex items-center gap-2 min-w-0">
+              <span className="flex items-center gap-2 min-w-0">
                 {user?.role === 'admin' && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d6c7f7] text-[#4c2fbf] font-semibold whitespace-nowrap">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d6c7f7] text-[#4c2fbf] font-semibold whitespace-nowrap">
                     ADMIN
-                    </span>
+                  </span>
                 )}
                 <span className="px-3 py-1 rounded-full bg-[#ede7df] text-[#3a3a3a] text-sm font-medium shadow-sm truncate max-w-[120px]">
-                    {user?.username ?? '…'}
+                  {user?.username ?? '…'}
                 </span>
-                </span>
+              </span>
 
-                <div className="w-8 h-8 rounded-full bg-secondary border border-border grid place-items-center text-muted-foreground">
+              <div className="w-8 h-8 rounded-full bg-secondary border border-border grid place-items-center text-muted-foreground">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
-                    <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-                    <path d="M5 19c1.2-3 4-4.2 7-4.2s5.8 1.2 7 4.2" stroke="currentColor" strokeWidth="1.8" />
+                  <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M5 19c1.2-3 4-4.2 7-4.2s5.8 1.2 7 4.2" stroke="currentColor" strokeWidth="1.8" />
                 </svg>
-                </div>
+              </div>
             </button>
-            </DropdownMenuTrigger>
+          </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuLabel className="text-[12px] font-normal text-muted-foreground">
-                {user?.email ?? ''}
+              {user?.email ?? ''}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
-                <Link href="/profile">Profile</Link>
+              <Link href="/profile">Profile</Link>
             </DropdownMenuItem>
             {user?.role === 'admin' && (
-                <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
+              <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
                 <Link href="/admin/dashboard">Admin</Link>
-                </DropdownMenuItem>
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-                onClick={handleLogout}
-                className="text-[12.5px] text-destructive focus:text-destructive cursor-pointer"
+              onClick={handleLogout}
+              className="text-[12.5px] text-destructive focus:text-destructive cursor-pointer"
             >
-                Log out
+              Log out
             </DropdownMenuItem>
-            </DropdownMenuContent>
+          </DropdownMenuContent>
         </DropdownMenu>
-    </div>
+      </div>
 
     </nav>
   );
