@@ -1,0 +1,7 @@
+# Ignore artifacts:
+build
+coverage
+.next/
+out/
+build/
+next-env.d.ts",
