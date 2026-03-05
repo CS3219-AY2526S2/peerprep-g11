@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,12 +62,6 @@ export function QuestionCard({ question }: QuestionCardProps) {
 
             {/* Actions */}
             <div className="flex gap-3 mt-6">
-                <Button
-                    asChild
-                    className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold px-5"
-                >
-                    <Link href="/matching">Attempt with Peer</Link>
-                </Button>
                 <Button
                     asChild
                     variant="outline"
