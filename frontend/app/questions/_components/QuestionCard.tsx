@@ -13,7 +13,6 @@ interface QuestionCardProps {
 export function QuestionCard({ question }: QuestionCardProps) {
     return (
         <Card className="border-border shadow-[var(--shadow)] p-6 md:p-8 transition-shadow duration-300 hover:shadow-md">
-            {/* Difficulty badge first, then topics */}
             <div className="flex items-center gap-2 flex-wrap mb-4">
                 <DifficultyBadge difficulty={question.difficulty} />
                 {question.topics.map((topic) => (
@@ -21,7 +20,6 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 ))}
             </div>
 
-            {/* Title */}
             <h2
                 className="text-[20px] font-bold text-foreground mb-3"
                 style={{ fontFamily: 'var(--font-serif)' }}
@@ -29,14 +27,12 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 {question.title}
             </h2>
 
-            {/* Description */}
             <div className="text-[13.5px] leading-relaxed text-foreground space-y-3">
                 {question.description.split('\n').map((para, i) => (
                     <p key={i}>{para}</p>
                 ))}
             </div>
 
-            {/* Constraints */}
             {question.constraints.length > 0 && (
                 <div className="mt-4">
                     <h3 className="text-[12px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
@@ -50,7 +46,6 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 </div>
             )}
 
-            {/* Examples */}
             {question.examples.map((example, i) => (
                 <div
                     key={i}
@@ -66,7 +61,6 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 </div>
             ))}
 
-            {/* Actions */}
             <div className="flex gap-3 mt-6">
                 <Link
                     href="/questions"

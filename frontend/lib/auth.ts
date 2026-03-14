@@ -3,7 +3,7 @@ export enum Role {
     USER = 'user'
 }
 
-// Keeps browser auth logic separate from server forwarding logic, hence split into two functions
+// Browser fetches send cookies directly; server routes forward incoming auth headers.
 export async function fetchWithAuth(
     path: string,
     init: RequestInit ={}

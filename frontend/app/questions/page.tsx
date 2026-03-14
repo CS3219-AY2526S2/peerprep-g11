@@ -115,7 +115,6 @@ export default function QuestionsPage() {
       <NavBar activePage="questions" />
 
       <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
         <div className="flex items-start justify-between gap-5 mb-6 animate-fade-in-up">
           <div>
             <h1
@@ -130,7 +129,6 @@ export default function QuestionsPage() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <QuestionFilters
             search={search}
@@ -143,7 +141,6 @@ export default function QuestionsPage() {
           />
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="mt-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (

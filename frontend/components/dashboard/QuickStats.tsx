@@ -1,6 +1,5 @@
 'use client';
 
-/* ─── Mock data — replace with real API data ─── */
 // TODO: Replace with actual user stats from API
 const stats = [
     { label: 'Sessions', value: '12', sub: 'completed' },

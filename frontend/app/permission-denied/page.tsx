@@ -12,7 +12,6 @@ export default function PermissionDeniedPage() {
       <div className="px-10 py-12 grid place-items-center min-h-[calc(100vh-57px)]">
         <Card className="w-[520px] max-w-full border-destructive/30 bg-destructive/5 shadow-[0_12px_26px_rgba(201,74,74,0.12)]">
           <CardHeader>
-            {/* Icon */}
             <div className="w-[52px] h-[52px] rounded-2xl bg-destructive/10 border border-destructive/25 grid place-items-center mb-3">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" className="text-destructive">
                 <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />

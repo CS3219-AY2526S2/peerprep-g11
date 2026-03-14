@@ -60,7 +60,6 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                             className="group/row relative hover:bg-secondary/50 transition-all duration-200 border-border cursor-pointer animate-fade-in-up"
                             style={{ animationDelay: `${i * 50}ms` }}
                         >
-                            {/* Left accent bar — dashboard-style reveal on hover */}
                             <TableCell className="relative text-[12.5px] font-medium text-foreground">
                                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 rounded-full bg-accent transition-all duration-200 group-hover/row:h-6" />
                                 <span className="pl-2">{q.title}</span>

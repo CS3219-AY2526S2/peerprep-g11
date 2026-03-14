@@ -61,7 +61,6 @@ export default function QuestionDetailsPage() {
       <NavBar activePage="questions" />
 
       <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
         <div className="flex items-start justify-between gap-5 mb-6 animate-fade-in-up">
           <div>
             <h1
@@ -76,7 +75,6 @@ export default function QuestionDetailsPage() {
           </div>
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
             <div className="space-y-4">

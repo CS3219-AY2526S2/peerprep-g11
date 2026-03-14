@@ -9,14 +9,12 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuickStats } from '@/components/dashboard/QuickStats';
 
-/* ─── Mock activity data ─── */
 const activityItems = [
   { title: 'Matched with Priya', topic: 'Graphs', duration: '38 minutes', lang: 'Python', completed: true },
   { title: 'Matched with Ethan', topic: 'System Design', duration: '12 minutes', lang: 'Java', completed: false },
   { title: 'Matched with Amira', topic: 'Dynamic Programming', duration: '52 minutes', lang: 'Python', completed: true },
 ];
 
-/* ─── Action card data ─── */
 const actionCards = [
   {
     icon: (
@@ -124,7 +122,6 @@ export default function DashboardPage() {
                     transition-all duration-300 ease-out
                     overflow-hidden no-underline"
                 >
-                  {/* Shine sweep */}
                   <span className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
                   <span className="relative z-10">{action}</span>
                   <span className="relative z-10 w-6 h-6 rounded-full bg-white/20 grid place-items-center transition-all duration-200 group-hover/btn:bg-white/30 group-hover/btn:scale-110">
@@ -157,7 +154,6 @@ export default function DashboardPage() {
                     animate-fade-in-up"
                   style={{ animationDelay: `${350 + i * 60}ms` }}
                 >
-                  {/* Left accent bar — absolute so it doesn't affect layout */}
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 rounded-full bg-accent transition-all duration-200 group-hover/row:h-6" />
 
                   <div className="min-w-0 pl-2">

@@ -60,7 +60,6 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                     </Select>
                 </div>
 
-                {/* Difficulty */}
                 <div className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col gap-2">
                     <Label className="text-[11.5px] font-semibold text-muted-foreground">Difficulty</Label>
                     <RadioGroup
@@ -90,7 +89,6 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                     </RadioGroup>
                 </div>
 
-                {/* Language — inline: label left, select right */}
                 <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-4 transition-all duration-200 ease-out hover:border-ring/30 hover:shadow-md active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.05)] cursor-pointer">
                     <Label className="text-[11.5px] font-semibold text-muted-foreground whitespace-nowrap">
                         Programming Language
@@ -112,7 +110,6 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                     </Select>
                 </div>
 
-                {/* Actions */}
                 <div className="flex items-center gap-4 mt-2">
                     <Button
                         onClick={handleSubmit}

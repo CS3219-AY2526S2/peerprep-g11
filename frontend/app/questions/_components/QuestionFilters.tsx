@@ -32,14 +32,14 @@ export function QuestionFilters({
     onTopicChange,
     onDifficultyChange,
 }: QuestionFiltersProps) {
-    // Debounced search: local input state syncs to parent after 300ms
+    // Debounce parent updates so we don't refetch on every keystroke.
     const [localSearch, setLocalSearch] = useState(search);
     const [searchFocused, setSearchFocused] = useState(false);
     const [topicOpen, setTopicOpen] = useState(false);
     const [difficultyOpen, setDifficultyOpen] = useState(false);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Keep local state in sync if parent resets search externally
+    // Mirror external search resets back into the local input.
     useEffect(() => {
         setLocalSearch(search);
     }, [search]);
@@ -52,7 +52,7 @@ export function QuestionFilters({
         }, 300);
     };
 
-    // Cleanup timeout on unmount
+    // Clear any pending debounce before unmounting.
     useEffect(() => {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -61,7 +61,6 @@ export function QuestionFilters({
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-[2.4fr_1fr_1fr] gap-3">
-            {/* Search Input */}
             <div
                 className={`bg-card border rounded-xl px-3.5 py-3 flex items-center gap-2.5 shadow-[var(--shadow)]
                     transition-all duration-200 ease-out cursor-text
@@ -71,7 +70,6 @@ export function QuestionFilters({
                     }`}
                 onClick={() => document.getElementById('question-search')?.focus()}
             >
-                {/* Search Icon */}
                 <svg
                     viewBox="0 0 20 20"
                     width="16"
@@ -101,7 +99,6 @@ export function QuestionFilters({
                 />
             </div>
 
-            {/* Topic Filter */}
             <div className={`bg-card border rounded-xl px-3.5 py-1 flex items-center gap-2.5 shadow-[var(--shadow)] transition-all duration-200 ease-out active:scale-[0.98] cursor-pointer ${topicOpen
                     ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
                     : 'border-border hover:border-ring/30 hover:shadow-md'
@@ -124,7 +121,6 @@ export function QuestionFilters({
                 </Select>
             </div>
 
-            {/* Difficulty Filter */}
             <div className={`bg-card border rounded-xl px-3.5 py-1 flex items-center gap-2.5 shadow-[var(--shadow)] transition-all duration-200 ease-out active:scale-[0.98] cursor-pointer ${difficultyOpen
                     ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
                     : 'border-border hover:border-ring/30 hover:shadow-md'

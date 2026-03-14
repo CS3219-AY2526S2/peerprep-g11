@@ -22,7 +22,6 @@ function formatTime(totalSeconds: number): string {
 export function WaitingCard({ preferences, elapsedSeconds, onCancel, isCancelling }: WaitingCardProps) {
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
-            {/* Animated pulse ring */}
             <div className="relative flex items-center justify-center w-20 h-20">
                 <span className="absolute inset-0 rounded-full bg-accent/10 animate-ping" style={{ animationDuration: '2s' }} />
                 <span className="absolute inset-2 rounded-full bg-accent/5 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.3s' }} />
@@ -55,7 +54,6 @@ export function WaitingCard({ preferences, elapsedSeconds, onCancel, isCancellin
                 />
             </div>
 
-            {/* Timer */}
             <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" className="text-muted-foreground/70">
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />

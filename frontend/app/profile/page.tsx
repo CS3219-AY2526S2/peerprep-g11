@@ -132,7 +132,6 @@ export default function ProfilePage() {
                   </Alert>
                 )}
 
-                {/* Email (read-only) */}
                 <div className="grid gap-1.5">
                   <Label className="text-[12.5px] font-semibold">
                     Email
@@ -144,7 +143,6 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                {/* Username */}
                 <div className="grid gap-1.5">
                   <Label className="text-[12.5px] font-semibold">
                     Username
@@ -162,7 +160,6 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* New Password */}
                 <div className="grid gap-1.5">
                   <Label className="text-[12.5px] font-semibold">
                     New Password (optional)
@@ -190,7 +187,6 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* Confirm Password */}
                 {password.length > 0 && (
                   <div className="grid gap-1.5">
                     <Label className="text-[12.5px] font-semibold">

@@ -17,7 +17,6 @@ interface NavBarProps {
   activePage?: 'dashboard' | 'matching' | 'questions';
 }
 
-/* ─── Logo ─── */
 const PeerPrepLogo = () => (
   <svg viewBox="0 0 32 32" fill="none" className="w-[26px] h-[26px] text-foreground">
     <rect x="3" y="3" width="26" height="26" rx="6" stroke="currentColor" strokeWidth="2" />
@@ -26,16 +25,15 @@ const PeerPrepLogo = () => (
   </svg>
 );
 
-/* ─── Letter Avatar ─── */
 const AVATAR_PALETTE = [
-  'oklch(0.65 0.15 25)',   // warm coral
-  'oklch(0.60 0.14 145)',  // sage green
-  'oklch(0.55 0.12 250)',  // slate blue
-  'oklch(0.62 0.16 50)',   // amber
-  'oklch(0.58 0.13 310)',  // plum
-  'oklch(0.60 0.15 180)',  // teal
-  'oklch(0.55 0.14 280)',  // indigo
-  'oklch(0.63 0.12 100)',  // olive
+  'oklch(0.65 0.15 25)',
+  'oklch(0.60 0.14 145)',
+  'oklch(0.55 0.12 250)',
+  'oklch(0.62 0.16 50)',
+  'oklch(0.58 0.13 310)',
+  'oklch(0.60 0.15 180)',
+  'oklch(0.55 0.14 280)',
+  'oklch(0.63 0.12 100)',
 ];
 
 function hashUsername(name: string): number {
@@ -61,14 +59,12 @@ function LetterAvatar({ username }: { username: string }) {
   );
 }
 
-/* ─── Nav Links ─── */
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', key: 'dashboard' },
   { href: '/matching', label: 'Matching', key: 'matching' },
   { href: '/questions', label: 'Questions', key: 'questions' },
 ] as const;
 
-/* ─── NavBar ─── */
 export function NavBar({ activePage }: NavBarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -88,7 +84,6 @@ export function NavBar({ activePage }: NavBarProps) {
         shadow-[0_2px_20px_-4px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.03)]
         animate-nav-slide-down"
     >
-      {/* Brand */}
       <Link
         href="/dashboard"
         className="flex items-center gap-2.5 font-semibold text-foreground no-underline group"
@@ -99,7 +94,6 @@ export function NavBar({ activePage }: NavBarProps) {
         <span style={{ fontFamily: 'var(--font-serif)' }}>PeerPrep</span>
       </Link>
 
-      {/* Middle Nav Links — no background wrapper */}
       <div className="flex justify-center gap-1">
         {navLinks.map(({ href, label, key }) => {
           const isActive = activePage === key;
@@ -121,7 +115,6 @@ export function NavBar({ activePage }: NavBarProps) {
       </div>
 
       <div className="flex justify-end">
-        {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 text-[12.5px] text-foreground transition-opacity duration-200 hover:opacity-80 min-w-0 cursor-pointer outline-none focus:outline-none focus-visible:ring-0">
@@ -130,7 +123,6 @@ export function NavBar({ activePage }: NavBarProps) {
                   ADMIN
                 </span>
               )}
-              {/* Username — no pill background */}
               <span className="text-[12.5px] font-medium text-foreground truncate max-w-[120px]">
                 {user?.username ?? '…'}
               </span>
