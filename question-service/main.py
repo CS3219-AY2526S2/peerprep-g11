@@ -13,7 +13,7 @@ collection = db['questions']
 async def home():
     return "Peerprep Questions Service"
 
-@app.get('/questions/list')
+@app.get('/questions/all')
 async def get_all_questions():
     cursor = collection.find({})
     result = await cursor.to_list(length=100)
