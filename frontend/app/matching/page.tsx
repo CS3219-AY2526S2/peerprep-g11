@@ -26,7 +26,7 @@ export default function MatchingPage() {
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // ─── Cleanup timers ───
+    // Clear both intervals whenever matching ends or the page unmounts.
     const stopTimers = useCallback(() => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -125,7 +125,7 @@ export default function MatchingPage() {
         return (
             <div className="min-h-screen bg-background text-foreground">
                 <NavBar activePage="matching" />
-                <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
+                <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
                     <Skeleton className="h-6 w-52 mb-2" />
                     <Skeleton className="h-4 w-[420px] mb-1" />
                     <Skeleton className="h-4 w-[360px] mb-6" />
@@ -143,8 +143,7 @@ export default function MatchingPage() {
             <NavBar activePage="matching" />
 
             {state === 'preferences' && (
-                <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
-                    {/* Header */}
+                <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
                     <div className="mb-6">
                         <h1
                             className="text-[20px] font-bold text-foreground mb-2"
@@ -159,7 +158,6 @@ export default function MatchingPage() {
                         </p>
                     </div>
 
-                    {/* Two-column layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
                         <MatchingPreferencesForm
                             onSubmit={handleStartMatching}

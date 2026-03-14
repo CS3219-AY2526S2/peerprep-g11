@@ -15,7 +15,6 @@ interface MatchFoundCardProps {
 export function MatchFoundCard({ preferences, partnerName, matchId }: MatchFoundCardProps) {
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
-            {/* Animated success icon with expanding rings */}
             <div className="relative flex items-center justify-center w-20 h-20">
                 <span className="absolute inset-0 rounded-full bg-accent/10 animate-ping" style={{ animationDuration: '2.5s', animationIterationCount: '3' }} />
                 <div className="relative w-14 h-14 rounded-full bg-accent/15 border-2 border-accent/40 grid place-items-center">

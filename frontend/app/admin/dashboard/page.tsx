@@ -54,7 +54,7 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
-  
+
       if (res.ok) {
         setUsers((prev) => prev.filter((u) => u._id !== userId));
       } else {
@@ -90,8 +90,7 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-background text-foreground">
       <NavBar />
 
-      <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
+      <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1
@@ -114,7 +113,6 @@ export default function AdminDashboardPage() {
           </Badge>
         </div>
 
-        {/* Error state */}
         {fetchError && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription className="text-[12.5px]">
@@ -123,7 +121,6 @@ export default function AdminDashboardPage() {
           </Alert>
         )}
 
-        {/* Users table */}
         <Card className="border-border shadow-[var(--shadow)]">
           <CardHeader className="pb-3">
             <CardTitle
@@ -134,7 +131,7 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <AdminUserTable users={users} onDelete={deleteUser}/>
+            <AdminUserTable users={users} onDelete={deleteUser} />
           </CardContent>
         </Card>
       </div>

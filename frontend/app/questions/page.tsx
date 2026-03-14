@@ -111,12 +111,11 @@ export default function QuestionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <NavBar activePage="questions" />
 
-      <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-5 mb-6">
+      <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
+        <div className="flex items-start justify-between gap-5 mb-6 animate-fade-in-up">
           <div>
             <h1
               className="text-[20px] font-bold text-foreground mb-1.5"
@@ -130,18 +129,18 @@ export default function QuestionsPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <QuestionFilters
-          search={search}
-          topic={topic}
-          difficulty={difficulty}
-          topics={topics}
-          onSearchChange={handleSearchChange}
-          onTopicChange={handleTopicChange}
-          onDifficultyChange={handleDifficultyChange}
-        />
+        <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <QuestionFilters
+            search={search}
+            topic={topic}
+            difficulty={difficulty}
+            topics={topics}
+            onSearchChange={handleSearchChange}
+            onTopicChange={handleTopicChange}
+            onDifficultyChange={handleDifficultyChange}
+          />
+        </div>
 
-        {/* Content */}
         {loading ? (
           <div className="mt-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -153,13 +152,13 @@ export default function QuestionsPage() {
             <p className="text-[13px] text-destructive mb-3">{error}</p>
             <button
               onClick={fetchQuestions}
-              className="text-[12.5px] font-semibold text-accent hover:underline"
+              className="text-[12.5px] font-semibold text-accent hover:underline cursor-pointer transition-colors duration-150"
             >
               Retry
             </button>
           </div>
         ) : (
-          <>
+          <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
             <QuestionTable questions={questions} />
             <PaginationControls
               page={page}
@@ -168,7 +167,7 @@ export default function QuestionsPage() {
               pageSize={PAGE_SIZE}
               onPageChange={setPage}
             />
-          </>
+          </div>
         )}
       </div>
     </div>

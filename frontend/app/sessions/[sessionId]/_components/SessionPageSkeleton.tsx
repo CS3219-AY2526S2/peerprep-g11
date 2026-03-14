@@ -7,7 +7,7 @@ export function SessionPageSkeleton() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <NavBar />
-      <div className="mx-auto max-w-[1680px] px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
+      <div className="mx-auto max-w-[1680px] px-5 pt-20 py-6 sm:px-8 lg:px-10 lg:py-8">
         <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-2">
             <Skeleton className="h-8 w-56" />

@@ -1,25 +1,15 @@
-/**
- * Shared password validation rules and UI component.
- * Used by signup and profile pages to keep requirements consistent.
- */
-
+// Keep signup and profile password rules in one place.
 export const PASSWORD_MIN_LENGTH = 8;
 
-/** Returns true if the password satisfies the length requirement. */
 export const passwordLengthValid = (password: string): boolean =>
   password.length >= PASSWORD_MIN_LENGTH;
 
-/** Returns true if the password contains at least one uppercase letter. */
+// Returns true if the password contains at least one uppercase letter.
 export const passwordUppercaseValid = (password: string): boolean =>
   /[A-Z]/.test(password);
 
-/** Returns true if the password passes all requirements. */
 export const isPasswordValid = (password: string): boolean =>
   passwordLengthValid(password) && passwordUppercaseValid(password);
-
-// ---------------------------------------------------------------------------
-// UI component
-// ---------------------------------------------------------------------------
 
 interface CriterionRowProps {
   met: boolean;
@@ -29,9 +19,8 @@ interface CriterionRowProps {
 function CriterionRow({ met, label }: CriterionRowProps) {
   return (
     <span
-      className={`flex items-center gap-1.5 text-[11px] ${
-        met ? 'text-emerald-600' : 'text-muted-foreground'
-      }`}
+      className={`flex items-center gap-1.5 text-[11px] ${met ? 'text-emerald-600' : 'text-muted-foreground'
+        }`}
     >
       <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 shrink-0">
         {met ? (

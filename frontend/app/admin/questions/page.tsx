@@ -17,18 +17,20 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <NavBar />
+      <div className="pt-20 px-10 max-w-[1100px] mx-auto">
         <Card className="border-border shadow-[var(--shadow)]">
           <CardHeader className="pb-3">
             <CardTitle
               className="text-[15px] font-semibold"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-               Questions
+              Questions
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
           </CardContent>
         </Card>
+      </div>
     </div>
   );
 }

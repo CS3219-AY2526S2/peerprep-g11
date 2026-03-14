@@ -24,7 +24,7 @@ export function DifficultyBadge({ difficulty }: DifficultyBadgeProps) {
     return (
         <Badge
             variant="outline"
-            className={`rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${config.className}`}
+            className={`rounded-full text-[11px] font-semibold px-2.5 py-0.5 transition-all duration-150 hover:brightness-95 hover:shadow-sm ${config.className}`}
         >
             {difficulty}
         </Badge>

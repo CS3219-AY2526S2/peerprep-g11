@@ -50,19 +50,18 @@ export default function QuestionDetailsPage() {
         <div className="px-10 py-8 max-w-[1100px] mx-auto">
           <Skeleton className="h-8 w-48 mb-2" />
           <Skeleton className="h-4 w-72 mb-6" />
-          <Skeleton className="h-96 max-w-[920px]" />
+          <Skeleton className="h-96" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <NavBar activePage="questions" />
 
-      <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-5 mb-6">
+      <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
+        <div className="flex items-start justify-between gap-5 mb-6 animate-fade-in-up">
           <div>
             <h1
               className="text-[20px] font-bold text-foreground mb-1.5"
@@ -71,28 +70,40 @@ export default function QuestionDetailsPage() {
               Question Details
             </h1>
             <p className="text-[12.5px] text-muted-foreground">
-              Review the prompt, examples, and constraints before pairing up.
+              Review the question, examples, and constraints before pairing up.
             </p>
           </div>
         </div>
 
-        {/* Content */}
         {loading ? (
-          <div className="space-y-4 max-w-[920px]">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
+            <div className="space-y-4">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-48" />
+              <Skeleton className="h-36" />
+            </div>
           </div>
         ) : error ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 animate-fade-in-up">
             <p className="text-[13px] text-destructive mb-4">{error}</p>
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="rounded-lg transition-all duration-150 hover:bg-secondary active:scale-[0.97]"
+            >
               <Link href="/questions">Back to Questions</Link>
             </Button>
           </div>
         ) : question ? (
-          <QuestionCard question={question} />
+          <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            <QuestionCard question={question} />
+          </div>
         ) : null}
       </div>
     </div>
