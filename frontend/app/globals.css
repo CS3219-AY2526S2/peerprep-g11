@@ -51,6 +51,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -69,6 +70,8 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
   --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-fade-in-up: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-nav-slide-down: navSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes shimmer {
@@ -78,6 +81,30 @@
 
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navSlideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -94,8 +121,9 @@
   --secondary-foreground: oklch(0.2570 0.0105 242.1169);
   --muted: oklch(0.9666 0.0086 67.7242);
   --muted-foreground: oklch(0.5251 0.0100 84.5884);
-  --accent: oklch(0.4908 0.0547 180.4743);
+  --accent: oklch(0.50 0.08 180);
   --accent-foreground: oklch(1.0000 0 0);
+  --accent-soft: oklch(0.94 0.025 178);
   --destructive: oklch(0.5824 0.1620 22.7259);
   --destructive-foreground: oklch(1.0000 0 0);
   --border: oklch(0.9067 0.0144 74.4171);
@@ -150,8 +178,9 @@
   --secondary-foreground: oklch(0.2570 0.0105 242.1169);
   --muted: oklch(0.9666 0.0086 67.7242);
   --muted-foreground: oklch(0.5251 0.0100 84.5884);
-  --accent: oklch(0.4908 0.0547 180.4743);
+  --accent: oklch(0.50 0.08 180);
   --accent-foreground: oklch(1.0000 0 0);
+  --accent-soft: oklch(0.94 0.025 178);
   --destructive: oklch(0.5824 0.1620 22.7259);
   --destructive-foreground: oklch(1.0000 0 0);
   --border: oklch(0.9067 0.0144 74.4171);
