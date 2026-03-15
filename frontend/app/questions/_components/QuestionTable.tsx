@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import {
     Table,
@@ -20,7 +19,6 @@ interface QuestionTableProps {
 }
 
 export function QuestionTable({ questions }: QuestionTableProps) {
-    const router = useRouter();
 
     if (questions.length === 0) {
         return (
@@ -49,15 +47,14 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                         <TableHead className="text-[11.5px] uppercase tracking-wide text-muted-foreground font-semibold">
                             Status
                         </TableHead>
-                        <TableHead className="w-[80px]" />
+                        <TableHead className="w-[100px]" />
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {questions.map((q, i) => (
                         <TableRow
                             key={q.id}
-                            onClick={() => router.push(`/questions/${q.id}`)}
-                            className="group/row relative hover:bg-secondary/50 transition-all duration-200 border-border cursor-pointer animate-fade-in-up"
+                            className="group/row relative hover:bg-secondary/50 transition-all duration-200 border-border animate-fade-in-up"
                             style={{ animationDelay: `${i * 50}ms` }}
                         >
                             <TableCell className="relative text-[12.5px] font-medium text-foreground">
@@ -73,10 +70,10 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                             <TableCell>
                                 <StatusPill status={q.status} />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="w-[100px]">
                                 <Link
                                     href={`/questions/${q.id}`}
-                                    onClick={(e) => e.stopPropagation()}
+
                                     className="group/btn inline-flex items-center rounded-lg text-[11.5px] font-semibold h-auto py-1.5 px-3
                                         border border-border bg-card text-foreground
                                         transition-all duration-200 ease-out no-underline

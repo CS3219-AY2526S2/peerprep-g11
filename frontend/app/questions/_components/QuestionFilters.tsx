@@ -100,14 +100,14 @@ export function QuestionFilters({
             </div>
 
             <div className={`bg-card border rounded-xl px-3.5 py-1 flex items-center gap-2.5 shadow-[var(--shadow)] transition-all duration-200 ease-out active:scale-[0.98] cursor-pointer ${topicOpen
-                    ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
-                    : 'border-border hover:border-ring/30 hover:shadow-md'
+                ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
+                : 'border-border hover:border-ring/30 hover:shadow-md'
                 }`}>
                 <label className="text-[11.5px] font-semibold text-muted-foreground whitespace-nowrap">
                     Topic
                 </label>
                 <Select value={topic} onValueChange={onTopicChange} onOpenChange={setTopicOpen}>
-                    <SelectTrigger className="border-none shadow-none focus:ring-0 text-[12.5px] h-auto p-0 bg-transparent flex-1 [&>svg]:transition-transform [&>svg]:duration-200 [&[data-state=open]>svg]:rotate-180">
+                    <SelectTrigger className="border-none shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-transparent text-[12.5px] h-auto p-0 bg-transparent flex-1 [&>svg]:transition-transform [&>svg]:duration-200 [&[data-state=open]>svg]:rotate-180">
                         <SelectValue placeholder="All Topics" />
                     </SelectTrigger>
                     <SelectContent className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200">
@@ -122,14 +122,14 @@ export function QuestionFilters({
             </div>
 
             <div className={`bg-card border rounded-xl px-3.5 py-1 flex items-center gap-2.5 shadow-[var(--shadow)] transition-all duration-200 ease-out active:scale-[0.98] cursor-pointer ${difficultyOpen
-                    ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
-                    : 'border-border hover:border-ring/30 hover:shadow-md'
+                ? 'border-accent/40 ring-2 ring-accent/10 shadow-md'
+                : 'border-border hover:border-ring/30 hover:shadow-md'
                 }`}>
                 <label className="text-[11.5px] font-semibold text-muted-foreground whitespace-nowrap">
                     Difficulty
                 </label>
                 <Select value={difficulty} onValueChange={onDifficultyChange} onOpenChange={setDifficultyOpen}>
-                    <SelectTrigger className="border-none shadow-none focus:ring-0 text-[12.5px] h-auto p-0 bg-transparent flex-1 [&>svg]:transition-transform [&>svg]:duration-200 [&[data-state=open]>svg]:rotate-180">
+                    <SelectTrigger className="border-none shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-transparent text-[12.5px] h-auto p-0 bg-transparent flex-1 [&>svg]:transition-transform [&>svg]:duration-200 [&[data-state=open]>svg]:rotate-180">
                         <SelectValue placeholder="All Levels" />
                     </SelectTrigger>
                     <SelectContent className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200">

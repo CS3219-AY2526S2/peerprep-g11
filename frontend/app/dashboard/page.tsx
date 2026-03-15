@@ -118,7 +118,7 @@ export default function DashboardPage() {
                     bg-accent text-white text-[12.5px] font-medium
                     shadow-[0_2px_12px_-3px_oklch(0.50_0.08_180_/_0.4)]
                     hover:shadow-[0_4px_20px_-4px_oklch(0.50_0.08_180_/_0.5)]
-                    hover:brightness-110
+                    hover:brightness-110 hover:scale-[1.01]
                     transition-all duration-300 ease-out
                     overflow-hidden no-underline"
                 >
