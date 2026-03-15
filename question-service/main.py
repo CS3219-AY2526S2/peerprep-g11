@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pymongo import AsyncMongoClient, ReturnDocument
+from pymongo.errors import PyMongoError
 from schema import QuestionSchema, DeleteSchema
 
 load_dotenv()
@@ -17,8 +18,11 @@ async def home():
 
 @app.get('/questions/all')
 async def get_all_questions():
-    cursor = collection.find({})
-    results = await cursor.to_list(length=100)
+    try:
+        cursor = collection.find({})
+        results = await cursor.to_list(length=100)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
     for r in results:
         r['_id'] = str(r['_id'])
@@ -27,8 +31,14 @@ async def get_all_questions():
 @app.get('/questions/{question_title}')
 async def get_question(question_title: str):
     filter = {'title': question_title}
-    question = await collection.find_one(filter)
+    try:
+        question = await collection.find_one(filter)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
+    if not question:
+        raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
+
     question['_id'] = str(question['_id'])
     return question
 
@@ -46,9 +56,12 @@ async def add_question(question: QuestionSchema):
         '$setOnInsert': {'created_at': now, 'title': title}
     }
 
-    result = await collection.find_one_and_update(filter, update, upsert=True, return_document=ReturnDocument.AFTER)
-    is_inserted = result['created_at'] == now
+    try:
+        result = await collection.find_one_and_update(filter, update, upsert=True, return_document=ReturnDocument.AFTER)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
+    is_inserted = result['created_at'] == now
     if is_inserted:
         return {'message': "Question added.", 'title': title}
     
@@ -57,5 +70,13 @@ async def add_question(question: QuestionSchema):
 @app.delete('/questions/delete')
 async def delete_question(question: DeleteSchema):
     filter = {'title': question.title}
-    result = await collection.delete_one(filter)
+
+    try:
+        result = await collection.delete_one(filter)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
+    
     return {'message': "Deleted", 'title': question.title}
