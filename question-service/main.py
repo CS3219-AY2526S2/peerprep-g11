@@ -33,6 +33,6 @@ async def add_question(question: QuestionSchema):
 
 @app.delete('/questions/delete')
 async def delete_question(question: DeleteSchema):
-    filter = {'_id': question.id}
+    filter = {'title': question.title}
     result = await collection.delete_one(filter)
-    return {'message': "Deleted", 'id': question.id}
+    return {'message': "Deleted", 'title': question.title}
