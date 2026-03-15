@@ -8,7 +8,11 @@ from schema import QuestionSchema, DeleteSchema
 
 load_dotenv()
 app = FastAPI()
-client = AsyncMongoClient(os.getenv("MONGODB_URI", "mongodb://localhost:27017"))
+
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+PORT = int(os.getenv("PORT", "8000"))
+
+client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
 
@@ -100,3 +104,7 @@ async def delete_question(question: DeleteSchema):
         raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
     
     return {'message': "Deleted", 'title': question.title}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=PORT)
