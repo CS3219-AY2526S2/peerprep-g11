@@ -18,13 +18,18 @@ async def home():
 @app.get('/questions/all')
 async def get_all_questions():
     cursor = collection.find({})
-    result = await cursor.to_list(length=100)
-    return result
+    results = await cursor.to_list(length=100)
+
+    for r in results:
+        r['_id'] = str(r['_id'])
+    return results
 
 @app.get('/questions/{question_title}')
 async def get_question(question_title: str):
     filter = {'title': question_title}
     question = await collection.find_one(filter)
+    
+    question['_id'] = str(question['_id'])
     return question
 
 @app.post('/questions/upsert', status_code=201)
