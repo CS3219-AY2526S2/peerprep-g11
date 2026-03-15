@@ -6,7 +6,7 @@ class QuestionSchema(BaseModel):
     topics: list[str]
     description: str
     examples: list[dict]
-    constraint: list[str]
+    constraints: list[str]
 
     @field_validator('difficulty', mode='before')
     @classmethod
@@ -18,7 +18,7 @@ class QuestionSchema(BaseModel):
     
     @field_validator('topics', mode='before')
     @classmethod
-    def validate_difficulty(cls, topics):
+    def validate_topics(cls, topics):
         if len(topics) < 1:
             raise ValueError('Need at least one topic')
         
@@ -26,7 +26,7 @@ class QuestionSchema(BaseModel):
     
     @field_validator('examples', mode='before')
     @classmethod
-    def validate_difficulty(cls, examples):
+    def validate_examples(cls, examples):
         if not examples:
             raise ValueError('Need at least one topic')
         
@@ -36,9 +36,9 @@ class QuestionSchema(BaseModel):
             
         return examples
     
-    @field_validator('constraint', mode='before')
+    @field_validator('constraints', mode='before')
     @classmethod
-    def validate_difficulty(cls, constraints):
+    def validate_constraints(cls, constraints):
         if not constraints:
             raise ValueError('Need at least one constraint')
         

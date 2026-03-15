@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from pymongo import AsyncMongoClient
+from schema import QuestionSchema
 
 load_dotenv()
 app = FastAPI()
@@ -24,3 +25,8 @@ async def get_question(question_id: int):
     query = {'_id': question_id}
     question = await collection.find_one(query)
     return question
+
+@app.post('/questions/add', status_code=201)
+async def add_question(question: QuestionSchema):
+    result = await collection.insert_one(question.model_dump())
+    return {"acknowledged": result.acknowledged}
