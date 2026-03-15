@@ -20,10 +20,10 @@ async def get_all_questions():
     result = await cursor.to_list(length=100)
     return result
 
-@app.get('/questions/{question_id}')
-async def get_question(question_id: int):
-    query = {'_id': question_id}
-    question = await collection.find_one(query)
+@app.get('/questions/{question_title}')
+async def get_question(question_title: str):
+    filter = {'title': question_title}
+    question = await collection.find_one(filter)
     return question
 
 @app.post('/questions/add', status_code=201)
