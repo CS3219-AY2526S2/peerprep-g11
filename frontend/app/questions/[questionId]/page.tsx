@@ -76,17 +76,27 @@ export default function QuestionDetailsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
-            <div className="space-y-4">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-8 w-64" />
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-24 w-full" />
+          <div className="border border-border rounded-xl p-6 md:p-8 space-y-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-5 w-24 rounded-full" />
             </div>
-            <div className="space-y-4">
-              <Skeleton className="h-48" />
-              <Skeleton className="h-36" />
+            <Skeleton className="h-7 w-72" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
             </div>
+            <div className="space-y-2 pt-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3.5 w-60" />
+              <Skeleton className="h-3.5 w-48" />
+            </div>
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-9 w-40 rounded-lg" />
           </div>
         ) : error ? (
           <div className="text-center py-12 animate-fade-in-up">
