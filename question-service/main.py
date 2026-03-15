@@ -14,10 +14,16 @@ collection = db['questions']
 
 @app.get('/')
 async def home():
+    '''
+    The root page of the service.
+    '''
     return "Peerprep Questions Service"
 
 @app.get('/questions/all')
 async def get_all_questions():
+    '''
+    Retrieves all questions in the database.
+    '''
     try:
         cursor = collection.find({})
         results = await cursor.to_list(length=100)
@@ -30,6 +36,10 @@ async def get_all_questions():
 
 @app.get('/questions/{question_title}')
 async def get_question(question_title: str):
+    '''
+    Retrieves a question by exact title.
+    Returns 404 if the question is not found.
+    '''
     filter = {'title': question_title}
     try:
         question = await collection.find_one(filter)
@@ -44,6 +54,12 @@ async def get_question(question_title: str):
 
 @app.post('/questions/upsert', status_code=201)
 async def add_question(question: QuestionSchema):
+    '''
+    Upsert (update/insert) a question to the database.
+
+    - If no document with exact title exists, inserts a new one.
+    - If matching title is found, updates the content and updated_at.
+    '''
     data = question.model_dump()
     title = data['title']
     now = datetime.now(timezone.utc).isoformat()
@@ -69,6 +85,10 @@ async def add_question(question: QuestionSchema):
 
 @app.delete('/questions/delete')
 async def delete_question(question: DeleteSchema):
+    '''
+    Deletes a question by its exact title.
+    Returns 404 if the question is not found.
+    '''
     filter = {'title': question.title}
 
     try:
