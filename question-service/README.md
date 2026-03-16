@@ -13,17 +13,11 @@ Handles CRUD operations on PeerPrep question repository. Built with FastAPI and 
 # Copy the environment variable and fill in the values
 cp .env.example .env
 
-# Create a python virtual environment
-python3 -m venv .venv
+# Build the docker image
+docker build -t question-service .
 
-# Activate the virtual environment
-source .venv/Scripts/activate
-
-# Install all dependencies
-pip install -r requirements.txt
-
-# Start the service
-python3 main.py
+# Run the built image
+docker run -p 8000:8000 question-service
 ```
 
 ## Environment Variables
