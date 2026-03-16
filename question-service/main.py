@@ -73,7 +73,7 @@ async def add_question(question: QuestionSchema):
     set_fields['updated_at'] = now
     update = {
         '$set': set_fields,
-        '$setOnInsert': {'created_at': now, 'title': title}
+        '$setOnInsert': {'created_at': now, 'title': title, 'status': "Pending"}
     }
 
     try:
@@ -104,6 +104,15 @@ async def delete_question(question: DeleteSchema):
         raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
     
     return {'message': "Deleted", 'title': question.title}
+
+@app.get('/health')
+async def health_check():
+    try:
+        await client.admin.command("ping")
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    return {'status': "ok"}
 
 if __name__ == "__main__":
     import uvicorn
