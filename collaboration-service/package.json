@@ -1,0 +1,18 @@
+{
+  "name": "collaboration-service",
+  "version": "1.0.0",
+  "description": "collaboration service that provides REST API endpoints",
+  "license": "ISC",
+  "author": "Park Junha",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "dependencies": {
+    "@teamwork/websocket-json-stream": "^2.0.0",
+    "express": "^5.2.1",
+    "sharedb": "^5.2.2",
+    "ws": "^8.19.0"
+  }
+}

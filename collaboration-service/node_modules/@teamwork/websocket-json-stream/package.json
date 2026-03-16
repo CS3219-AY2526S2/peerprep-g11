@@ -1,0 +1,30 @@
+{
+  "name": "@teamwork/websocket-json-stream",
+  "version": "2.0.0",
+  "description": "Expose WebSockets with JSON as an object stream.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha",
+    "test:watch": "mocha -w",
+    "test:cover": "istanbul cover -x destroy.js _mocha",
+    "eslint": "eslint index.js test/"
+  },
+  "keywords": [
+    "stream",
+    "websocket"
+  ],
+  "author": "Greg Kubisa <gkubisa@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/teamwork/websocket-json-stream.git"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "coveralls": "^3.0.2",
+    "eslint": "^4.19.1",
+    "istanbul": "^0.4.5",
+    "mocha": "^5.2.0",
+    "ws": "^6.1.0"
+  }
+}
