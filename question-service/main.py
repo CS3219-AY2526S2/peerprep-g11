@@ -1,4 +1,5 @@
 import os
+from bson import ObjectId
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -38,20 +39,20 @@ async def get_all_questions():
         r['_id'] = str(r['_id'])
     return results
 
-@app.get('/questions/{question_title}')
-async def get_question(question_title: str):
+@app.get('/questions/{question_id}')
+async def get_question(question_id: str):
     '''
     Retrieves a question by exact title.
     Returns 404 if the question is not found.
     '''
-    filter = {'title': question_title}
+    filter = {'_id': ObjectId(question_id)}
     try:
         question = await collection.find_one(filter)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     if not question:
-        raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
+        raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
 
     question['_id'] = str(question['_id'])
     return question
