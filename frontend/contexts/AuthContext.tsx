@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch the current user from /api/users/me (which reads the HttpOnly cookie server-side)
+  // Load the current user from the cookie-backed session.
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/users/me', {
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Hydrate on mount
+  // Load auth state once on mount.
   useEffect(() => {
     refresh();
   }, [refresh]);

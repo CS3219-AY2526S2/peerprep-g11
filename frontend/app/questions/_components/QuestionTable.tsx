@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
     Table,
     TableBody,
@@ -20,6 +19,7 @@ interface QuestionTableProps {
 }
 
 export function QuestionTable({ questions }: QuestionTableProps) {
+
     if (questions.length === 0) {
         return (
             <Card className="border-border shadow-[var(--shadow)] mt-6 p-8 text-center">
@@ -47,14 +47,19 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                         <TableHead className="text-[11.5px] uppercase tracking-wide text-muted-foreground font-semibold">
                             Status
                         </TableHead>
-                        <TableHead className="w-[80px]" />
+                        <TableHead className="w-[100px]" />
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {questions.map((q) => (
-                        <TableRow key={q.id} className="hover:bg-secondary/50 transition-colors border-border">
-                            <TableCell className="text-[12.5px] font-medium text-foreground">
-                                {q.title}
+                    {questions.map((q, i) => (
+                        <TableRow
+                            key={q.id}
+                            className="group/row relative hover:bg-secondary/50 transition-all duration-200 border-border animate-fade-in-up"
+                            style={{ animationDelay: `${i * 50}ms` }}
+                        >
+                            <TableCell className="relative text-[12.5px] font-medium text-foreground">
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 rounded-full bg-accent transition-all duration-200 group-hover/row:h-6" />
+                                <span className="pl-2">{q.title}</span>
                             </TableCell>
                             <TableCell className="text-[12.5px] text-muted-foreground">
                                 {q.topics.join(', ')}
@@ -65,15 +70,29 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                             <TableCell>
                                 <StatusPill status={q.status} />
                             </TableCell>
-                            <TableCell>
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg text-[11.5px] font-semibold h-auto py-1.5 px-3 border-border hover:bg-secondary hover:text-foreground"
+                            <TableCell className="w-[100px]">
+                                <Link
+                                    href={`/questions/${q.id}`}
+
+                                    className="group/btn inline-flex items-center rounded-lg text-[11.5px] font-semibold h-auto py-1.5 px-3
+                                        border border-border bg-card text-foreground
+                                        transition-all duration-200 ease-out no-underline
+                                        hover:bg-accent hover:text-white hover:border-accent hover:scale-105 hover:shadow-md
+                                        active:scale-95 active:shadow-sm"
                                 >
-                                    <Link href={`/questions/${q.id}`}>View</Link>
-                                </Button>
+                                    View
+                                    <span className="inline-flex w-0 overflow-hidden transition-all duration-200 group-hover/btn:w-4 group-hover/btn:ml-1">
+                                        <svg
+                                            viewBox="0 0 16 16"
+                                            width="12"
+                                            height="12"
+                                            fill="none"
+                                            className="shrink-0 opacity-0 transition-opacity duration-200 group-hover/btn:opacity-100"
+                                        >
+                                            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </span>
+                                </Link>
                             </TableCell>
                         </TableRow>
                     ))}

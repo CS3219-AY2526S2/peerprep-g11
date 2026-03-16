@@ -1,7 +1,3 @@
-/**
- * Type definitions for the Questions feature.
- */
-
 import type { Difficulty } from '@/lib/types';
 
 export type QuestionStatus = 'Completed' | 'In Review' | 'Pending';

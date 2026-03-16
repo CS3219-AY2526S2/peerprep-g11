@@ -103,7 +103,6 @@ export default function CreateAccountPage() {
                 </Alert>
               )}
 
-              {/* Username */}
               <div className="grid gap-1.5">
                 <Label htmlFor="username" className="text-[12.5px] font-semibold">Username</Label>
                 <Input
@@ -120,7 +119,6 @@ export default function CreateAccountPage() {
                 )}
               </div>
 
-              {/* Email */}
               <div className="grid gap-1.5">
                 <Label htmlFor="email" className="text-[12.5px] font-semibold">Email</Label>
                 <Input
@@ -137,7 +135,6 @@ export default function CreateAccountPage() {
                 )}
               </div>
 
-              {/* Password */}
               <div className="grid gap-1.5">
                 <Label htmlFor="password" className="text-[12.5px] font-semibold">Password</Label>
                 <Input
@@ -157,7 +154,6 @@ export default function CreateAccountPage() {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div className="grid gap-1.5">
                 <Label htmlFor="confirmPassword" className="text-[12.5px] font-semibold">Confirm Password</Label>
                 <Input

@@ -1,7 +1,3 @@
-/**
- * Type definitions for the Matching feature.
- */
-
 import type { Difficulty } from '@/lib/types';
 import type { ProgrammingLanguage } from '@/lib/programming-languages';
 
@@ -17,9 +13,10 @@ export interface MatchRequest {
     requestId: string;
     status: MatchRequestStatus;
     preferences: MatchingPreferences;
-    matchId?: string; // present when status === 'matched'
-    partnerName?: string; // present when status === 'matched'
+    // These fields are only available after a match is found.
+    matchId?: string;
+    partnerName?: string;
 }
 
-/** Maximum time (seconds) before a match request times out */
+// Backend timeout window, in seconds.
 export const MATCH_TIMEOUT_SECONDS = 120;
