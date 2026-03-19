@@ -25,7 +25,6 @@ interface AdminUserTableProps {
 }
 
 export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
-  // ✅ Sort: admins first, then by newest
   const sortedUsers = [...users].sort((a, b) => {
     if (a.role !== b.role) {
       return a.role === 'admin' ? -1 : 1;

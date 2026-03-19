@@ -77,8 +77,6 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         setAdminRequests(data);
       }
-    } catch {
-      // silently fail — requests section is secondary
     } finally {
       setRequestsLoading(false);
     }
