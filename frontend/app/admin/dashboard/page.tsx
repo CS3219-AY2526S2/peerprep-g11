@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AdminUserTable } from './AdminUserTable';
+import { AdminRequestsTable, AdminRequestItem } from './AdminRequestsTable';
 import { NavBar } from '@/components/ui/navBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,8 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [fetchError, setFetchError] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [adminRequests, setAdminRequests] = useState<AdminRequestItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
 
   const getAllUsers = async () => {
 
@@ -67,6 +70,43 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchAdminRequests = async () => {
+    try {
+      const res = await fetch('/api/users/admin-requests');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminRequests(data);
+      }
+    } catch {
+      // silently fail — requests section is secondary
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleRequestAction = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch(`/api/users/admin-requests/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (res.ok) {
+        setAdminRequests((prev) => prev.filter((r) => r._id !== id));
+        if (status === 'approved') {
+          // Refresh user list to reflect role change
+          getAllUsers().then(setUsers).catch(() => {});
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to process request');
+      }
+    } catch {
+      alert('A network error occurred.');
+    }
+  };
+
   useEffect(() => {
     // Don't fetch until auth is resolved
     if (isLoading || !user) return;
@@ -75,6 +115,8 @@ export default function AdminDashboardPage() {
       .then(setUsers)
       .catch(() => setFetchError(true))
       .finally(() => setUsersLoading(false));
+
+    fetchAdminRequests();
   }, [isLoading, user]);
 
   if (isLoading || !user) {
@@ -119,6 +161,30 @@ export default function AdminDashboardPage() {
               Failed to load users. The user service may be unavailable.
             </AlertDescription>
           </Alert>
+        )}
+
+        {adminRequests.length > 0 && (
+          <Card className="border-border shadow-[var(--shadow)] mb-6">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle
+                  className="text-[15px] font-semibold"
+                  style={{ fontFamily: 'var(--font-serif)' }}
+                >
+                  Admin Requests
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className="text-[11px] rounded-full px-2.5 font-medium text-accent bg-accent-soft border-accent/20"
+                >
+                  {adminRequests.length} pending
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminRequestsTable requests={adminRequests} onAction={handleRequestAction} />
+            </CardContent>
+          </Card>
         )}
 
         <Card className="border-border shadow-[var(--shadow)]">
