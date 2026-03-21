@@ -139,6 +139,9 @@ export function NavBar({ activePage }: NavBarProps) {
             <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
               <Link href="/profile">Profile</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
+              <Link href="/faq">FAQ</Link>
+            </DropdownMenuItem>
             {user?.role === 'admin' && (
               <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
                 <Link href="/admin/dashboard">Admin</Link>
