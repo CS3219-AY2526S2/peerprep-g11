@@ -1,7 +1,24 @@
-import { ClipboardList, Code, Languages, Users, LogOut } from 'lucide-react';
+import {
+  ClipboardList,
+  Code,
+  Languages,
+  Sparkles,
+  PanelLeft,
+  Users,
+  LogOut,
+} from 'lucide-react';
 import type { Tour } from 'nextstepjs';
 
 export const SESSION_TOUR_ID = 'sessions';
+export const SESSION_TOUR_STEP_INDEX = {
+  QUESTION: 0,
+  SHARED_EDITOR: 1,
+  LANGUAGE_SELECTOR: 2,
+  EXPLAIN_DEMO: 3,
+  AI_SIDEBAR: 4,
+  PARTICIPANTS: 5,
+  LEAVE_SESSION: 6,
+} as const;
 
 export const sessionTourSteps: Tour[] = [
   {
@@ -38,6 +55,31 @@ export const sessionTourSteps: Tour[] = [
           'Switch between programming languages here. The editor will update its syntax highlighting to match the language you choose.',
         selector: '[data-nextstep="language-selector"]',
         side: 'bottom',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <Sparkles size={15} />,
+        title: 'Explain Selected Code',
+        content:
+          'The walkthrough highlights the starter code for you here. When you select code in the shared editor, the Explain action appears so you can ask AI to break it down.',
+        selector: '[data-nextstep="editor-panel"]',
+        side: 'left',
+        showControls: true,
+        showSkip: false,
+        disableInteraction: true,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <PanelLeft size={15} />,
+        title: 'AI Assistant Sidebar',
+        content:
+          'The AI sidebar opens on Hints first. Click the Explain tab yourself to see where code explanations appear and unlock the next step.',
+        selector: '[data-nextstep="ai-sidebar-tabs"]',
+        side: 'bottom-right',
         showControls: true,
         showSkip: false,
         pointerPadding: 8,

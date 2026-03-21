@@ -5,8 +5,6 @@ Minimal Express + TypeScript bootstrap for the PeerPrep AI assistant service.
 This service currently keeps the shared backend infrastructure from `user-service`:
 - JWT authentication middleware
 - admin guard middleware
-- audit logging middleware
-- MongoDB connection setup
 - Jest test setup
 - Docker packaging
 
@@ -19,7 +17,6 @@ For now, the API surface is intentionally small while future AI assistant routes
 ## Prerequisites
 
 - Node.js 20+
-- A MongoDB instance
 
 ## Getting Started
 
@@ -33,7 +30,6 @@ npm run dev
 
 | Variable | Required | Description | Default |
 | --- | --- | --- | --- |
-| `MONGODB_URI` | Yes | MongoDB connection string | - |
 | `JWT_SECRET` | Yes | Secret used to verify JWTs | - |
 | `JWT_EXPIRES_IN` | No | Reserved for future token-related consistency | `1d` |
 | `FRONTEND_ORIGIN` | No | Allowed CORS origin | `http://localhost:3000` |

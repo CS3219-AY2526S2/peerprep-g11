@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import assistantRoutes from './routes/assistant.routes';
-import { globalAuditLogger } from './middleware/auditLogger';
 import { authenticate } from './middleware/authenticate';
 
 const app = express();
@@ -21,7 +20,6 @@ app.get('/health', (_req, res) => {
 });
 
 app.use(authenticate);
-app.use(globalAuditLogger);
 app.use('/assistant', assistantRoutes);
 
 export default app;

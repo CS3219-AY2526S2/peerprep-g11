@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import type { CardComponentProps } from 'nextstepjs';
 import { NextStepProvider, NextStep, useNextStep } from 'nextstepjs';
 import { useTourPreference } from '@/hooks/useTourPreference';
 import { sessionTourSteps, SESSION_TOUR_ID } from './sessionTourSteps';
@@ -45,26 +46,66 @@ function TourAutoStarter({ isSkipped }: { isSkipped: boolean }) {
 
 interface SessionOnboardingTourProps {
   children: React.ReactNode;
+  onStepChange?: (stepIndex: number | null) => void;
+  isNextDisabled?: boolean;
+  nextDisabledMessage?: string | null;
 }
 
-export function SessionOnboardingTour({ children }: SessionOnboardingTourProps) {
+export function SessionOnboardingTour({
+  children,
+  onStepChange,
+  isNextDisabled = false,
+  nextDisabledMessage = null,
+}: SessionOnboardingTourProps) {
   const { isSkipped, skip } = useTourPreference(SESSION_TOUR_ID);
+  const WrappedTourCard = useCallback(
+    (props: CardComponentProps) => (
+      <TourCard
+        {...props}
+        isNextDisabled={isNextDisabled}
+        nextDisabledMessage={nextDisabledMessage}
+      />
+    ),
+    [isNextDisabled, nextDisabledMessage]
+  );
+  const handleTourStart = useCallback(
+    (tourName: string | null) => {
+      if (tourName === SESSION_TOUR_ID) {
+        onStepChange?.(0);
+      }
+    },
+    [onStepChange]
+  );
+  const handleTourStepChange = useCallback(
+    (step: number, tourName: string | null) => {
+      if (tourName === SESSION_TOUR_ID) {
+        onStepChange?.(step);
+      }
+    },
+    [onStepChange]
+  );
+  const handleTourComplete = useCallback(() => {
+    onStepChange?.(null);
+    skip();
+  }, [onStepChange, skip]);
+  const handleTourSkip = useCallback(() => {
+    onStepChange?.(null);
+    skip();
+  }, [onStepChange, skip]);
 
   return (
     <NextStepProvider>
       <NextStep
         steps={sessionTourSteps}
-        cardComponent={TourCard}
+        cardComponent={WrappedTourCard}
         shadowRgb="0, 0, 0"
         shadowOpacity="0.35"
         displayArrow
         scrollToTop={false}
-        onComplete={() => {
-          skip();
-        }}
-        onSkip={() => {
-          skip();
-        }}
+        onStart={handleTourStart}
+        onStepChange={handleTourStepChange}
+        onComplete={handleTourComplete}
+        onSkip={handleTourSkip}
       >
         <TourAutoStarter isSkipped={isSkipped} />
         {children}

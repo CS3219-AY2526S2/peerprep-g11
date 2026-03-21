@@ -11,9 +11,11 @@ import { EditorPanel } from '@/app/sessions/[sessionId]/_components/EditorPanel'
 import { SessionOnboardingTour } from '@/app/sessions/[sessionId]/_components/SessionOnboardingTour';
 import { AiSidebar } from '@/app/sessions/[sessionId]/_components/AiSidebar';
 import { AiSidebarToggle } from '@/app/sessions/[sessionId]/_components/AiSidebarToggle';
+import { SESSION_TOUR_STEP_INDEX } from '@/app/sessions/[sessionId]/_components/sessionTourSteps';
 import { useSessionAi } from '@/app/sessions/[sessionId]/useSessionAi';
 import type { Question } from '@/app/questions/types';
 import type {
+  AiTab,
   LeaveSessionResponse,
   SessionDetails,
   SessionLanguage,
@@ -24,6 +26,26 @@ const EMPTY_DRAFTS: Record<SessionLanguage, string> = {
   python: '',
   java: '',
 };
+
+interface SessionWalkthroughState {
+  activeStepIndex: number | null;
+  isEditorExplainDemoActive: boolean;
+  isAiSidebarForcedOpen: boolean;
+  forcedAiTab: AiTab | null;
+  stepFiveVisitedTabs: AiTab[];
+  canAdvanceFromStepFive: boolean;
+}
+
+function createInitialWalkthroughState(): SessionWalkthroughState {
+  return {
+    activeStepIndex: null,
+    isEditorExplainDemoActive: false,
+    isAiSidebarForcedOpen: false,
+    forcedAiTab: null,
+    stepFiveVisitedTabs: [],
+    canAdvanceFromStepFive: false,
+  };
+}
 
 function applyCurrentUserToSession(session: SessionDetails, username: string) {
   return {
@@ -54,6 +76,8 @@ export default function SessionPage() {
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [walkthroughState, setWalkthroughState] =
+    useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
   const loadSessionPage = useCallback(async (sessionId: string) => {
     setLoadingSession(true);
@@ -155,6 +179,69 @@ export default function SessionPage() {
     });
   }
 
+  const handleTourStepChange = useCallback((stepIndex: number | null) => {
+    setWalkthroughState((current) => {
+      if (stepIndex === null) {
+        return createInitialWalkthroughState();
+      }
+
+      if (stepIndex === SESSION_TOUR_STEP_INDEX.EXPLAIN_DEMO) {
+        return {
+          activeStepIndex: stepIndex,
+          isEditorExplainDemoActive: true,
+          isAiSidebarForcedOpen: false,
+          forcedAiTab: null,
+          stepFiveVisitedTabs: [],
+          canAdvanceFromStepFive: false,
+        };
+      }
+
+      if (stepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
+        const stayingOnSidebarStep =
+          current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
+
+        return {
+          activeStepIndex: stepIndex,
+          isEditorExplainDemoActive: false,
+          isAiSidebarForcedOpen: true,
+          forcedAiTab: stayingOnSidebarStep ? current.forcedAiTab : 'hints',
+          stepFiveVisitedTabs: stayingOnSidebarStep ? current.stepFiveVisitedTabs : [],
+          canAdvanceFromStepFive: stayingOnSidebarStep
+            ? current.canAdvanceFromStepFive
+            : false,
+        };
+      }
+
+      return {
+        activeStepIndex: stepIndex,
+        isEditorExplainDemoActive: false,
+        isAiSidebarForcedOpen: false,
+        forcedAiTab: null,
+        stepFiveVisitedTabs: [],
+        canAdvanceFromStepFive: false,
+      };
+    });
+  }, []);
+
+  const handleWalkthroughTabClick = useCallback((tab: AiTab) => {
+    setWalkthroughState((current) => {
+      if (current.activeStepIndex !== SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
+        return current;
+      }
+
+      const nextVisitedTabs = current.stepFiveVisitedTabs.includes(tab)
+        ? current.stepFiveVisitedTabs
+        : [...current.stepFiveVisitedTabs, tab];
+
+      return {
+        ...current,
+        forcedAiTab: null,
+        stepFiveVisitedTabs: nextVisitedTabs,
+        canAdvanceFromStepFive: tab === 'explain',
+      };
+    });
+  }, []);
+
   const {
     sidebarOpen,
     setSidebarOpen,
@@ -174,6 +261,13 @@ export default function SessionPage() {
     selectedLanguage,
     codeByLanguage,
   });
+
+  const isAiSidebarVisible = sidebarOpen || walkthroughState.isAiSidebarForcedOpen;
+  const isStepFiveActive =
+    walkthroughState.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
+  const nextDisabledMessage = isStepFiveActive
+    ? 'Click the Explain tab in the AI sidebar to continue the walkthrough.'
+    : null;
 
   if (authLoading || !user) {
     return <SessionPageSkeleton />;
@@ -210,7 +304,7 @@ export default function SessionPage() {
     <div className="min-h-screen bg-background text-foreground">
       <AiSidebarToggle
         onClick={() => setSidebarOpen(true)}
-        visible={!sidebarOpen}
+        visible={!isAiSidebarVisible}
       />
       <div className="flex min-h-screen">
         <AiSidebar
@@ -225,9 +319,17 @@ export default function SessionPage() {
           isHintStreaming={isHintStreaming}
           onSendHint={handleSendHint}
           onClearHints={handleClearHints}
+          walkthroughForceOpen={walkthroughState.isAiSidebarForcedOpen}
+          walkthroughForcedTab={walkthroughState.forcedAiTab}
+          onWalkthroughTabClick={handleWalkthroughTabClick}
+          walkthroughDisableTransition={walkthroughState.activeStepIndex !== null}
         />
         <div className="min-w-0 flex-1">
-          <SessionOnboardingTour>
+          <SessionOnboardingTour
+            onStepChange={handleTourStepChange}
+            isNextDisabled={isStepFiveActive && !walkthroughState.canAdvanceFromStepFive}
+            nextDisabledMessage={nextDisabledMessage}
+          >
             <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
               <SessionHeader
                 sessionId={session.sessionId}
@@ -247,6 +349,7 @@ export default function SessionPage() {
                   onLanguageChange={handleLanguageChange}
                   onChange={handleEditorChange}
                   onExplainCode={handleExplainCode}
+                  walkthroughShowExplainDemo={walkthroughState.isEditorExplainDemoActive}
                 />
               </div>
             </div>

@@ -16,6 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { SessionLanguage } from '@/app/sessions/[sessionId]/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
 
+type MonacoInstance = typeof import('monaco-editor');
+
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
@@ -33,6 +35,7 @@ interface EditorPanelProps {
   onLanguageChange: (language: SessionLanguage) => void;
   onChange: (value: string) => void;
   onExplainCode: (selectedCode: string) => void;
+  walkthroughShowExplainDemo?: boolean;
 }
 
 interface WidgetPosition {
@@ -76,6 +79,7 @@ export function EditorPanel({
   onLanguageChange,
   onChange,
   onExplainCode,
+  walkthroughShowExplainDemo = false,
 }: EditorPanelProps) {
   const onExplainCodeRef = useRef(onExplainCode);
   useEffect(() => {
@@ -83,6 +87,7 @@ export function EditorPanel({
   }, [onExplainCode]);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<MonacoInstance | null>(null);
   const [widgetPos, setWidgetPos] = useState<WidgetPosition>({
     visible: false,
     top: 0,
@@ -161,6 +166,73 @@ export function EditorPanel({
     fixedOverflowWidgets: true,
   };
 
+  const clearWalkthroughSelection = useCallback(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    ed.setSelection(new monaco.Selection(1, 1, 1, 1));
+    setWidgetPos({ visible: false, top: 0, left: 0 });
+  }, []);
+
+  const applyWalkthroughSelection = useCallback(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    const model = ed?.getModel();
+
+    if (!ed || !monaco || !model) {
+      return;
+    }
+
+    const modelValue = model.getValue();
+    const firstNonWhitespace = modelValue.search(/\S/);
+    const lastNonWhitespace = modelValue.trimEnd().length;
+
+    if (firstNonWhitespace === -1 || lastNonWhitespace <= firstNonWhitespace) {
+      clearWalkthroughSelection();
+      return;
+    }
+
+    const startPosition = model.getPositionAt(firstNonWhitespace);
+    const endPosition = model.getPositionAt(lastNonWhitespace);
+    const selection = new monaco.Selection(
+      startPosition.lineNumber,
+      startPosition.column,
+      endPosition.lineNumber,
+      endPosition.column
+    );
+
+    ed.setSelection(selection);
+    ed.revealRangeInCenter(selection);
+    updateWidgetPosition();
+  }, [clearWalkthroughSelection, updateWidgetPosition]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (walkthroughShowExplainDemo) {
+        applyWalkthroughSelection();
+        return;
+      }
+
+      clearWalkthroughSelection();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [applyWalkthroughSelection, clearWalkthroughSelection, walkthroughShowExplainDemo]);
+
+  useEffect(() => {
+    if (walkthroughShowExplainDemo) {
+      const frame = window.requestAnimationFrame(() => {
+        applyWalkthroughSelection();
+      });
+
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [applyWalkthroughSelection, selectedLanguage, value, walkthroughShowExplainDemo]);
+
   return (
     <Card data-nextstep="editor-panel" className="gap-0 overflow-hidden rounded-b-none border-border bg-card shadow-[var(--shadow-xl)]">
       <CardHeader className="gap-2 border-b border-border/80">
@@ -235,6 +307,7 @@ export function EditorPanel({
             monaco.editor.setTheme('peerprep-light');
             monacoEditor.focus();
             editorRef.current = monacoEditor;
+            monacoRef.current = monaco;
 
             monacoEditor.addAction({
               id: 'peerprep.explainCode',
@@ -261,6 +334,10 @@ export function EditorPanel({
             monacoEditor.onDidScrollChange(() => {
               updateWidgetPosition();
             });
+
+            if (walkthroughShowExplainDemo) {
+              applyWalkthroughSelection();
+            }
           }}
           onChange={(nextValue) => onChange(nextValue ?? '')}
           options={editorOptions}
@@ -270,6 +347,8 @@ export function EditorPanel({
           <button
             type="button"
             className="peerprep-explain-widget"
+            disabled={walkthroughShowExplainDemo}
+            aria-disabled={walkthroughShowExplainDemo}
             style={{
               position: 'absolute',
               top: widgetPos.top,
@@ -278,6 +357,9 @@ export function EditorPanel({
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              if (walkthroughShowExplainDemo) {
+                return;
+              }
               handleExplainClick();
             }}
           >

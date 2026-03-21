@@ -63,6 +63,10 @@ interface AiSidebarProps {
   isHintStreaming: boolean;
   onSendHint: (message: string) => void;
   onClearHints: () => void;
+  walkthroughForceOpen?: boolean;
+  walkthroughForcedTab?: AiTab | null;
+  onWalkthroughTabClick?: (tab: AiTab) => void;
+  walkthroughDisableTransition?: boolean;
 }
 
 const TABS: { id: AiTab; label: string; icon: typeof SparklesIcon }[] = [
@@ -82,11 +86,18 @@ export function AiSidebar({
   isHintStreaming,
   onSendHint,
   onClearHints,
+  walkthroughForceOpen = false,
+  walkthroughForcedTab = null,
+  onWalkthroughTabClick,
+  walkthroughDisableTransition = false,
 }: AiSidebarProps) {
   const [chatInput, setChatInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const explainScrollRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const effectiveIsOpen = isOpen || walkthroughForceOpen;
+  const effectiveActiveTab = walkthroughForcedTab ?? activeTab;
 
   const totalExplanations = explanations.length;
   const viewIndex =
@@ -102,6 +113,41 @@ export function AiSidebar({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [hintMessages]);
+
+  useEffect(() => {
+    function notifyLayoutChanged() {
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    const sidebarElement = sidebarRef.current;
+    if (!sidebarElement) {
+      return;
+    }
+
+    if (walkthroughDisableTransition) {
+      const frameId = window.requestAnimationFrame(() => {
+        notifyLayoutChanged();
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frameId);
+      };
+    }
+
+    const handleTransitionEnd = (event: TransitionEvent) => {
+      if (event.propertyName === 'width') {
+        notifyLayoutChanged();
+      }
+    };
+
+    sidebarElement.addEventListener('transitionend', handleTransitionEnd);
+    const timeoutId = window.setTimeout(notifyLayoutChanged, 320);
+
+    return () => {
+      sidebarElement.removeEventListener('transitionend', handleTransitionEnd);
+      window.clearTimeout(timeoutId);
+    };
+  }, [effectiveIsOpen, walkthroughDisableTransition]);
 
   function handleSendMessage() {
     const text = chatInput.trim();
@@ -136,11 +182,17 @@ export function AiSidebar({
 
   return (
     <aside
-      className="sticky top-0 z-20 h-screen shrink-0 overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-out"
-      style={{ width: isOpen ? 440 : 0 }}
+      ref={sidebarRef}
+      data-nextstep="ai-sidebar"
+      className={`sticky top-0 z-20 h-screen shrink-0 overflow-hidden border-r border-border bg-card ${
+        walkthroughDisableTransition ? '' : 'transition-[width] duration-300 ease-out'
+      }`}
+      style={{ width: effectiveIsOpen ? 440 : 0 }}
     >
       <div
-        className={`flex h-full w-[440px] flex-col overflow-hidden transition-opacity duration-200 ${isOpen ? 'opacity-100 delay-100' : 'opacity-0'
+        className={`flex h-full w-[440px] flex-col overflow-hidden ${
+          walkthroughDisableTransition ? '' : 'transition-opacity duration-200'
+        } ${effectiveIsOpen ? 'opacity-100 delay-100' : 'opacity-0'
           }`}
       >
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
@@ -176,15 +228,19 @@ export function AiSidebar({
           </button>
         </div>
 
-        <div className="flex border-b border-border/60">
+        <div data-nextstep="ai-sidebar-tabs" className="flex border-b border-border/60">
           {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+            const isActive = effectiveActiveTab === tab.id;
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => onTabChange(tab.id)}
+                data-nextstep={`ai-tab-${tab.id}`}
+                onClick={() => {
+                  onWalkthroughTabClick?.(tab.id);
+                  onTabChange(tab.id);
+                }}
                 className={`relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] font-medium transition-all duration-150 ease-out active:scale-[0.98] ${isActive
                   ? 'text-accent'
                   : 'text-muted-foreground hover:bg-accent/8 hover:text-accent'
@@ -206,9 +262,10 @@ export function AiSidebar({
             className="flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
             style={{
               gridArea: '1 / 1',
-              opacity: activeTab === 'explain' ? 1 : 0,
-              transform: activeTab === 'explain' ? 'translateX(0)' : 'translateX(40%)',
-              pointerEvents: activeTab === 'explain' ? 'auto' : 'none',
+              opacity: effectiveActiveTab === 'explain' ? 1 : 0,
+              transform:
+                effectiveActiveTab === 'explain' ? 'translateX(0)' : 'translateX(40%)',
+              pointerEvents: effectiveActiveTab === 'explain' ? 'auto' : 'none',
             }}
           >
             {totalExplanations === 0 ? (
@@ -316,9 +373,10 @@ export function AiSidebar({
             className="flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
             style={{
               gridArea: '1 / 1',
-              opacity: activeTab === 'hints' ? 1 : 0,
-              transform: activeTab === 'hints' ? 'translateX(0)' : 'translateX(-40%)',
-              pointerEvents: activeTab === 'hints' ? 'auto' : 'none',
+              opacity: effectiveActiveTab === 'hints' ? 1 : 0,
+              transform:
+                effectiveActiveTab === 'hints' ? 'translateX(0)' : 'translateX(-40%)',
+              pointerEvents: effectiveActiveTab === 'hints' ? 'auto' : 'none',
             }}
           >
             <div className="flex flex-1 flex-col overflow-y-auto">
