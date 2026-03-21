@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/button';
  * - Warm card background, serif headings, rounded surfaces, themed shadows.
  * - "Don't show this again" only appears on the final step.
  */
+interface TourCardProps extends CardComponentProps {
+  isNextDisabled?: boolean;
+  nextDisabledMessage?: string | null;
+}
+
 export function TourCard({
   step,
   currentStep,
@@ -16,7 +21,9 @@ export function TourCard({
   prevStep,
   skipTour,
   arrow,
-}: CardComponentProps) {
+  isNextDisabled = false,
+  nextDisabledMessage = null,
+}: TourCardProps) {
   const isFirst = currentStep === 0;
   const isLast = currentStep === totalSteps - 1;
   const progress = ((currentStep + 1) / totalSteps) * 100;
@@ -69,6 +76,7 @@ export function TourCard({
             <Button
               size="sm"
               onClick={nextStep}
+              disabled={isNextDisabled}
               className="rounded-full px-4 text-[11.5px] shadow-[var(--shadow)]"
             >
               {isLast ? 'Got it' : 'Next'}
@@ -76,6 +84,12 @@ export function TourCard({
           )}
         </div>
       </div>
+
+      {isNextDisabled && nextDisabledMessage ? (
+        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+          {nextDisabledMessage}
+        </p>
+      ) : null}
 
       {skipTour && isLast && (
         <button

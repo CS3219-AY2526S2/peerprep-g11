@@ -1,8 +1,9 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { editor } from 'monaco-editor';
-import { CheckIcon, ChevronDownIcon } from 'lucide-react';
+import { CheckIcon, ChevronDownIcon, SparklesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,6 +15,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { SessionLanguage } from '@/app/sessions/[sessionId]/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
+
+type MonacoInstance = typeof import('monaco-editor');
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -31,6 +34,14 @@ interface EditorPanelProps {
   value: string;
   onLanguageChange: (language: SessionLanguage) => void;
   onChange: (value: string) => void;
+  onExplainCode: (selectedCode: string) => void;
+  walkthroughShowExplainDemo?: boolean;
+}
+
+interface WidgetPosition {
+  visible: boolean;
+  top: number;
+  left: number;
 }
 
 function handleEditorWillMount(monaco: typeof import('monaco-editor')) {
@@ -67,7 +78,79 @@ export function EditorPanel({
   value,
   onLanguageChange,
   onChange,
+  onExplainCode,
+  walkthroughShowExplainDemo = false,
 }: EditorPanelProps) {
+  const onExplainCodeRef = useRef(onExplainCode);
+  useEffect(() => {
+    onExplainCodeRef.current = onExplainCode;
+  }, [onExplainCode]);
+
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<MonacoInstance | null>(null);
+  const [widgetPos, setWidgetPos] = useState<WidgetPosition>({
+    visible: false,
+    top: 0,
+    left: 0,
+  });
+
+  const getSelectedText = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) return '';
+    const selection = ed.getSelection();
+    if (!selection) return '';
+    const model = ed.getModel();
+    if (!model) return '';
+    return model.getValueInRange(selection).trim();
+  }, []);
+
+  const updateWidgetPosition = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const selection = ed.getSelection();
+    if (!selection || selection.isEmpty()) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const model = ed.getModel();
+    if (!model) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const selected = model.getValueInRange(selection).trim();
+    if (!selected) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    // Position at the end of the selection
+    const endPos = selection.getEndPosition();
+    const coords = ed.getScrolledVisiblePosition(endPos);
+    if (!coords) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    setWidgetPos({
+      visible: true,
+      top: coords.top - 32,
+      left: coords.left + 16,
+    });
+  }, []);
+
+  function handleExplainClick() {
+    const selected = getSelectedText();
+    if (selected) {
+      onExplainCodeRef.current(selected);
+    }
+  }
+
   const editorOptions: editor.IStandaloneEditorConstructionOptions = {
     automaticLayout: true,
     fontFamily: 'var(--font-mono)',
@@ -82,6 +165,73 @@ export function EditorPanel({
     overviewRulerBorder: false,
     fixedOverflowWidgets: true,
   };
+
+  const clearWalkthroughSelection = useCallback(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    ed.setSelection(new monaco.Selection(1, 1, 1, 1));
+    setWidgetPos({ visible: false, top: 0, left: 0 });
+  }, []);
+
+  const applyWalkthroughSelection = useCallback(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    const model = ed?.getModel();
+
+    if (!ed || !monaco || !model) {
+      return;
+    }
+
+    const modelValue = model.getValue();
+    const firstNonWhitespace = modelValue.search(/\S/);
+    const lastNonWhitespace = modelValue.trimEnd().length;
+
+    if (firstNonWhitespace === -1 || lastNonWhitespace <= firstNonWhitespace) {
+      clearWalkthroughSelection();
+      return;
+    }
+
+    const startPosition = model.getPositionAt(firstNonWhitespace);
+    const endPosition = model.getPositionAt(lastNonWhitespace);
+    const selection = new monaco.Selection(
+      startPosition.lineNumber,
+      startPosition.column,
+      endPosition.lineNumber,
+      endPosition.column
+    );
+
+    ed.setSelection(selection);
+    ed.revealRangeInCenter(selection);
+    updateWidgetPosition();
+  }, [clearWalkthroughSelection, updateWidgetPosition]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (walkthroughShowExplainDemo) {
+        applyWalkthroughSelection();
+        return;
+      }
+
+      clearWalkthroughSelection();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [applyWalkthroughSelection, clearWalkthroughSelection, walkthroughShowExplainDemo]);
+
+  useEffect(() => {
+    if (walkthroughShowExplainDemo) {
+      const frame = window.requestAnimationFrame(() => {
+        applyWalkthroughSelection();
+      });
+
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [applyWalkthroughSelection, selectedLanguage, value, walkthroughShowExplainDemo]);
 
   return (
     <Card data-nextstep="editor-panel" className="gap-0 overflow-hidden rounded-b-none border-border bg-card shadow-[var(--shadow-xl)]">
@@ -129,11 +279,10 @@ export function EditorPanel({
                     <DropdownMenuItem
                       key={language}
                       onSelect={() => onLanguageChange(language)}
-                      className={`rounded-xl px-4 py-3 text-[12.5px] font-medium ${
-                        isSelected
-                          ? 'bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground'
-                          : 'cursor-pointer focus:bg-accent-soft focus:text-foreground'
-                      }`}
+                      className={`rounded-xl px-4 py-3 text-[12.5px] font-medium ${isSelected
+                        ? 'bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground'
+                        : 'cursor-pointer focus:bg-accent-soft focus:text-foreground'
+                        }`}
                     >
                       <span className="flex min-w-0 flex-1 items-center">
                         {PROGRAMMING_LANGUAGE_LABELS[language]}
@@ -148,7 +297,7 @@ export function EditorPanel({
         </div>
       </CardHeader>
 
-      <CardContent className="overflow-hidden rounded-b-none bg-secondary/10 px-0 pb-0 pt-0">
+      <CardContent className="relative overflow-hidden rounded-b-none bg-secondary/10 px-0 pb-0 pt-0">
         <MonacoEditor
           height="640px"
           language={selectedLanguage}
@@ -157,10 +306,67 @@ export function EditorPanel({
           onMount={(monacoEditor, monaco) => {
             monaco.editor.setTheme('peerprep-light');
             monacoEditor.focus();
+            editorRef.current = monacoEditor;
+            monacoRef.current = monaco;
+
+            monacoEditor.addAction({
+              id: 'peerprep.explainCode',
+              label: 'PeerPrep AI: Explain Code',
+              contextMenuGroupId: 'navigation',
+              contextMenuOrder: 0,
+              precondition: 'editorHasSelection',
+              run: () => {
+                const selection = monacoEditor.getSelection();
+                if (!selection) return;
+                const model = monacoEditor.getModel();
+                if (!model) return;
+                const selected = model.getValueInRange(selection).trim();
+                if (selected) {
+                  onExplainCodeRef.current(selected);
+                }
+              },
+            });
+
+            monacoEditor.onDidChangeCursorSelection(() => {
+              updateWidgetPosition();
+            });
+
+            monacoEditor.onDidScrollChange(() => {
+              updateWidgetPosition();
+            });
+
+            if (walkthroughShowExplainDemo) {
+              applyWalkthroughSelection();
+            }
           }}
           onChange={(nextValue) => onChange(nextValue ?? '')}
           options={editorOptions}
         />
+
+        {widgetPos.visible && (
+          <button
+            type="button"
+            className="peerprep-explain-widget"
+            disabled={walkthroughShowExplainDemo}
+            aria-disabled={walkthroughShowExplainDemo}
+            style={{
+              position: 'absolute',
+              top: widgetPos.top,
+              left: widgetPos.left,
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (walkthroughShowExplainDemo) {
+                return;
+              }
+              handleExplainClick();
+            }}
+          >
+            <SparklesIcon className="h-3.5 w-3.5" />
+            <span>Explain</span>
+          </button>
+        )}
       </CardContent>
     </Card>
   );
