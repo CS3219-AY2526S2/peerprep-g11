@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { PaginatedResponse } from '@/lib/types';
-import type { Question } from '@/app/questions/types';
+import type { Difficulty, PaginatedResponse } from '@/lib/types';
+import type { QuestionListElement, QuestionStatus } from '@/app/questions/types';
 
 const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:8000';
 
 interface QuestionServiceResponse {
   _id: string;
   title: string;
-  description: string;
+  slug: string;
   topics: string[];
-  difficulty: string;
-  status: string;
-  examples: { input: string; output: string; explanation?: string }[];
-  constraints: string[];
+  difficulty: Difficulty;
+  status: QuestionStatus;
 }
 
-function mapQuestion(raw: QuestionServiceResponse): Question {
+function mapQuestion(raw: QuestionServiceResponse): QuestionListElement {
   return {
     id: raw._id,
     title: raw.title,
-    description: raw.description,
+    slug: raw.slug,
     topics: raw.topics,
-    difficulty: raw.difficulty as Question['difficulty'],
-    status: (raw.status as Question['status']) ?? 'Pending',
-    examples: raw.examples,
-    constraints: raw.constraints,
+    difficulty: raw.difficulty as QuestionListElement['difficulty'],
+    status: (raw.status as QuestionListElement['status']),
   };
 }
 
@@ -75,7 +71,7 @@ export async function GET(request: NextRequest) {
     const start = (page - 1) * pageSize;
     const data = filtered.slice(start, start + pageSize);
 
-    const response: PaginatedResponse<Question> = {
+    const response: PaginatedResponse<QuestionListElement> = {
       data,
       total,
       page,

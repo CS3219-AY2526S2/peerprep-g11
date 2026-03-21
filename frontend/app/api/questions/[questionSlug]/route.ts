@@ -5,12 +5,12 @@ const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localho
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ questionId: string }> }
+  { params }: { params: Promise<{ questionSlug: string }> }
 ) {
   try {
-    const { questionId } = await params;
+    const { questionSlug } = await params;
 
-    const res = await fetch(`${QUESTION_SERVICE_URL}/questions/${questionId}`);
+    const res = await fetch(`${QUESTION_SERVICE_URL}/questions/${questionSlug}`);
 
     if (res.status === 404) {
       return NextResponse.json(

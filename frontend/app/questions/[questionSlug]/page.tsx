@@ -12,7 +12,7 @@ import type { Question } from '@/app/questions/types';
 
 export default function QuestionDetailsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
-  const params = useParams<{ questionId: string }>();
+  const params = useParams<{ questionSlug: string }>();
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ export default function QuestionDetailsPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/questions/${params.questionId}`);
+        const res = await fetch(`/api/questions/${params.questionSlug}`);
         if (res.status === 404) {
           setError('Question not found');
           return;
@@ -38,10 +38,10 @@ export default function QuestionDetailsPage() {
       }
     }
 
-    if (params.questionId) {
+    if (params.questionSlug) {
       fetchQuestion();
     }
-  }, [params.questionId]);
+  }, [params.questionSlug]);
 
   if (authLoading || !user) {
     return (

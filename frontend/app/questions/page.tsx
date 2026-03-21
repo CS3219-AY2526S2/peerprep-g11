@@ -8,7 +8,7 @@ import { QuestionTable } from '@/app/questions/_components/QuestionTable';
 import { PaginationControls } from '@/app/questions/_components/PaginationControls';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { PaginatedResponse } from '@/lib/types';
-import type { Question } from '@/app/questions/types';
+import type { QuestionListElement } from '@/app/questions/types';
 
 const PAGE_SIZE = 10;
 
@@ -22,7 +22,7 @@ export default function QuestionsPage() {
   const [page, setPage] = useState(1);
 
   // Data state
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuestionListElement[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [topics, setTopics] = useState<string[]>([]);
@@ -61,7 +61,7 @@ export default function QuestionsPage() {
       const res = await fetch(`/api/questions?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch questions');
 
-      const body: PaginatedResponse<Question> = await res.json();
+      const body: PaginatedResponse<QuestionListElement> = await res.json();
       setQuestions(body.data);
       setTotal(body.total);
       setTotalPages(body.totalPages);
