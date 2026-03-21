@@ -3,11 +3,9 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/ui/navBar';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { QuickStats } from '@/components/dashboard/QuickStats';
 
 const activityItems = [
   { title: 'Matched with Priya', topic: 'Graphs', duration: '38 minutes', lang: 'Python', completed: true },

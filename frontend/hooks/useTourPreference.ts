@@ -9,7 +9,7 @@ function getStorageKey(tourId: string): string {
 }
 
 function subscribeToStorage(callback: () => void) {
-  const handler = (e: StorageEvent) => {
+  const handler = () => {
     callback();
   };
   window.addEventListener('storage', handler);

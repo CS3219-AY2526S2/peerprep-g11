@@ -25,7 +25,6 @@ export default function AdminDashboardPage() {
   const [fetchError, setFetchError] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
   const [adminRequests, setAdminRequests] = useState<AdminRequestItem[]>([]);
-  const [requestsLoading, setRequestsLoading] = useState(true);
 
   const getAllUsers = async () => {
 
@@ -77,8 +76,7 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         setAdminRequests(data);
       }
-    } finally {
-      setRequestsLoading(false);
+    } catch {
     }
   };
 

@@ -50,21 +50,37 @@ const faqItems = [
 export default function FAQPage() {
   const { user } = useRequireAuth();
   const [requestStatus, setRequestStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'exists'>('idle');
-  const [hasPending, setHasPending] = useState(false);
-  const [checkLoading, setCheckLoading] = useState(true);
+  const [hasPending, setHasPending] = useState<boolean | null>(null);
+  const shouldCheckPending = Boolean(user && user.role !== 'admin');
 
   useEffect(() => {
-    if (!user || user.role === 'admin') {
-      setCheckLoading(false);
+    if (!shouldCheckPending) {
       return;
     }
 
-    fetch('/api/users/admin-requests/mine')
-      .then((res) => res.json())
-      .then((data) => setHasPending(data.hasPending))
-      .catch(() => {})
-      .finally(() => setCheckLoading(false));
-  }, [user]);
+    let isActive = true;
+
+    const loadPendingRequest = async () => {
+      try {
+        const res = await fetch('/api/users/admin-requests/mine');
+        const data = await res.json();
+
+        if (isActive) {
+          setHasPending(Boolean(data.hasPending));
+        }
+      } catch {
+        if (isActive) {
+          setHasPending(false);
+        }
+      }
+    };
+
+    void loadPendingRequest();
+
+    return () => {
+      isActive = false;
+    };
+  }, [shouldCheckPending]);
 
   const handleRequestAdmin = async () => {
     setRequestStatus('loading');
@@ -95,6 +111,7 @@ export default function FAQPage() {
   }
 
   const isAdmin = user.role === 'admin';
+  const isCheckingPending = !isAdmin && hasPending === null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -172,10 +189,10 @@ export default function FAQPage() {
 
               <Button
                 onClick={handleRequestAdmin}
-                disabled={requestStatus === 'loading' || hasPending || checkLoading}
+                disabled={requestStatus === 'loading' || hasPending === true || isCheckingPending}
                 className="w-fit h-9 text-[12.5px] font-semibold"
               >
-                {checkLoading
+                {isCheckingPending
                   ? 'Checking…'
                   : hasPending
                     ? 'Request Pending'
