@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,28 +71,6 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   };
-
-  const CriterionRow = ({ met, label }: { met: boolean; label: string }) => (
-    <span
-      className={`flex items-center gap-1.5 text-[11px] ${met ? 'text-emerald-600' : 'text-muted-foreground'
-        }`}
-    >
-      <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 shrink-0">
-        {met ? (
-          <path
-            d="M3 8l3.5 3.5L13 5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : (
-          <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-        )}
-      </svg>
-      {label}
-    </span>
-  );
 
   return (
     <div>
@@ -174,7 +151,7 @@ export default function ProfilePage() {
                   />
 
                   {touched.password &&
-                    (!passwordLengthValid || !passwordUppercaseValid) && (
+                    (!passwordLengthValid(password) || !passwordUppercaseValid(password)) && (
                       <p className="text-[11px] text-destructive">
                         * Password must meet all criteria
                       </p>

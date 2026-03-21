@@ -25,7 +25,17 @@ interface AdminUserTableProps {
 }
 
 export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
-  if (users.length === 0) {
+  const sortedUsers = [...users].sort((a, b) => {
+    if (a.role !== b.role) {
+      return a.role === 'admin' ? -1 : 1;
+    }
+    return (
+      new Date(a.createdAt).getTime() -
+      new Date(b.createdAt).getTime()
+    );
+  });
+
+  if (sortedUsers.length === 0) {
     return (
       <div className="px-6 py-12 text-center text-[12.5px] text-muted-foreground">
         No users found.
@@ -55,7 +65,7 @@ export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => (
+        {sortedUsers.map((user) => (
           <TableRow
             key={user._id}
             className="border-border hover:bg-secondary transition-colors"
@@ -65,9 +75,11 @@ export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
                 {user._id}
               </span>
             </TableCell>
+
             <TableCell className="py-3 text-[12.5px] text-foreground">
               {user.email}
             </TableCell>
+
             <TableCell className="py-3">
               <Badge
                 variant="outline"
@@ -80,6 +92,7 @@ export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
                 {user.role}
               </Badge>
             </TableCell>
+
             <TableCell className="py-3 text-[12px] text-muted-foreground">
               {new Date(user.createdAt).toLocaleDateString('en-SG', {
                 day: 'numeric',
@@ -87,18 +100,19 @@ export function AdminUserTable({ users, onDelete }: AdminUserTableProps) {
                 year: 'numeric',
               })}
             </TableCell>
+
             <TableCell className="py-3">
-              {user.role !== "admin" &&
+              {user.role !== 'admin' && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onDelete(user._id)}
-                  className="h-8 w-8 p-0 text-muted-foreground  hover:text-destructive hover:bg-destructive/10"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span className="sr-only">Delete user</span>
                 </Button>
-              }
+              )}
             </TableCell>
           </TableRow>
         ))}
