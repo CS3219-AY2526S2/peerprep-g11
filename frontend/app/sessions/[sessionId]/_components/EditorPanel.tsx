@@ -2,15 +2,15 @@
 
 import dynamic from 'next/dynamic';
 import type { editor } from 'monaco-editor';
+import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { SessionLanguage } from '@/app/sessions/[sessionId]/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
@@ -84,7 +84,7 @@ export function EditorPanel({
   };
 
   return (
-    <Card className="gap-0 overflow-hidden rounded-b-none border-border bg-card shadow-[var(--shadow-xl)]">
+    <Card data-nextstep="editor-panel" className="gap-0 overflow-hidden rounded-b-none border-border bg-card shadow-[var(--shadow-xl)]">
       <CardHeader className="gap-2 border-b border-border/80">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
@@ -102,25 +102,48 @@ export function EditorPanel({
             </Badge>
           </div>
 
-          <div className="min-w-[170px]">
+          <div data-nextstep="language-selector" className="min-w-[170px]">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Language
             </p>
-            <Select
-              value={selectedLanguage}
-              onValueChange={(value) => onLanguageChange(value as SessionLanguage)}
-            >
-              <SelectTrigger className="w-full rounded-full border-border bg-secondary/60 text-[12.5px]">
-                <SelectValue placeholder="Select language" />
-              </SelectTrigger>
-              <SelectContent>
-                {allowedLanguages.map((language) => (
-                  <SelectItem key={language} value={language}>
-                    {PROGRAMMING_LANGUAGE_LABELS[language]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="border-input text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-full border bg-secondary/60 px-3 py-2 text-[12.5px] shadow-xs transition-all duration-200 ease-out outline-none hover:border-ring/30 hover:bg-muted/50 focus-visible:ring-[3px]"
+                  aria-label="Select programming language"
+                >
+                  <span>{PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]}</span>
+                  <ChevronDownIcon className="size-4 shrink-0 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={8}
+                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] rounded-[1.1rem] border-border bg-popover p-2 shadow-[var(--shadow-xl)]"
+              >
+                {allowedLanguages.map((language) => {
+                  const isSelected = language === selectedLanguage;
+
+                  return (
+                    <DropdownMenuItem
+                      key={language}
+                      onSelect={() => onLanguageChange(language)}
+                      className={`rounded-xl px-4 py-3 text-[12.5px] font-medium ${
+                        isSelected
+                          ? 'bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground'
+                          : 'cursor-pointer focus:bg-accent-soft focus:text-foreground'
+                      }`}
+                    >
+                      <span className="flex min-w-0 flex-1 items-center">
+                        {PROGRAMMING_LANGUAGE_LABELS[language]}
+                      </span>
+                      {isSelected ? <CheckIcon className="ml-auto size-4 text-current" /> : null}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </CardHeader>

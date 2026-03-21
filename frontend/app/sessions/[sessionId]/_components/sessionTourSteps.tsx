@@ -1,0 +1,72 @@
+import { ClipboardList, Code, Languages, Users, LogOut } from 'lucide-react';
+import type { Tour } from 'nextstepjs';
+
+export const SESSION_TOUR_ID = 'sessions';
+
+export const sessionTourSteps: Tour[] = [
+  {
+    tour: SESSION_TOUR_ID,
+    steps: [
+      {
+        icon: <ClipboardList size={15} />,
+        title: 'Your Question',
+        content:
+          'This panel shows the question you and your peer will solve together. Read through the description, examples and constraints before you start coding.',
+        selector: '[data-nextstep="question-panel"]',
+        side: 'right',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <Code size={15} />,
+        title: 'Shared Editor',
+        content:
+          'This is your real-time collaborative code editor. Changes sync live between both participants, decide who starts first or take turns writing code.',
+        selector: '[data-nextstep="editor-panel"]',
+        side: 'left',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <Languages size={15} />,
+        title: 'Language Selector',
+        content:
+          'Switch between programming languages here. The editor will update its syntax highlighting to match the language you choose.',
+        selector: '[data-nextstep="language-selector"]',
+        side: 'bottom',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <Users size={15} />,
+        title: 'Session Participants',
+        content:
+          "See who is in the session and their connection status. A green dot means they are connected and ready to collaborate.",
+        selector: '[data-nextstep="participants-card"]',
+        side: 'bottom',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <LogOut size={15} />,
+        title: 'Leave Session',
+        content:
+          "When you are done, click this button to leave the session and return to the dashboard.",
+        selector: '[data-nextstep="leave-session-btn"]',
+        side: 'bottom-right',
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+    ],
+  },
+];

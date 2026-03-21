@@ -66,10 +66,27 @@ export function LeaveSessionDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="destructive"
-          className="rounded-full px-4 text-[12.5px] font-semibold shadow-[var(--shadow-lg)]"
+          data-nextstep="leave-session-btn"
+          variant="ghost"
+          className="gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
         >
-          Leave Session
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" className="shrink-0">
+            <path
+              d="M10 7H6.8C5.8 7 5 7.8 5 8.8v6.4C5 16.2 5.8 17 6.8 17H10"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <path
+              d="M14 8l4 4-4 4"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M9 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          Leave
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[460px] rounded-2xl border-border bg-card p-6 shadow-[var(--shadow-xl)]">
