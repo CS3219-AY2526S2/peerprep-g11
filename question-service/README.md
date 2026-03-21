@@ -21,6 +21,7 @@ docker run -p 8000:8000 question-service
 ```
 
 ## Environment Variables
+
 | Variable          | Required | Description                                          | Example                          |
 |-------------------|----------|------------------------------------------------------|----------------------------------|
 | `MONGODB_URI`     | Yes      | MongoDB connection string                            | `mongodb+srv://...`              |
@@ -28,9 +29,9 @@ docker run -p 8000:8000 question-service
 
 ## API Reference
 
-### GET /questions/`{question_title}`
+### GET /questions/`{question_slug}`
 
-Get a question with exact question title based on `question_title`.
+Get a question with full details based on `question_slug`. Refer to [Data Model](#data-model) for more details.
 
 #### Responses
 
@@ -57,9 +58,9 @@ Get all available questions in the repository.
 
 ### POST /questions/upsert
 
-Upsert (update/insert) a question to the database. It searches the question with exact title before upsert.
+Upsert (update/insert) a question to the database. It searches the question with exact title and slug before upsert.
 
-- If no question with exact title exists, inserts the question.
+- If no question with exact title and slug exists, inserts the question.
 - If matching question is found, updates the content of the question.
 
 #### Request body
@@ -85,7 +86,6 @@ The request body should look like this. **All elements are required**.
       "Only one valid answer exists.",
     ]
 }
-
 ```
 
 | Variable          | Description | Constraint                                         |
@@ -132,15 +132,47 @@ Delete a question with exact title from the repository.
 
 ## Data Model
 
+Below demonstrates the data structures stored in question service.
+
 ### Question
 
-| Field        | Type       | Constraints                            |
-|--------------|------------|----------------------------------------|
-| `title`      | str        | Required, unique                       |
-| `description`| str        | Required, unique, lowercase            |
-| `topics`     | List[str]  | Required, at least one                 |
-| `difficulty` | str        | `Easy`, `Medium` or `Hard` only        |
-| `examples`   | List[dict] | Required, at least one                 |
-| `constraint` | List[str]  | Required, at least one                 |
-| `created_at` | Date       | Auto-managed by PyMongo                |
-| `updated_at` | Date       | Auto-managed by Pymongo                |
+```json
+{
+    "_id": "69be848b4e2576f0b59c492d",
+    "title": "Two Sum Variations",
+    "slug": "two-sum-variations",
+    "topics": [
+        "Arrays",
+        "Hash Table"
+    ],
+    "difficulty": "Easy",
+    "description": "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.",
+    "examples": [
+        {
+            "input": "nums = [2,7,11,15], target = 9",
+            "output": "[0,1]",
+            "explanation": "Because nums[0] + nums[1] == 9, we return [0, 1]."
+        }
+    ],
+    "constraints": [
+        "2 ≤ nums.length ≤ 10⁴",
+        "-10⁹ ≤ nums[i] ≤ 10⁹",
+        "Only one valid answer exists."
+    ],
+    "created_at": "2026-03-21T11:44:11.420579+00:00",
+    "updated_at": "2026-03-21T11:44:11.420579+00:00"
+}
+```
+
+| Field         | Type       | Constraints                                   |
+|---------------|------------|-----------------------------------------------|
+| `_id`         | ObjectId   | Auto-managed by MongoDB                       |
+| `title`       | str        | Required, unique                              |
+| `description` | str        | Required                                      |
+| `slug`        | str        | Auto-generated from title                     |
+| `topics`      | List[str]  | Required, at least one                        |
+| `difficulty`  | str        | Required, `Easy`, `Medium` or `Hard` only     |
+| `examples`    | List[dict] | Required, at least one                        |
+| `constraints` | List[str]  | Required, at least one                        |
+| `created_at`  | Date       | Auto-managed by PyMongo                       |
+| `updated_at`  | Date       | Auto-managed by Pymongo                       |
