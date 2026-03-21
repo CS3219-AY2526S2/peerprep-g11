@@ -2,10 +2,10 @@
 
 // TODO: Replace with actual user stats from API
 const stats = [
-    { label: 'Sessions', value: '12', sub: 'completed' },
-    { label: 'Questions', value: '34', sub: 'solved' },
-    { label: 'Streak', value: '5', sub: 'day' },
-    { label: 'Avg', value: '28m', sub: 'per session' },
+    { label: 'Sessions', value: '12' },
+    { label: 'Questions', value: '34' },
+    { label: 'Streak', value: '5' },
+    { label: 'Avg', value: '28m' },
 ];
 
 export function QuickStats() {
@@ -14,7 +14,7 @@ export function QuickStats() {
             className="flex items-center gap-6 mb-6 animate-fade-in-up"
             style={{ animationDelay: '80ms' }}
         >
-            {stats.map(({ label, value, sub }, i) => (
+            {stats.map(({ label, value }, i) => (
                 <div
                     key={label}
                     className="flex items-baseline gap-1.5 group cursor-default"

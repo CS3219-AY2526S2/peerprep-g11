@@ -9,6 +9,7 @@ import { SessionErrorState } from '@/app/sessions/[sessionId]/_components/Sessio
 import { SessionHeader } from '@/app/sessions/[sessionId]/_components/SessionHeader';
 import { QuestionPanel } from '@/app/sessions/[sessionId]/_components/QuestionPanel';
 import { EditorPanel } from '@/app/sessions/[sessionId]/_components/EditorPanel';
+import { SessionOnboardingTour } from '@/app/sessions/[sessionId]/_components/SessionOnboardingTour';
 import type { Question } from '@/app/questions/types';
 import type {
   LeaveSessionResponse,
@@ -169,7 +170,7 @@ export default function SessionPage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <NavBar />
-        <div className="mx-auto max-w-[1680px] px-5 pt-20 py-6 sm:px-8 lg:px-10 lg:py-8">
+        <div className="mx-auto max-w-[1680px] px-5 pt-24 pb-6 sm:px-8 lg:px-10 lg:pb-8">
           <SessionErrorState
             title={notFound ? 'Session unavailable' : 'Unable to open session'}
             message={
@@ -187,27 +188,29 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <NavBar />
-      <div className="mx-auto max-w-[1680px] px-5 pt-20 py-6 sm:px-8 lg:px-10 lg:py-8">
-        <SessionHeader
-          sessionId={session.sessionId}
-          participants={session.participants}
-          leaveError={leaveError}
-          onLeaveSuccess={handleLeaveSuccess}
-          onLeaveError={setLeaveError}
-        />
-
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
-          <QuestionPanel question={question} />
-          <EditorPanel
+      <SessionOnboardingTour>
+        <div className="mx-auto max-w-[1680px] px-5 pt-24 pb-6 sm:px-8 lg:px-10 lg:pb-8">
+          <SessionHeader
             sessionId={session.sessionId}
-            selectedLanguage={selectedLanguage}
-            allowedLanguages={session.allowedLanguages}
-            value={codeByLanguage[selectedLanguage]}
-            onLanguageChange={handleLanguageChange}
-            onChange={handleEditorChange}
+            participants={session.participants}
+            leaveError={leaveError}
+            onLeaveSuccess={handleLeaveSuccess}
+            onLeaveError={setLeaveError}
           />
+
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
+            <QuestionPanel question={question} />
+            <EditorPanel
+              sessionId={session.sessionId}
+              selectedLanguage={selectedLanguage}
+              allowedLanguages={session.allowedLanguages}
+              value={codeByLanguage[selectedLanguage]}
+              onLanguageChange={handleLanguageChange}
+              onChange={handleEditorChange}
+            />
+          </div>
         </div>
-      </div>
+      </SessionOnboardingTour>
     </div>
   );
 }
