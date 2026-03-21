@@ -48,8 +48,16 @@ async def get_all_questions():
     '''
     Retrieves all questions in the database.
     '''
+    projection = {
+        'title': 1,
+        'slug': 1,
+        'topics': 1,
+        'difficulty': 1,
+        'status': 1
+    }
+    
     try:
-        cursor = collection.find({})
+        cursor = collection.find({}, projection)
         results = await cursor.to_list(length=100)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
@@ -65,13 +73,6 @@ async def get_question(question_slug: str):
     Returns 404 if the question is not found.
     '''
     filter = {'slug': question_slug}
-    projection = {
-        'title': 1,
-        'slug': 1,
-        'topics': 1,
-        'difficulty': 1,
-        'status': 1
-    }
     try:
         question = await collection.find_one(filter)
     except PyMongoError as e:
