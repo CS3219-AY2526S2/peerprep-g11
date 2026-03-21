@@ -1,21 +1,40 @@
 import os
+import re
 from bson import ObjectId
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from pymongo import AsyncMongoClient, ReturnDocument
+from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from schema import QuestionSchema, DeleteSchema
 
 load_dotenv()
-app = FastAPI()
-
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 PORT = int(os.getenv("PORT", "8000"))
 
 client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
+
+@asynccontextmanager
+async def lifespan(app):
+    await collection.create_index(
+        [('slug', ASCENDING)],
+        unique=True,\
+        background=True)
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+def create_slug(title: str):
+    '''
+    Creates a slug from provided title.
+    '''
+    title = title.lower().strip()
+    title = re.sub(r'[^\w\s-]', '', title) # Remove special chars
+    title = re.sub(r'[\s_-]+', '-', title) # Replace spaces/underscores with hyphens
+    return title
 
 @app.get('/')
 async def home():
@@ -39,20 +58,27 @@ async def get_all_questions():
         r['_id'] = str(r['_id'])
     return results
 
-@app.get('/questions/{question_id}')
-async def get_question(question_id: str):
+@app.get('/questions/{question_slug}')
+async def get_question(question_slug: str):
     '''
     Retrieves a question by exact title.
     Returns 404 if the question is not found.
     '''
-    filter = {'_id': ObjectId(question_id)}
+    filter = {'slug': question_slug}
+    projection = {
+        'title': 1,
+        'slug': 1,
+        'topics': 1,
+        'difficulty': 1,
+        'status': 1
+    }
     try:
         question = await collection.find_one(filter)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     if not question:
-        raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+        raise HTTPException(status_code=404, detail=f"Question {question_slug} not found")
 
     question['_id'] = str(question['_id'])
     return question
@@ -67,14 +93,15 @@ async def add_question(question: QuestionSchema):
     '''
     data = question.model_dump()
     title = data['title']
+    slug = create_slug(title)
     now = datetime.now(timezone.utc).isoformat()
 
-    filter = {'title': title}
+    filter = {'title': title, 'slug': slug}
     set_fields = {key: value for key, value in data.items() if key != 'title'}
     set_fields['updated_at'] = now
     update = {
         '$set': set_fields,
-        '$setOnInsert': {'created_at': now, 'title': title, 'status': "Pending"}
+        '$setOnInsert': {'created_at': now, 'title': title, 'slug': slug, 'status': "Pending"}
     }
 
     try:
@@ -83,10 +110,16 @@ async def add_question(question: QuestionSchema):
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     is_inserted = result['created_at'] == now
+    result = {'created_at': result['created_at'],
+              'updated_at': now,
+              'title': title,
+              'slug': slug}
     if is_inserted:
-        return {'message': "Question added.", 'title': title}
+        result['message'] = "Question added."
+        return result
     
-    return {'message': "Question updated.", 'title': title}
+    result['message'] = "Question updated."
+    return result
 
 @app.delete('/questions/delete')
 async def delete_question(question: DeleteSchema):
