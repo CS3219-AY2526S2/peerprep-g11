@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { NavBar } from '@/components/ui/navBar';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { SessionPageSkeleton } from '@/app/sessions/[sessionId]/_components/SessionPageSkeleton';
 import { SessionErrorState } from '@/app/sessions/[sessionId]/_components/SessionErrorState';
@@ -10,6 +9,9 @@ import { SessionHeader } from '@/app/sessions/[sessionId]/_components/SessionHea
 import { QuestionPanel } from '@/app/sessions/[sessionId]/_components/QuestionPanel';
 import { EditorPanel } from '@/app/sessions/[sessionId]/_components/EditorPanel';
 import { SessionOnboardingTour } from '@/app/sessions/[sessionId]/_components/SessionOnboardingTour';
+import { AiSidebar } from '@/app/sessions/[sessionId]/_components/AiSidebar';
+import { AiSidebarToggle } from '@/app/sessions/[sessionId]/_components/AiSidebarToggle';
+import { useSessionAi } from '@/app/sessions/[sessionId]/useSessionAi';
 import type { Question } from '@/app/questions/types';
 import type {
   LeaveSessionResponse,
@@ -153,6 +155,26 @@ export default function SessionPage() {
     });
   }
 
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    activeAiTab,
+    setActiveAiTab,
+    explanations,
+    activeExplainIndex,
+    setActiveExplainIndex,
+    handleExplainCode,
+    hintMessages,
+    isHintStreaming,
+    handleSendHint,
+    handleClearHints,
+  } = useSessionAi({
+    sessionId: params.sessionId,
+    question,
+    selectedLanguage,
+    codeByLanguage,
+  });
+
   if (authLoading || !user) {
     return <SessionPageSkeleton />;
   }
@@ -169,8 +191,7 @@ export default function SessionPage() {
 
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <NavBar />
-        <div className="mx-auto max-w-[1680px] px-5 pt-24 pb-6 sm:px-8 lg:px-10 lg:pb-8">
+        <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
           <SessionErrorState
             title={notFound ? 'Session unavailable' : 'Unable to open session'}
             message={
@@ -187,30 +208,51 @@ export default function SessionPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <NavBar />
-      <SessionOnboardingTour>
-        <div className="mx-auto max-w-[1680px] px-5 pt-24 pb-6 sm:px-8 lg:px-10 lg:pb-8">
-          <SessionHeader
-            sessionId={session.sessionId}
-            participants={session.participants}
-            leaveError={leaveError}
-            onLeaveSuccess={handleLeaveSuccess}
-            onLeaveError={setLeaveError}
-          />
+      <AiSidebarToggle
+        onClick={() => setSidebarOpen(true)}
+        visible={!sidebarOpen}
+      />
+      <div className="flex min-h-screen">
+        <AiSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          activeTab={activeAiTab}
+          onTabChange={setActiveAiTab}
+          explanations={explanations}
+          activeExplainIndex={activeExplainIndex}
+          onActiveExplainIndexChange={setActiveExplainIndex}
+          hintMessages={hintMessages}
+          isHintStreaming={isHintStreaming}
+          onSendHint={handleSendHint}
+          onClearHints={handleClearHints}
+        />
+        <div className="min-w-0 flex-1">
+          <SessionOnboardingTour>
+            <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
+              <SessionHeader
+                sessionId={session.sessionId}
+                participants={session.participants}
+                leaveError={leaveError}
+                onLeaveSuccess={handleLeaveSuccess}
+                onLeaveError={setLeaveError}
+              />
 
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
-            <QuestionPanel question={question} />
-            <EditorPanel
-              sessionId={session.sessionId}
-              selectedLanguage={selectedLanguage}
-              allowedLanguages={session.allowedLanguages}
-              value={codeByLanguage[selectedLanguage]}
-              onLanguageChange={handleLanguageChange}
-              onChange={handleEditorChange}
-            />
-          </div>
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
+                <QuestionPanel question={question} />
+                <EditorPanel
+                  sessionId={session.sessionId}
+                  selectedLanguage={selectedLanguage}
+                  allowedLanguages={session.allowedLanguages}
+                  value={codeByLanguage[selectedLanguage]}
+                  onLanguageChange={handleLanguageChange}
+                  onChange={handleEditorChange}
+                  onExplainCode={handleExplainCode}
+                />
+              </div>
+            </div>
+          </SessionOnboardingTour>
         </div>
-      </SessionOnboardingTour>
+      </div>
     </div>
   );
 }

@@ -26,3 +26,45 @@ export interface LeaveSessionResponse {
   status: 'left';
   redirectTo: '/dashboard';
 }
+
+export type AiTab = 'explain' | 'hints';
+export type AiFeature = AiTab;
+export type AiStreamFinishReason = 'stop' | 'length' | 'refusal';
+
+export interface ExplainEntry {
+  id: string;
+  selectedCode: string;
+  language: string;
+  response: string | null;
+  createdAt: string;
+}
+
+export type HintMessageRole = 'USER' | 'AI';
+export type HintMessageStatus = 'idle' | 'streaming' | 'complete' | 'error';
+
+export interface HintMessage {
+  id: string;
+  role: HintMessageRole;
+  content: string;
+  createdAt: string;
+  status: HintMessageStatus;
+  requestId?: string;
+  finishReason?: AiStreamFinishReason;
+}
+
+export interface AiStreamMetaEvent {
+  requestId: string;
+  feature: AiFeature;
+}
+
+export interface AiStreamChunkEvent {
+  delta: string;
+}
+
+export interface AiStreamDoneEvent {
+  finishReason: AiStreamFinishReason;
+}
+
+export interface AiStreamErrorEvent {
+  message: string;
+}

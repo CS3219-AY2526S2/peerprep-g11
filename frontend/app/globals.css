@@ -72,6 +72,7 @@
   --animate-shimmer: shimmer 1.5s ease-in-out infinite;
   --animate-fade-in-up: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-nav-slide-down: navSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-bounce-dot: bounce-dot 1.2s ease-in-out infinite;
 }
 
 @keyframes shimmer {
@@ -105,6 +106,17 @@
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
   }
 }
 
@@ -225,4 +237,65 @@
   body {
     letter-spacing: var(--tracking-normal);
   }
+}
+
+/* ── Monaco context menu customizations ────────────── */
+
+/* Hide Command Palette and Change All Occurrences */
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="Command Palette"]),
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="Change All Occurrences"]) {
+  display: none !important;
+}
+
+/* Also hide orphan separators that sit between hidden items */
+.monaco-menu-container li.action-item.separator:has(+ li.action-item:has(> .action-label[aria-label="Command Palette"])) {
+  display: none !important;
+}
+
+/* Style the "PeerPrep AI: Explain Code" context menu item */
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="PeerPrep AI: Explain Code"])>.action-label {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+/* ── Floating Explain selection widget ─────────────── */
+
+.peerprep-explain-widget {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: oklch(1.0 0 0 / 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.10), 0 0 0 1px hsl(0 0% 0% / 0.04);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  transition: all 0.15s ease-out;
+  white-space: nowrap;
+  z-index: 2147483647;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.peerprep-explain-widget:hover {
+  background: oklch(0.94 0.025 178);
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px hsl(0 0% 0% / 0.14), 0 0 0 1px var(--accent);
+  transform: translateY(-1px);
+}
+
+.peerprep-explain-widget:active {
+  transform: scale(0.96);
+}
+
+.peerprep-explain-widget svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
