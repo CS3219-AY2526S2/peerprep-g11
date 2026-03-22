@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import type { CardComponentProps } from 'nextstepjs';
 import { Button } from '@/components/ui/button';
 
@@ -11,6 +12,8 @@ import { Button } from '@/components/ui/button';
 interface TourCardProps extends CardComponentProps {
   isNextDisabled?: boolean;
   nextDisabledMessage?: string | null;
+  onDontShowAgain?: (closeTour: () => void) => void | Promise<void>;
+  showDontShowAgain?: boolean;
 }
 
 export function TourCard({
@@ -23,10 +26,22 @@ export function TourCard({
   arrow,
   isNextDisabled = false,
   nextDisabledMessage = null,
+  onDontShowAgain,
+  showDontShowAgain = true,
 }: TourCardProps) {
   const isFirst = currentStep === 0;
   const isLast = currentStep === totalSteps - 1;
   const progress = ((currentStep + 1) / totalSteps) * 100;
+  const handleDontShowAgain = useCallback(() => {
+    if (onDontShowAgain) {
+      void onDontShowAgain(() => {
+        skipTour?.();
+      });
+      return;
+    }
+
+    skipTour?.();
+  }, [onDontShowAgain, skipTour]);
 
   return (
     <div className="w-[300px] rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-xl)]">
@@ -91,9 +106,9 @@ export function TourCard({
         </p>
       ) : null}
 
-      {skipTour && isLast && (
+      {skipTour && isLast && showDontShowAgain && (
         <button
-          onClick={skipTour}
+          onClick={handleDontShowAgain}
           className="mt-3 w-full cursor-pointer text-center text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
         >
           Don&apos;t show this again

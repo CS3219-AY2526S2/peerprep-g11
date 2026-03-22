@@ -3,21 +3,39 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { CardComponentProps } from 'nextstepjs';
 import { NextStepProvider, NextStep, useNextStep } from 'nextstepjs';
-import { useTourPreference } from '@/hooks/useTourPreference';
+import { useAuth } from '@/contexts/AuthContext';
 import { sessionTourSteps, SESSION_TOUR_ID } from './sessionTourSteps';
 import { TourCard } from './TourCard';
+
+const skippedUserIds = new Set<string>();
+
+function hasSkippedOnboardingInMemory(userId: string | undefined): boolean {
+  return Boolean(userId && skippedUserIds.has(userId));
+}
+
+function markSkippedOnboardingInMemory(userId: string | undefined) {
+  if (userId) {
+    skippedUserIds.add(userId);
+  }
+}
 
 /**
  * Auto-starts the session tour on first visit (when not skipped).
  * Polls for the first tour target element before triggering, ensuring
  * the DOM is ready.
  */
-function TourAutoStarter({ isSkipped }: { isSkipped: boolean }) {
+function TourAutoStarter({
+  isSkipped,
+  isAuthLoading,
+}: {
+  isSkipped: boolean;
+  isAuthLoading: boolean;
+}) {
   const { startNextStep } = useNextStep();
   const hasStarted = useRef(false);
 
   const tryStart = useCallback(() => {
-    if (hasStarted.current || isSkipped) return;
+    if (hasStarted.current || isSkipped || isAuthLoading) return;
 
     // Wait until the first tour target is in the DOM
     const firstTarget = document.querySelector('[data-nextstep="question-panel"]');
@@ -25,10 +43,10 @@ function TourAutoStarter({ isSkipped }: { isSkipped: boolean }) {
 
     hasStarted.current = true;
     startNextStep(SESSION_TOUR_ID);
-  }, [isSkipped, startNextStep]);
+  }, [isAuthLoading, isSkipped, startNextStep]);
 
   useEffect(() => {
-    if (isSkipped || hasStarted.current) return;
+    if (isSkipped || isAuthLoading || hasStarted.current) return;
 
     // Try immediately, then retry with increasing delays
     const timers = [
@@ -39,7 +57,7 @@ function TourAutoStarter({ isSkipped }: { isSkipped: boolean }) {
     ];
 
     return () => timers.forEach(clearTimeout);
-  }, [isSkipped, tryStart]);
+  }, [isAuthLoading, isSkipped, tryStart]);
 
   return null;
 }
@@ -57,16 +75,57 @@ export function SessionOnboardingTour({
   isNextDisabled = false,
   nextDisabledMessage = null,
 }: SessionOnboardingTourProps) {
-  const { isSkipped, skip } = useTourPreference(SESSION_TOUR_ID);
+  const { user, isLoading } = useAuth();
+  const userId = user?.id;
+  const isSkipped = (user?.skipOnboarding ?? false) || hasSkippedOnboardingInMemory(userId);
+  const skippedRef = useRef(isSkipped);
+
+  useEffect(() => {
+    skippedRef.current = isSkipped;
+  }, [isSkipped]);
+
+  const handleDontShowAgain = useCallback(
+    async (closeTour: () => void) => {
+      closeTour();
+      onStepChange?.(null);
+
+      if (skippedRef.current) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/users/onboarding-preference', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ skip_onboarding: 1 }),
+        });
+
+        if (!res.ok) {
+          console.error('Failed to persist onboarding preference');
+          return;
+        }
+
+        markSkippedOnboardingInMemory(userId);
+        skippedRef.current = true;
+      } catch (error) {
+        console.error('Failed to persist onboarding preference', error);
+      }
+    },
+    [onStepChange, userId]
+  );
   const WrappedTourCard = useCallback(
     (props: CardComponentProps) => (
       <TourCard
         {...props}
         isNextDisabled={isNextDisabled}
         nextDisabledMessage={nextDisabledMessage}
+        onDontShowAgain={handleDontShowAgain}
+        showDontShowAgain={!skippedRef.current}
       />
     ),
-    [isNextDisabled, nextDisabledMessage]
+    [handleDontShowAgain, isNextDisabled, nextDisabledMessage]
   );
   const handleTourStart = useCallback(
     (tourName: string | null) => {
@@ -86,12 +145,10 @@ export function SessionOnboardingTour({
   );
   const handleTourComplete = useCallback(() => {
     onStepChange?.(null);
-    skip();
-  }, [onStepChange, skip]);
+  }, [onStepChange]);
   const handleTourSkip = useCallback(() => {
     onStepChange?.(null);
-    skip();
-  }, [onStepChange, skip]);
+  }, [onStepChange]);
 
   return (
     <NextStepProvider>
@@ -107,7 +164,7 @@ export function SessionOnboardingTour({
         onComplete={handleTourComplete}
         onSkip={handleTourSkip}
       >
-        <TourAutoStarter isSkipped={isSkipped} />
+        <TourAutoStarter isSkipped={isSkipped} isAuthLoading={isLoading} />
         {children}
       </NextStep>
     </NextStepProvider>

@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'admin' | 'user';
+  skip_onboarding?: number;
   createdAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
 }
@@ -33,6 +34,11 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['admin', 'user'],
       default: 'user',
+    },
+    skip_onboarding: {
+      type: Number,
+      enum: [1],
+      required: false,
     },
   },
   { timestamps: true }

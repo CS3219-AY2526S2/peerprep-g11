@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requireAdmin } from '../middleware/requireAdmin';
-import { getAllUsers, getMe, deleteUser, updateUser } from '../controllers/user.controller';
+import {
+  getAllUsers,
+  getMe,
+  deleteUser,
+  updateUser,
+  updateOnboardingPreference,
+} from '../controllers/user.controller';
 import {
   createAdminRequest,
   getAllAdminRequests,
@@ -14,6 +20,7 @@ const router = Router();
 router.get('/me', authenticate, getMe);
 router.get('/', authenticate, requireAdmin, getAllUsers);
 router.put('/profile', authenticate, updateUser);
+router.patch('/onboarding-preference', authenticate, updateOnboardingPreference);
 
 router.post('/admin-requests', authenticate, createAdminRequest);
 router.get('/admin-requests/mine', authenticate, getMyAdminRequest);
