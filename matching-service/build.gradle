@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.2'
+    id 'io.spring.dependency-management' version '1.1.3'
+}
+
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot web starter (REST + MVC)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Scheduling support for @Scheduled
+    implementation 'org.springframework.boot:spring-boot-starter'
+
+    // JSON support
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // Spring Boot testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
