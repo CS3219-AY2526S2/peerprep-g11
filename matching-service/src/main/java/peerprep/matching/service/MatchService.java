@@ -22,7 +22,10 @@ public class MatchService {
     // userId → match result
     private final Map<String, MatchResult> matches = new ConcurrentHashMap<>();
 
-    // category → lock
+    // requestId → User
+    private final Map<String, User> requestIdMap = new ConcurrentHashMap<>();
+
+    // category → lock for synchronized matching
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
     private Object getLock(String key) {
@@ -32,8 +35,9 @@ public class MatchService {
 
     public enum UserState {
         IDLE,
-        WAITING,
-        MATCHED
+        PENDING,
+        MATCHED,
+        TIMED_OUT
     }
 
     /**
@@ -45,60 +49,91 @@ public class MatchService {
      * @param req A MatchRequest object containing user id, topic, difficulty and language.
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
-    public void addUser(MatchRequest req) {
-        String userId = req.userId;
+    public User addUser(MatchRequest req) {
+        String userId = req.getUserId();
         UserState prev = userStates.getOrDefault(userId, UserState.IDLE);
 
-        if (prev == UserState.WAITING) {
-            throw new RuntimeException("User already in queue");
-        }
+        if (prev == UserState.PENDING) throw new RuntimeException("User already in queue");
+        if (prev == UserState.MATCHED) throw new RuntimeException("User already matched");
 
-        if (prev == UserState.MATCHED) {
-            throw new RuntimeException("User already matched");
-        }
+        userStates.put(userId, UserState.PENDING);
 
-        userStates.put(userId, UserState.WAITING);
-        User user = new User(req.userId, req.topic, req.difficulty, req.language);
+        String requestId = UUID.randomUUID().toString();
+        req.setRequestId(requestId);
+
+        User user = new User(userId, req.getTopic(), req.getDifficulty(), req.getLanguage(), requestId);
         String key = user.getKey();
         waitingPool.putIfAbsent(key, new ConcurrentLinkedQueue<>());
         Queue<User> queue = waitingPool.get(key);
 
         synchronized (getLock(key)) {
-            if (userStates.get(userId) != UserState.WAITING) return;
-
+            if (userStates.get(userId) != UserState.PENDING) return null;
             queue.add(user);
+            requestIdMap.put(requestId, user);
             tryMatch(key);
         }
+
+        return user;
     }
 
     /**
      * Removes user from the waiting pool.
      *
-     * @param userId User ID of the user to be removed.
+     * @param requestId Request ID of the match request of user.
      */
-    public void cancel(String userId) {
-        if (userStates.get(userId) != UserState.WAITING) return;
+    public boolean cancelMatch(String requestId) {
+        User user = requestIdMap.get(requestId);
+        if (user == null) return false;
 
-        userStates.put(userId, UserState.IDLE);
+        userStates.put(user.getUserId(), UserState.IDLE);
+        Queue<User> queue = waitingPool.get(user.getKey());
 
-        for (Map.Entry<String, Queue<User>> entry : waitingPool.entrySet()) {
-            String key = entry.getKey();
-
-            synchronized (getLock(key)) {
-                entry.getValue().removeIf(u -> u.userId.equals(userId));
-            }
+        synchronized (getLock(user.getKey())) {
+            queue.remove(user);
         }
+
+        requestIdMap.remove(requestId);
+        return true;
     }
 
     /**
-     * Returns the state of the user (waiting / matched / idle).
+     * Returns the state of the user (waiting / matched / idle / timed out).
      *
-     * @param userId User ID of user.
+     * @param requestId Request ID of the match request of user.
      * @return Current state of the user.
      */
-    public String getStatus(String userId) {
-        return userStates.getOrDefault(userId, UserState.IDLE)
-                .name().toLowerCase();
+    public String getStatus(String requestId) {
+        User user = requestIdMap.get(requestId);
+        if (user == null) return null;
+
+        return userStates.getOrDefault(user.getUserId(), UserState.IDLE).name().toLowerCase();
+    }
+
+    /**
+     * Reset state of the user to idle.
+     *
+     * @param requestId Request ID of the match request of user.
+     */
+    public boolean endSession(String requestId) {
+        User user = requestIdMap.get(requestId);
+        if (user == null) return false;
+
+        String userId = user.getUserId();
+        if (userStates.get(userId) != UserState.MATCHED) return false;
+
+        MatchResult match = matches.remove(userId);
+        if (match == null) return false;
+
+        userStates.put(userId, UserState.IDLE);
+
+        String otherUserId = match.getOtherUser(userId);
+        if (otherUserId != null) {
+            matches.remove(otherUserId);
+            userStates.put(otherUserId, UserState.IDLE);
+        }
+
+        requestIdMap.remove(requestId);
+        return true;
     }
 
     private void tryMatch(String key) {
@@ -109,29 +144,24 @@ public class MatchService {
             User u2 = queue.poll();
 
             if (u1 == null || u2 == null) {
-                if (u1 != null) {
-                    queue.add(u1);
-                }
+                if (u1 != null) queue.add(u1);
+                if (u2 != null) queue.add(u2);
                 break;
             }
 
-            // check both still waiting
-            if (userStates.get(u1.userId) != UserState.WAITING ||
-                    userStates.get(u2.userId) != UserState.WAITING) {
-
-                if (userStates.get(u1.userId) == UserState.WAITING) queue.add(u1);
-                if (userStates.get(u2.userId) == UserState.WAITING) queue.add(u2);
+            if (userStates.get(u1.getUserId()) != UserState.PENDING ||
+                    userStates.get(u2.getUserId()) != UserState.PENDING) {
+                if (userStates.get(u1.getUserId()) == UserState.PENDING) queue.add(u1);
+                if (userStates.get(u2.getUserId()) == UserState.PENDING) queue.add(u2);
                 continue;
             }
 
-            // WAITING → MATCHED
-            userStates.put(u1.userId, UserState.MATCHED);
-            userStates.put(u2.userId, UserState.MATCHED);
+            userStates.put(u1.getUserId(), UserState.MATCHED);
+            userStates.put(u2.getUserId(), UserState.MATCHED);
 
-            MatchResult match = new MatchResult(u1.userId, u2.userId);
-
-            matches.put(u1.userId, match);
-            matches.put(u2.userId, match);
+            MatchResult match = new MatchResult(u1.getUserId(), u2.getUserId());
+            matches.put(u1.getUserId(), match);
+            matches.put(u2.getUserId(), match);
         }
     }
 
@@ -147,12 +177,8 @@ public class MatchService {
 
             synchronized (getLock(key)) {
                 queue.removeIf(user -> {
-                    boolean timeout = (now - user.joinedAt) > TWO_MIN_IN_MS;
-
-                    if (timeout) {
-                        userStates.put(user.userId, UserState.IDLE);
-                    }
-
+                    boolean timeout = (now - user.getJoinedAt()) > TWO_MIN_IN_MS;
+                    if (timeout) userStates.put(user.getUserId(), UserState.TIMED_OUT);
                     return timeout;
                 });
             }
@@ -160,27 +186,12 @@ public class MatchService {
     }
 
     /**
-     * Reset state of the user to idle.
+     * Finds and returns the user ID using the request ID
      *
-     * @param userId User ID of user.
+     * @param requestId Request ID of the match request of user.
+     * @return User ID of the user.
      */
-    public boolean endSession(String userId) {
-        if (userStates.get(userId) != UserState.MATCHED) {
-            return false;
-        }
-
-        MatchResult match = matches.remove(userId);
-        if (match == null) {
-            return false;
-        }
-        userStates.put(userId, UserState.IDLE);
-
-        String otherUserId = match.getOtherUser(userId);
-        if (otherUserId != null) {
-            matches.remove(otherUserId);
-            userStates.put(otherUserId, UserState.IDLE);
-        }
-
-        return true;
+    public User getUserByRequestId(String requestId) {
+        return requestIdMap.get(requestId);
     }
 }
