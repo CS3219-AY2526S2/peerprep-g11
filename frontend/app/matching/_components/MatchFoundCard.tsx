@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { PreferenceSummaryBadge } from './PreferenceSummaryBadge';
 import type { MatchingPreferences } from '@/app/matching/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
+import { useRouter } from 'next/navigation';
 
 interface MatchFoundCardProps {
     preferences: MatchingPreferences;
@@ -12,9 +13,11 @@ interface MatchFoundCardProps {
     matchId?: string;
     onCancel: () => void;
     isCancelling?: boolean;
+    onEnter: () => Promise<string>;
 }
 
-export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling }: MatchFoundCardProps) {
+export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling, onEnter }: MatchFoundCardProps) {
+    const router = useRouter();
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
             <div className="relative flex items-center justify-center w-20 h-20">
@@ -58,16 +61,20 @@ export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, is
 
             <div className="grid grid-cols-1 gap-2 w-full">
                 <Button
-                    asChild
+                    onClick={async () => {
+                        try {
+                            const sessionMatchId = await onEnter();
+                            router.push(`/sessions/${sessionMatchId}`);
+                        } catch (error) {
+                            console.error('Failed to enter session:', error);
+                        }
+                    }}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold rounded-lg"
                 >
-                    {/* TODO: Replace with actual session URL using matchId */}
-                    <a href={matchId ? `/sessions/${matchId}` : '/sessions'}>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="mr-2">
-                            <path d="M5 12h14m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        Enter Session
-                    </a>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="mr-2">
+                        <path d="M5 12h14m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Enter Session
                 </Button>
                 <Button
                     onClick={onCancel}

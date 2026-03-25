@@ -66,8 +66,6 @@ export async function DELETE(
       }
     );
 
-    createdAtMap.delete(requestId);
-
     return NextResponse.json({ requestId, status: 'cancelled' });
   } catch {
     return NextResponse.json(
