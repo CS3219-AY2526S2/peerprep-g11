@@ -11,6 +11,14 @@ public class MatchResult {
         this.matchId = matchId;
     }
 
+    public String getUser1() {
+        return user1;
+    }
+
+    public String getUser2() {
+        return user2;
+    }
+
     public String getOtherUser(String userId) {
         if (this.user1.equals(userId)) {
             return this.user2;

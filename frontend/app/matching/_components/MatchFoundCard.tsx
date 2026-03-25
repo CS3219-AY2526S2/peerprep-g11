@@ -13,10 +13,9 @@ interface MatchFoundCardProps {
     matchId?: string;
     onCancel: () => void;
     isCancelling?: boolean;
-    onEnter: () => Promise<string>;
 }
 
-export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling, onEnter }: MatchFoundCardProps) {
+export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling }: MatchFoundCardProps) {
     const router = useRouter();
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
@@ -63,8 +62,7 @@ export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, is
                 <Button
                     onClick={async () => {
                         try {
-                            const sessionMatchId = await onEnter();
-                            router.push(`/sessions/${sessionMatchId}`);
+                            router.push(`/sessions/${matchId}`);
                         } catch (error) {
                             console.error('Failed to enter session:', error);
                         }

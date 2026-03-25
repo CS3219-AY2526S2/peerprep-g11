@@ -30,6 +30,9 @@ public class MatchService {
     // userId → requestId
     private final Map<String, String> userToRequest = new ConcurrentHashMap<>();
 
+    // matchId → match result
+    private final Map<String, MatchResult> matchIdMap = new ConcurrentHashMap<>();
+
     // userId → timestamp when user timed out
     private final Map<String, Long> timedOutUsers = new ConcurrentHashMap<>();
 
@@ -64,21 +67,21 @@ public class MatchService {
         if (prev == UserState.PENDING) throw new RuntimeException("User already in queue");
         if (prev == UserState.MATCHED) throw new RuntimeException("User already matched");
 
-        userStates.put(userId, UserState.PENDING);
-
         String requestId = UUID.randomUUID().toString();
         req.setRequestId(requestId);
-
         User user = new User(userId, req.getTopic(), req.getDifficulty(), req.getLanguage(), requestId);
+
         String key = user.getKey();
         waitingPool.putIfAbsent(key, new ConcurrentLinkedQueue<>());
         Queue<User> queue = waitingPool.get(key);
 
+        userStates.put(userId, UserState.PENDING);
+        requestIdMap.put(requestId, user);
+        userToRequest.put(userId, requestId);
+
         synchronized (getLock(key)) {
             if (userStates.get(userId) != UserState.PENDING) return null;
             queue.add(user);
-            requestIdMap.put(requestId, user);
-            userToRequest.put(userId, requestId);
             tryMatch(key);
         }
 
@@ -116,7 +119,7 @@ public class MatchService {
     }
 
     /**
-     * Returns the state of the user (waiting / matched / idle / timed out).
+     * Returns the state of the user (idle / pending / matched / timed out).
      *
      * @param requestId Request ID of the match request of user.
      * @return Current state of the user.
@@ -136,34 +139,13 @@ public class MatchService {
      * @param requestId Request ID of the match request of user.
      * @return true if session ended successfully, false otherwise.
      */
-    public boolean endSession(String requestId) {
-        User user = requestIdMap.get(requestId);
-        if (user == null) return false;
+    public boolean endSession(String matchId) {
+        MatchResult match = matchIdMap.get(matchId);
+        if (match == null) return false;
 
-        String userId = user.getUserId();
-        if (userStates.get(userId) != UserState.MATCHED) return false;
-
+        String userId = match.getUser1(); 
         boolean removed = removeMatch(userId);
         return removed;
-    }
-
-    /**
-     * Enters the session for the matched user, retrieving the matchId.
-     *
-     * @param requestId Request ID of the match request of user.
-     * @return the matchId for the session, or null if not matched.
-     */
-    public String enterSession(String requestId) {
-        User user = requestIdMap.get(requestId);
-        if (user == null) return null;
-
-        String userId = user.getUserId();
-        if (userStates.get(userId) != UserState.MATCHED) return null;
-
-        MatchResult match = matches.get(userId);
-        if (match == null) return null;
-
-        return match.matchId;
     }
 
     private void tryMatch(String key) {
@@ -193,6 +175,7 @@ public class MatchService {
             MatchResult match = new MatchResult(u1.getUserId(), u2.getUserId(), matchId);
             matches.put(u1.getUserId(), match);
             matches.put(u2.getUserId(), match);
+            matchIdMap.put(matchId, match);
         }
     }
 
@@ -236,12 +219,14 @@ public class MatchService {
         MatchResult match = matches.remove(userId);
         if (match == null) return false;
 
+        matchIdMap.remove(match.matchId);
+        cleanUpUser(userId);
+
         String otherUserId = match.getOtherUser(userId);
         if (otherUserId != null) {
             matches.remove(otherUserId);
             cleanUpUser(otherUserId);
         }
-        cleanUpUser(userId);
         return true;
     }
 
@@ -252,12 +237,48 @@ public class MatchService {
     }
 
     /**
-     * Finds and returns the user ID using the request ID
+     * Finds and returns the user using the match ID
+     *
+     * @param matchId Match ID of the match.
+     * @return The User object corresponding to the match ID, or null if not found.
+     */
+    public MatchResult getMatchResultByMatchId(String matchId) {
+        return matchIdMap.get(matchId);
+
+    }    
+
+    /**
+     * Finds and returns the user using the request ID
      *
      * @param requestId Request ID of the match request of user.
-     * @return User ID of the user.
+     * @return The User object corresponding to the request ID, or null if not found.
      */
     public User getUserByRequestId(String requestId) {
         return requestIdMap.get(requestId);
+    }
+
+    /**
+     * Gets the status and matchId (if matched) for a user by request ID.
+     *
+     * @param requestId Request ID of the match request of user.
+     * @return A map containing status and optionally matchId.
+     */
+    public Map<String, Object> getStatusWithMatchId(String requestId) {
+        User user = requestIdMap.get(requestId);
+        if (user == null) return null;
+
+        String userId = user.getUserId();
+        String status = userStates.getOrDefault(userId, UserState.IDLE).name().toLowerCase();
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", status);
+
+        if (status.equals("matched")) {
+            MatchResult match = matches.get(userId);
+            if (match != null) {
+                result.put("matchId", match.matchId);
+            }
+        }
+
+        return result;
     }
 }

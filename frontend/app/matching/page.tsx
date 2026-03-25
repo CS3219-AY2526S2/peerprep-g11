@@ -121,16 +121,6 @@ export default function MatchingPage() {
         setState('preferences');
     };
 
-    const handleEnterSession = async (): Promise<string> => {
-        if (!matchRequest) throw new Error('No match request');
-        const res = await fetch(`/api/matching/requests/${matchRequest.requestId}/enter`, {
-            method: 'POST',
-        });
-        if (!res.ok) throw new Error('Failed to enter session');
-        const data = await res.json();
-        return data.matchId;
-    };
-
     if (isLoading || !user) {
         return (
             <div className="min-h-screen bg-background text-foreground">
@@ -197,7 +187,6 @@ export default function MatchingPage() {
                         matchId={matchRequest?.matchId}
                         onCancel={handleCancel}
                         isCancelling={isCancelling}
-                        onEnter={handleEnterSession}
                     />
                 </div>
             )}

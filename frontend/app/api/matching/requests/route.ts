@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { topic, difficulty, language } = body;
 
-    const res = await fetchWithAuth(`${MATCHING_SERVICE_URL}/match`, {
+    const res = await fetchWithAuth(`${MATCHING_SERVICE_URL}/matching/requests`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

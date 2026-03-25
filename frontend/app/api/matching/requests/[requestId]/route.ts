@@ -5,7 +5,7 @@ const MATCHING_SERVICE_URL =
   process.env.MATCHING_SERVICE_URL ?? 'http://localhost:8080';
 
 /**
- * Gets the current user's match status.
+ * Gets the current user's matching status.
  * @returns Match data if successful, error message otherwise
  */
 export async function GET(
@@ -16,7 +16,7 @@ export async function GET(
 
   try {
     const res = await fetchWithAuth(
-      `${MATCHING_SERVICE_URL}/match/${requestId}`,
+      `${MATCHING_SERVICE_URL}/matching/requests/${requestId}`,
       {
         headers: {
           ...forwardAuthHeaders(request),
@@ -46,7 +46,7 @@ export async function GET(
 
 
 /**
- * Cancels the current user's match.
+ * Cancels the current user's matching attempt.
  * @returns Success message if successful, error message if unsuccessful
  */
 export async function DELETE(
@@ -57,7 +57,7 @@ export async function DELETE(
 
   try {
     await fetchWithAuth(
-      `${MATCHING_SERVICE_URL}/match/${requestId}`,
+      `${MATCHING_SERVICE_URL}/matching/requests/${requestId}`,
       {
         method: 'DELETE',
         headers: {

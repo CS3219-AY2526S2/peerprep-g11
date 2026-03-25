@@ -11,8 +11,8 @@ import peerprep.matching.service.JwtService;
 import peerprep.matching.service.MatchService;
 
 @RestController
-@RequestMapping("/match")
-public class MatchController {
+@RequestMapping("/matching/requests")
+public class MatchingController {
 
     @Autowired
     private MatchService matchService;
@@ -71,48 +71,12 @@ public class MatchController {
         if (user == null || !user.getUserId().equals(jwtUserId))
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
 
-        String status = matchService.getStatus(requestId);
-        return ResponseEntity.ok(Map.of(
-                "requestId", requestId,
-                "status", status
-        ));
-    }
-
-    // --- End match session ---
-    @PatchMapping("/{requestId}")
-    public ResponseEntity<?> endMatch(@PathVariable String requestId,
-                                      @RequestHeader("Authorization") String authHeader,
-                                      @CookieValue(value = "token", required = false) String cookieToken
-                                    ) {
-        String jwtUserId = extractUserId(authHeader, cookieToken);
-        if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User user = matchService.getUserByRequestId(requestId);
-        if (user == null || !user.getUserId().equals(jwtUserId))
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-
-        boolean ended = matchService.endSession(requestId);
-        if (ended) return ResponseEntity.ok(Map.of("message", "Match session ended"));
-        return ResponseEntity.status(404).body(Map.of("error", "No active match found"));
-    }
-
-    // --- Enter match session ---
-    @PostMapping("/{requestId}/enter")
-    public ResponseEntity<?> enterSession(@PathVariable String requestId,
-                                          @RequestHeader("Authorization") String authHeader,
-                                          @CookieValue(value = "token", required = false) String cookieToken
-                                        ) {
-        String jwtUserId = extractUserId(authHeader, cookieToken);
-        if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User user = matchService.getUserByRequestId(requestId);
-        if (user == null || !user.getUserId().equals(jwtUserId))
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-
-        String matchId = matchService.enterSession(requestId);
-        if (matchId == null) return ResponseEntity.status(404).body(Map.of("error", "No active match found"));
-
-        return ResponseEntity.ok(Map.of("matchId", matchId));
+        Map<String, Object> statusInfo = matchService.getStatusWithMatchId(requestId);
+        if (statusInfo == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Status not found"));
+        }
+        statusInfo.put("requestId", requestId);
+        return ResponseEntity.ok(statusInfo);
     }
 
     private String extractUserId(String authHeader, String cookieToken) {
