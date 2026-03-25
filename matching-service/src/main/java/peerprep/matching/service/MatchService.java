@@ -33,9 +33,6 @@ public class MatchService {
     // userId → timestamp when user timed out
     private final Map<String, Long> timedOutUsers = new ConcurrentHashMap<>();
 
-    // userId → matchId
-    private final Map<String, String> sessionIds = new ConcurrentHashMap<>();
-
     // category → lock for synchronized matching
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
@@ -151,7 +148,7 @@ public class MatchService {
     }
 
     /**
-     * Enters the session for the matched user, generating a matchId if not already generated.
+     * Enters the session for the matched user, retrieving the matchId.
      *
      * @param requestId Request ID of the match request of user.
      * @return the matchId for the session, or null if not matched.
@@ -166,16 +163,7 @@ public class MatchService {
         MatchResult match = matches.get(userId);
         if (match == null) return null;
 
-        String otherUserId = match.getOtherUser(userId);
-        if (otherUserId == null) return null;
-
-        String matchId = sessionIds.get(userId);
-        if (matchId == null) {
-            matchId = UUID.randomUUID().toString();
-            sessionIds.put(userId, matchId);
-            sessionIds.put(otherUserId, matchId);
-        }
-        return matchId;
+        return match.matchId;
     }
 
     private void tryMatch(String key) {
@@ -201,7 +189,8 @@ public class MatchService {
             userStates.put(u1.getUserId(), UserState.MATCHED);
             userStates.put(u2.getUserId(), UserState.MATCHED);
 
-            MatchResult match = new MatchResult(u1.getUserId(), u2.getUserId());
+            String matchId = UUID.randomUUID().toString();
+            MatchResult match = new MatchResult(u1.getUserId(), u2.getUserId(), matchId);
             matches.put(u1.getUserId(), match);
             matches.put(u2.getUserId(), match);
         }
