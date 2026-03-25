@@ -10,9 +10,11 @@ interface MatchFoundCardProps {
     preferences: MatchingPreferences;
     partnerName?: string;
     matchId?: string;
+    onCancel: () => void;
+    isCancelling?: boolean;
 }
 
-export function MatchFoundCard({ preferences, partnerName, matchId }: MatchFoundCardProps) {
+export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling }: MatchFoundCardProps) {
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
             <div className="relative flex items-center justify-center w-20 h-20">
@@ -54,18 +56,28 @@ export function MatchFoundCard({ preferences, partnerName, matchId }: MatchFound
                 />
             </div>
 
-            <Button
-                asChild
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold rounded-lg"
-            >
-                {/* TODO: Replace with actual session URL using matchId */}
-                <a href={matchId ? `/sessions/${matchId}` : '/sessions'}>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="mr-2">
-                        <path d="M5 12h14m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Enter Session
-                </a>
-            </Button>
+            <div className="grid grid-cols-1 gap-2 w-full">
+                <Button
+                    asChild
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold rounded-lg"
+                >
+                    {/* TODO: Replace with actual session URL using matchId */}
+                    <a href={matchId ? `/sessions/${matchId}` : '/sessions'}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="mr-2">
+                            <path d="M5 12h14m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Enter Session
+                    </a>
+                </Button>
+                <Button
+                    onClick={onCancel}
+                    disabled={isCancelling}
+                    variant="ghost"
+                    className="w-full text-[12.5px] font-semibold text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                >
+                    {isCancelling ? 'Cancelling…' : 'Cancel Matching'}
+                </Button>
+            </div>
         </Card>
     );
 }

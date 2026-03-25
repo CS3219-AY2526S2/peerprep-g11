@@ -185,6 +185,8 @@ export default function MatchingPage() {
                         preferences={preferences}
                         partnerName={matchRequest?.partnerName}
                         matchId={matchRequest?.matchId}
+                        onCancel={handleCancel}
+                        isCancelling={isCancelling}
                     />
                 </div>
             )}

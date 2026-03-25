@@ -78,6 +78,7 @@ public class MatchService {
             if (userStates.get(userId) != UserState.PENDING) return null;
             queue.add(user);
             requestIdMap.put(requestId, user);
+            userToRequest.put(userId, requestId);
             tryMatch(key);
         }
 
@@ -88,10 +89,19 @@ public class MatchService {
      * Removes user from the waiting pool.
      *
      * @param requestId Request ID of the match request of user.
+     * @return true if user removed successfully, false if user was not found.
      */
     public boolean cancelMatch(String requestId) {
         User user = requestIdMap.get(requestId);
         if (user == null) return false;
+
+        String userId = user.getUserId();
+        UserState currentState = userStates.get(userId);
+
+        if (currentState == UserState.MATCHED) {
+            boolean removed = removeMatch(userId);
+            return removed;
+        }
 
         Queue<User> queue = waitingPool.get(user.getKey());
 
@@ -99,7 +109,7 @@ public class MatchService {
             queue.remove(user);
         }
 
-        cleanUpUser(user.getUserId());
+        cleanUpUser(userId);
         return true;
     }
 
@@ -131,17 +141,8 @@ public class MatchService {
         String userId = user.getUserId();
         if (userStates.get(userId) != UserState.MATCHED) return false;
 
-        MatchResult match = matches.remove(userId);
-        if (match == null) return false;
-
-        String otherUserId = match.getOtherUser(userId);
-        if (otherUserId != null) {
-            matches.remove(otherUserId);
-            cleanUpUser(otherUserId);
-        }
-
-        cleanUpUser(userId);
-        return true;
+        boolean removed = removeMatch(userId);
+        return removed;
     }
 
     private void tryMatch(String key) {
@@ -209,10 +210,22 @@ public class MatchService {
         });
     }
 
+    private boolean removeMatch(String userId) {
+        MatchResult match = matches.remove(userId);
+        if (match == null) return false;
+
+        String otherUserId = match.getOtherUser(userId);
+        if (otherUserId != null) {
+            matches.remove(otherUserId);
+            cleanUpUser(otherUserId);
+        }
+        cleanUpUser(userId);
+        return true;
+    }
+
     private void cleanUpUser(String userId) {
-        String requestId = userToRequest.get(userId);
+        String requestId = userToRequest.remove(userId);
         userStates.remove(userId);
-        userToRequest.remove(userId);
         requestIdMap.remove(requestId);
     }
 
