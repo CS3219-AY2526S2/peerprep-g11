@@ -169,6 +169,7 @@ Return the authenticated user's profile.
   "username": "john_doe",
   "email": "john@example.com",
   "role": "user",
+  "skip_onboarding": 1,
   "createdAt": "...",
   "updatedAt": "..."
 }
@@ -196,6 +197,28 @@ Update the authenticated user's username or password.
 | 200    | Profile updated          |
 | 400    | Validation error         |
 | 401    | Unauthenticated          |
+
+---
+
+#### PATCH /users/onboarding-preference
+
+Persist the authenticated user's onboarding opt-out preference.
+
+**Request body:**
+
+```json
+{
+  "skip_onboarding": 1
+}
+```
+
+**Responses:**
+
+| Status | Description                       |
+|--------|-----------------------------------|
+| 200    | Onboarding preference updated     |
+| 400    | Invalid request body              |
+| 401    | Unauthenticated                   |
 
 ---
 
