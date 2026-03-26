@@ -44,6 +44,19 @@ class QuestionSchema(BaseModel):
         
         return constraints
     
-class DeleteSchema(BaseModel):
-    slug: str
+# Schema used for retrieve and delete
+class RetrieveDeleteSchema(BaseModel):
+    title: str
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def validate_title(cls, title):
+        if len(title) == 0:
+            raise ValueError('Enter a topic')
+
+        for c in title:
+            if c != ' ' or c.isalnum():
+                raise ValueError('Title must not include special characters')
+            
+        return title
     

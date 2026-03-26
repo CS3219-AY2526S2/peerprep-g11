@@ -1,13 +1,13 @@
+import jwt
 import os
 import re
-from bson import ObjectId
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Cookie, FastAPI, HTTPException
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
-from schema import QuestionSchema, DeleteSchema
+from schema import QuestionSchema, RetrieveDeleteSchema
 
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
@@ -35,6 +35,16 @@ def create_slug(title: str):
     title = re.sub(r'[^\w\s-]', '', title) # Remove special chars
     title = re.sub(r'[\s_-]+', '-', title) # Replace spaces/underscores with hyphens
     return title
+
+def check_roles(token: str):
+    '''
+    Checks the role from jwt for verification
+    '''
+    payload = jwt.decode(token, options={"verify_signature": False})
+    if 'role' not in payload:
+        return False
+    
+    return payload['role'].lower() == "admin"
 
 @app.get('/')
 async def home():
@@ -88,6 +98,7 @@ async def get_question(question_slug: str):
 async def add_question(question: QuestionSchema):
     '''
     Upsert (update/insert) a question to the database.
+    Admin access only.
 
     - If no document with exact title exists, inserts a new one.
     - If matching title is found, updates the content and updated_at.
@@ -122,13 +133,34 @@ async def add_question(question: QuestionSchema):
     result['message'] = "Question updated."
     return result
 
+@app.get('/questions/retrieve')
+async def get_question_admin(question: RetrieveDeleteSchema):
+    '''
+    Retrieves a question based on the generated slug of a title.
+    Admin access only.
+    '''
+    title = question.title
+    filter = {'slug': create_slug(title)}
+    print(title)
+
+    return {"message": "retrieved"}
+
+    try:
+        result = await collection.find_one(filter)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    return result
+
 @app.delete('/questions/delete')
-async def delete_question(question: DeleteSchema):
+async def delete_question(question: RetrieveDeleteSchema):
     '''
     Deletes a question by its exact slug.
     Returns 404 if the question is not found.
+    Admin access only.
     '''
-    filter = {'slug': question.slug}
+    title = question.title
+    filter = {'slug': create_slug(title)}
 
     try:
         result = await collection.delete_one(filter)
