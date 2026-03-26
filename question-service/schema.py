@@ -45,5 +45,5 @@ class QuestionSchema(BaseModel):
         return constraints
     
 class DeleteSchema(BaseModel):
-    title: str
+    slug: str
     

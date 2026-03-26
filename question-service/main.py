@@ -125,10 +125,10 @@ async def add_question(question: QuestionSchema):
 @app.delete('/questions/delete')
 async def delete_question(question: DeleteSchema):
     '''
-    Deletes a question by its exact title.
+    Deletes a question by its exact slug.
     Returns 404 if the question is not found.
     '''
-    filter = {'title': question.title}
+    filter = {'slug': question.slug}
 
     try:
         result = await collection.delete_one(filter)
@@ -136,9 +136,9 @@ async def delete_question(question: DeleteSchema):
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail=f"Question {question.title} not found")
+        raise HTTPException(status_code=404, detail=f"Question {question.slug} not found")
     
-    return {'message': "Deleted", 'title': question.title}
+    return {'message': "Deleted", 'title': question.slug}
 
 @app.get('/health')
 async def health_check():
