@@ -1,6 +1,7 @@
 package peerprep.matching.documents;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
 import java.util.Date;
@@ -10,10 +11,11 @@ public class WaitingQueueDoc {
     @Id
     private String id;
 
+    @Indexed(unique = true)
     private String category;  // "topic|difficulty|language"
+    
     private List<String> userIds;  // List of user IDs in the queue
     private Date createdAt;
-    private Date updatedAt;
 
     public WaitingQueueDoc() {
     }
@@ -22,7 +24,6 @@ public class WaitingQueueDoc {
         this.category = category;
         this.userIds = userIds;
         this.createdAt = new Date();
-        this.updatedAt = new Date();
     }
 
     public String getId() {
@@ -55,13 +56,5 @@ public class WaitingQueueDoc {
 
     public void setCreatedAt(Date createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public Date getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Date updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }

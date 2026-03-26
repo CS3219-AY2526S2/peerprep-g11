@@ -8,4 +8,5 @@ import peerprep.matching.documents.UserStateDoc;
 public interface UserStateRepository extends MongoRepository<UserStateDoc, String> {
     UserStateDoc findByUserId(String userId);
     UserStateDoc findByRequestId(String requestId);
+    void deleteByUserId(String userId);
 }

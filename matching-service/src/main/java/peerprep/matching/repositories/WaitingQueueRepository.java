@@ -5,6 +5,6 @@ import org.springframework.stereotype.Repository;
 import peerprep.matching.documents.WaitingQueueDoc;
 
 @Repository
-public interface WaitingQueueRepository extends MongoRepository<WaitingQueueDoc, String> {
+public interface WaitingQueueRepository extends MongoRepository<WaitingQueueDoc, String>, WaitingQueueRepositoryCustom {
     WaitingQueueDoc findByCategory(String category);
-}
+ }

@@ -2,6 +2,7 @@ package peerprep.matching.documents;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
 import java.util.Date;
 
 @Document(collection = "matches")
@@ -9,7 +10,9 @@ public class MatchDoc {
     @Id
     private String id;
 
+    @Indexed(unique = true)
     private String matchId;
+    
     private String user1;
     private String user2;
     private String status;  // "active" or "ended"
