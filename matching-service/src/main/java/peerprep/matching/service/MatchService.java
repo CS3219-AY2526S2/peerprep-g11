@@ -1,9 +1,14 @@
 package peerprep.matching.service;
 
-import peerprep.matching.models.User;
 import peerprep.matching.models.MatchRequest;
-import peerprep.matching.models.MatchResult;
+import peerprep.matching.repositories.WaitingQueueRepository;
+import peerprep.matching.repositories.MatchRepository;
+import peerprep.matching.repositories.UserStateRepository;
+import peerprep.matching.documents.WaitingQueueDoc;
+import peerprep.matching.documents.MatchDoc;
+import peerprep.matching.documents.UserStateDoc;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
         import java.util.concurrent.*;
@@ -12,36 +17,22 @@ import java.util.*;
 public class MatchService {
 
     private static final long TWO_MIN_IN_MS = 120000;
-    private static final long SIXTY_SECONDS_IN_MS = 60000;
 
+    @Autowired
+    private WaitingQueueRepository waitingQueueRepository;
 
-    // category → queue
-    private final Map<String, Queue<User>> waitingPool = new ConcurrentHashMap<>();
+    @Autowired
+    private MatchRepository matchRepository;
 
-    // userId → state
-    private final Map<String, UserState> userStates = new ConcurrentHashMap<>();
-
-    // userId → match result
-    private final Map<String, MatchResult> matches = new ConcurrentHashMap<>();
-
-    // requestId → User
-    private final Map<String, User> requestIdMap = new ConcurrentHashMap<>();
-
-    // userId → requestId
-    private final Map<String, String> userToRequest = new ConcurrentHashMap<>();
-
-    // matchId → match result
-    private final Map<String, MatchResult> matchIdMap = new ConcurrentHashMap<>();
-
-    // userId → timestamp when user timed out
-    private final Map<String, Long> timedOutUsers = new ConcurrentHashMap<>();
+    @Autowired
+    private UserStateRepository userStateRepository;
 
     // category → lock for synchronized matching
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
-    private Object getLock(String key) {
-        locks.putIfAbsent(key, new Object());
-        return locks.get(key);
+    private Object getLock(String category) {
+        locks.putIfAbsent(category, new Object());
+        return locks.get(category);
     }
 
     public enum UserState {
@@ -60,32 +51,40 @@ public class MatchService {
      * @param req A MatchRequest object containing user id, topic, difficulty and language.
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
-    public User addUser(MatchRequest req) {
+    public UserStateDoc addUser(MatchRequest req) {
         String userId = req.getUserId();
-        UserState prev = userStates.getOrDefault(userId, UserState.IDLE);
-
-        if (prev == UserState.PENDING) throw new RuntimeException("User already in queue");
-        if (prev == UserState.MATCHED) throw new RuntimeException("User already matched");
-
+        UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
+        if (stateDoc != null) {
+            if (stateDoc.getState().equals(UserState.PENDING.name())) {
+                throw new RuntimeException("User already in queue");
+            }
+            if (stateDoc.getState().equals(UserState.MATCHED.name())) {
+                throw new RuntimeException("User already matched");
+            }
+            userStateRepository.delete(stateDoc);
+        }
+        String category = req.getCategory();
         String requestId = UUID.randomUUID().toString();
         req.setRequestId(requestId);
-        User user = new User(userId, req.getTopic(), req.getDifficulty(), req.getLanguage(), requestId);
+        stateDoc = new UserStateDoc(userId, requestId, UserState.PENDING.name(), category);
+        userStateRepository.save(stateDoc);
 
-        String key = user.getKey();
-        waitingPool.putIfAbsent(key, new ConcurrentLinkedQueue<>());
-        Queue<User> queue = waitingPool.get(key);
-
-        userStates.put(userId, UserState.PENDING);
-        requestIdMap.put(requestId, user);
-        userToRequest.put(userId, requestId);
-
-        synchronized (getLock(key)) {
-            if (userStates.get(userId) != UserState.PENDING) return null;
-            queue.add(user);
-            tryMatch(key);
+        synchronized (getLock(category)) {
+            stateDoc = userStateRepository.findByUserId(userId);
+            if (stateDoc == null || !stateDoc.getState().equals(UserState.PENDING.name())) {
+                return null;
+            }
+            WaitingQueueDoc queueDoc = waitingQueueRepository.findByCategory(category);
+            if (queueDoc == null) {
+                queueDoc = new WaitingQueueDoc(category, new ArrayList<>());
+                waitingQueueRepository.save(queueDoc);
+            }
+            waitingQueueRepository.enqueueUser(category, userId);
+            tryMatch(category);
         }
 
-        return user;
+        stateDoc = userStateRepository.findByUserId(userId);
+        return stateDoc;
     }
 
     /**
@@ -95,26 +94,29 @@ public class MatchService {
      * @return true if user removed successfully, false if user was not found.
      */
     public boolean cancelMatch(String requestId) {
-        User user = requestIdMap.get(requestId);
-        if (user == null) return false;
+        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
 
-        String userId = user.getUserId();
-        UserState currentState = userStates.get(userId);
+        if (stateDoc == null) return false;
 
-        if (currentState == UserState.MATCHED) {
-            boolean removed = removeMatch(userId);
-            return removed;
+        String userId = stateDoc.getUserId();
+
+        if (stateDoc.getState().equals(UserState.MATCHED.name())) {
+            MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
+            
+            if (matchDoc == null) return false;
+
+            matchRepository.delete(matchDoc);
+            userStateRepository.deleteByUserId(matchDoc.getUser1());
+            userStateRepository.deleteByUserId(matchDoc.getUser2());
+            return true;
         }
 
-        Queue<User> queue = waitingPool.get(user.getKey());
-
-        if (queue == null) return false;
-
-        synchronized (getLock(user.getKey())) {
-            queue.remove(user);
+        String category = stateDoc.getCategory();
+        synchronized (getLock(category)) {
+            waitingQueueRepository.removeUser(category, userId);
         }
 
-        cleanUpUser(userId);
+        userStateRepository.deleteByUserId(stateDoc.getUserId());
         return true;
     }
 
@@ -125,10 +127,10 @@ public class MatchService {
      * @return Current state of the user.
      */
     public String getStatus(String requestId) {
-        User user = requestIdMap.get(requestId);
-        if (user == null) return null;
-
-        return userStates.getOrDefault(user.getUserId(), UserState.IDLE).name().toLowerCase();
+        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
+        if (stateDoc == null) return null;
+        System.out.println(stateDoc.getState());
+        return stateDoc.getState().toLowerCase();
     }
 
     /**
@@ -140,111 +142,91 @@ public class MatchService {
      * @return true if session ended successfully, false otherwise.
      */
     public boolean endSession(String matchId) {
-        MatchResult match = matchIdMap.get(matchId);
-        if (match == null) return false;
+        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+        if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
 
-        String userId = match.getUser1(); 
-        boolean removed = removeMatch(userId);
-        return removed;
+        matchDoc.setStatus("ended");
+        matchDoc.setEndedAt(new Date());
+        matchRepository.save(matchDoc);
+
+        userStateRepository.deleteByUserId(matchDoc.getUser1());
+        userStateRepository.deleteByUserId(matchDoc.getUser2());
+
+        return true;
     }
 
-    private void tryMatch(String key) {
-        Queue<User> queue = waitingPool.get(key);
-
+    private void tryMatch(String category) {
         while (true) {
-            User u1 = queue.poll();
-            User u2 = queue.poll();
+            String userId1 = waitingQueueRepository.dequeueUserAndReturn(category);
+            String userId2 = waitingQueueRepository.dequeueUserAndReturn(category);
 
-            if (u1 == null || u2 == null) {
-                if (u1 != null) queue.add(u1);
-                if (u2 != null) queue.add(u2);
+            if (userId1 == null) break;
+            if (userId2 == null) {
+                waitingQueueRepository.enqueueFront(category, userId1);
                 break;
             }
 
-            if (userStates.get(u1.getUserId()) != UserState.PENDING ||
-                    userStates.get(u2.getUserId()) != UserState.PENDING) {
-                if (userStates.get(u1.getUserId()) == UserState.PENDING) queue.add(u1);
-                if (userStates.get(u2.getUserId()) == UserState.PENDING) queue.add(u2);
+            UserStateDoc stateDoc1 = userStateRepository.findByUserId(userId1);
+            UserStateDoc stateDoc2 = userStateRepository.findByUserId(userId2);
+
+            Boolean state1Valid = stateDoc1 != null && stateDoc1.getState().equals(UserState.PENDING.name());
+            Boolean state2Valid = stateDoc2 != null && stateDoc2.getState().equals(UserState.PENDING.name());
+
+            if (!state1Valid || !state2Valid) {
+                if (state1Valid) {
+                    waitingQueueRepository.enqueueFront(category, userId1);
+                }
+                if (state2Valid) {
+                    waitingQueueRepository.enqueueFront(category, userId2);
+                }
                 continue;
             }
 
-            userStates.put(u1.getUserId(), UserState.MATCHED);
-            userStates.put(u2.getUserId(), UserState.MATCHED);
+            stateDoc1.setState(UserState.MATCHED.name());
+            userStateRepository.save(stateDoc1);
+            stateDoc2.setState(UserState.MATCHED.name());
+            userStateRepository.save(stateDoc2);
 
             String matchId = UUID.randomUUID().toString();
-            MatchResult match = new MatchResult(u1.getUserId(), u2.getUserId(), matchId);
-            matches.put(u1.getUserId(), match);
-            matches.put(u2.getUserId(), match);
-            matchIdMap.put(matchId, match);
+            MatchDoc matchDoc = new MatchDoc(matchId, userId1, userId2);
+            matchRepository.save(matchDoc);
         }
     }
 
     /**
-     * Removes all users that have entered the waiting pool more than two min ago,
-     * and cleans up users that timed out more than 60 seconds ago.
+     * Removes all users that have entered the waiting pool more than two min ago.
      */
     public void removeTimeoutUsers() {
         long now = System.currentTimeMillis();
 
-        // Mark users in waiting pool that exceed 2 minutes as timed out
-        for (Map.Entry<String, Queue<User>> entry : waitingPool.entrySet()) {
-            String key = entry.getKey();
-            Queue<User> queue = entry.getValue();
+        for (WaitingQueueDoc queueDoc : waitingQueueRepository.findAll()) {
+            String category = queueDoc.getCategory();
+            synchronized (getLock(category)) {
+                List<String> userIds = queueDoc.getUserIds();
 
-            synchronized (getLock(key)) {
-                queue.removeIf(user -> {
-                    boolean timeout = (now - user.getJoinedAt()) > TWO_MIN_IN_MS;
-                    if (timeout) {
-                        userStates.put(user.getUserId(), UserState.TIMED_OUT);
-                        timedOutUsers.putIfAbsent(user.getUserId(), now);
-                    }
-                    return timeout;
-                });
+                for (String userId : userIds) {
+                    UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
+                    if (stateDoc == null || !stateDoc.getState().equals(UserState.PENDING.name())) continue;
+
+                    long joinedAt = stateDoc.getCreatedAt().getTime();
+                    if ((now - joinedAt) < TWO_MIN_IN_MS) continue;
+
+                    stateDoc.setState(UserState.TIMED_OUT.name());
+                    waitingQueueRepository.removeUser(category, userId);
+                    userStateRepository.save(stateDoc);
+                }
             }
         }
-
-        // Clean up users that timed out more than 60 seconds ago
-        timedOutUsers.entrySet().removeIf(entry -> {
-            long timeoutTime = entry.getValue();
-            if ((now - timeoutTime) > SIXTY_SECONDS_IN_MS) {
-                String userId = entry.getKey();
-                cleanUpUser(userId);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    private boolean removeMatch(String userId) {
-        MatchResult match = matches.remove(userId);
-        if (match == null) return false;
-
-        matchIdMap.remove(match.matchId);
-        cleanUpUser(userId);
-
-        String otherUserId = match.getOtherUser(userId);
-        if (otherUserId != null) {
-            matches.remove(otherUserId);
-            cleanUpUser(otherUserId);
-        }
-        return true;
-    }
-
-    private void cleanUpUser(String userId) {
-        String requestId = userToRequest.remove(userId);
-        userStates.remove(userId);
-        requestIdMap.remove(requestId);
     }
 
     /**
-     * Finds and returns the user using the match ID
+     * Finds and returns the match document using the match ID
      *
      * @param matchId Match ID of the match.
-     * @return The User object corresponding to the match ID, or null if not found.
+     * @return The match document corresponding to the match ID, or null if not found.
      */
-    public MatchResult getMatchResultByMatchId(String matchId) {
-        return matchIdMap.get(matchId);
-
+    public MatchDoc getMatchDocByMatchId(String matchId) {
+        return matchRepository.findByMatchId(matchId);
     }    
 
     /**
@@ -253,8 +235,8 @@ public class MatchService {
      * @param requestId Request ID of the match request of user.
      * @return The User object corresponding to the request ID, or null if not found.
      */
-    public User getUserByRequestId(String requestId) {
-        return requestIdMap.get(requestId);
+    public UserStateDoc getStateDocByRequestId(String requestId) {
+        return userStateRepository.findByRequestId(requestId);
     }
 
     /**
@@ -264,18 +246,19 @@ public class MatchService {
      * @return A map containing status and optionally matchId.
      */
     public Map<String, Object> getStatusWithMatchId(String requestId) {
-        User user = requestIdMap.get(requestId);
-        if (user == null) return null;
+        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
+        if (stateDoc == null) return null;
 
-        String userId = user.getUserId();
-        String status = userStates.getOrDefault(userId, UserState.IDLE).name().toLowerCase();
+        String status = stateDoc.getState().toLowerCase();
+        String userId = stateDoc.getUserId();
+
         Map<String, Object> result = new HashMap<>();
         result.put("status", status);
 
         if (status.equals("matched")) {
-            MatchResult match = matches.get(userId);
-            if (match != null) {
-                result.put("matchId", match.matchId);
+            MatchDoc matchDoc = matchRepository.findActiveMatch(stateDoc.getUserId());
+            if (matchDoc != null) {
+                result.put("matchId", matchDoc.getMatchId());
             }
         }
 

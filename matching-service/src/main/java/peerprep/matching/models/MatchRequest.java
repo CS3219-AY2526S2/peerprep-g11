@@ -34,4 +34,8 @@ public class MatchRequest {
     public String getLanguage() {
         return this.language;
     }
+
+    public String getCategory() {
+        return this.topic + "|" + this.difficulty + "|" + this.language;
+    }
 }

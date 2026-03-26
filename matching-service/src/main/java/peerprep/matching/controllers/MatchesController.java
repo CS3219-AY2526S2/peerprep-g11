@@ -5,11 +5,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import peerprep.matching.models.User;
-import peerprep.matching.models.MatchRequest;
-import peerprep.matching.models.MatchResult;
 import peerprep.matching.service.JwtService;
 import peerprep.matching.service.MatchService;
+import peerprep.matching.documents.MatchDoc;
 
 @RestController
 @RequestMapping("/matches")
@@ -30,11 +28,11 @@ public class MatchesController {
         String jwtUserId = extractUserId(authHeader, cookieToken);
         if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        MatchResult match = matchService.getMatchResultByMatchId(matchId);
-        if (match == null) {
+        MatchDoc matchDoc = matchService.getMatchDocByMatchId(matchId);
+        if (matchDoc == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Match not found"));
         }
-        boolean isUserInMatch = match.getUser1().equals(jwtUserId) || match.getUser2().equals(jwtUserId);
+        boolean isUserInMatch = matchDoc.getUser1().equals(jwtUserId) || matchDoc.getUser2().equals(jwtUserId);
         if (!isUserInMatch) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
         }

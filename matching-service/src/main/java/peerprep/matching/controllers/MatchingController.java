@@ -5,10 +5,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import peerprep.matching.models.User;
 import peerprep.matching.models.MatchRequest;
 import peerprep.matching.service.JwtService;
 import peerprep.matching.service.MatchService;
+import peerprep.matching.documents.UserStateDoc;
 
 @RestController
 @RequestMapping("/matching/requests")
@@ -31,11 +31,11 @@ public class MatchingController {
         if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         req.setUserId(jwtUserId);
-        User user = matchService.addUser(req);
+        UserStateDoc stateDoc = matchService.addUser(req);
 
         return ResponseEntity.status(201).body(Map.of(
                 "message", "Matching started",
-                "requestId", user.getRequestId()
+                "requestId", stateDoc.getRequestId()
         ));
     }
 
@@ -49,8 +49,8 @@ public class MatchingController {
         String jwtUserId = extractUserId(authHeader, cookieToken);
         if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        User user = matchService.getUserByRequestId(requestId);
-        if (user == null || !user.getUserId().equals(jwtUserId))
+        UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
+        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId))
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
 
         boolean cancelled = matchService.cancelMatch(requestId);
@@ -67,8 +67,8 @@ public class MatchingController {
         String jwtUserId = extractUserId(authHeader, cookieToken);
         if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        User user = matchService.getUserByRequestId(requestId);
-        if (user == null || !user.getUserId().equals(jwtUserId))
+        UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
+        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId))
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
 
         Map<String, Object> statusInfo = matchService.getStatusWithMatchId(requestId);
