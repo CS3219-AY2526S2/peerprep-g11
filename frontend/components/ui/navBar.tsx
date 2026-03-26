@@ -128,6 +128,11 @@ export function NavBar({ activePage }: NavBarProps) {
                 <Link href="/admin/dashboard">Admin</Link>
               </DropdownMenuItem>
             )}
+            {user?.role === 'admin' && (
+              <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
+                <Link href="/admin/questions">Questions</Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}

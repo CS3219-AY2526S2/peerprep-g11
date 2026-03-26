@@ -19,6 +19,15 @@ export interface Question {
     constraints: string[];
 }
 
+export interface QuestionListElement {
+    id: string;
+    title: string;
+    slug: string;
+    topics: string[];
+    difficulty: Difficulty;
+    status: QuestionStatus;
+}
+
 export interface QuestionsQueryParams {
     search?: string;
     topic?: string;

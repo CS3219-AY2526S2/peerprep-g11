@@ -1,6 +1,6 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/HpD0QZBI)
 # CS3219 Project (PeerPrep) - AY2526S2
-## Group: Gxx
+## Group: G11
 
 ### Note: 
 - You are required to develop individual microservices within separate folders within this repository.

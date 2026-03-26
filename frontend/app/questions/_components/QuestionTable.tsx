@@ -12,10 +12,10 @@ import {
 } from '@/components/ui/table';
 import { StatusPill } from './StatusPill';
 import { DifficultyBadge } from './DifficultyBadge';
-import type { Question } from '@/app/questions/types';
+import type { QuestionListElement } from '@/app/questions/types';
 
 interface QuestionTableProps {
-    questions: Question[];
+    questions: QuestionListElement[];
 }
 
 export function QuestionTable({ questions }: QuestionTableProps) {
@@ -72,7 +72,7 @@ export function QuestionTable({ questions }: QuestionTableProps) {
                             </TableCell>
                             <TableCell className="w-[100px]">
                                 <Link
-                                    href={`/questions/${q.id}`}
+                                    href={`/questions/${q.slug}`}
 
                                     className="group/btn inline-flex items-center rounded-lg text-[11.5px] font-semibold h-auto py-1.5 px-3
                                         border border-border bg-card text-foreground
