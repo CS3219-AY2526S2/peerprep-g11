@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'admin' | 'user';
+  tokenInvalidatedAt?: Date;
   skip_onboarding?: number;
   createdAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -34,6 +35,10 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['admin', 'user'],
       default: 'user',
+    },
+    tokenInvalidatedAt: {
+      type: Date,
+      required: false,
     },
     skip_onboarding: {
       type: Number,
