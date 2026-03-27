@@ -42,12 +42,21 @@ When a demotion is approved:
 
 ## Abuse Prevention (Security Considerations)
 
-### Can the endpoints be hit directly to bypass the system?
-No. The system is protected at multiple layers:
+### Can an admin user pretend to be another admin to abuse the endpoint?
+No. The system's security is built on verified identity, not user-provided claims.
 
-1. **Role-Based Access Control (RBAC):** Every demotion-related endpoint is protected by `requireAdmin` middleware. Even if an attacker knows the endpoint URL, they cannot trigger a vote or cast a vote without a valid, active admin session.
-2. **Logic-Level Guards:**
-    - **Self-Voting:** The `castVote` logic explicitly prevents the target from voting on their own demotion.
-    - **Initialization Checks:** The system verifies the target's role before allowing a vote to start. You cannot "demote" a regular user via this system.
-    - **Integrity:** The `requiredVotes` is calculated at the moment of creation based on the server-side database state, not provided by the client.
-3. **Audit Trail:** Every vote and its outcome is persisted in the database, allowing for accountability and review of administrative actions.
+1.  **Identity Verification:** The system uses JSON Web Tokens (JWT) for authentication. When an admin makes a request (e.g., to cast a vote), the `voterId` is extracted directly from the verified `req.user.id` payload in the JWT.
+2.  **No Spoofing:** There is no field in the request body (like `voterId` or `fromAdminId`) that the server will trust over the JWT. If an admin (Admin A) tries to send a request claiming to be Admin B, the server will ignore the claim and record the vote as coming from Admin A.
+3.  **Endpoint Integrity:**
+    - **`POST /demotion-votes`**: The `initiatorId` is automatically set to the ID of the admin who signed the request. You can only specify the *target* user.
+    - **`POST /demotion-votes/:id/vote`**: The vote is automatically attributed to the admin who signed the request. You cannot cast a vote "on behalf of" someone else.
+    - **`DELETE /demotion-votes/:id/vote`**: An admin can only withdraw their *own* vote. The system identifies which vote to remove based on the ID in the JWT.
+
+Even if you hit the endpoint directly using a tool like `curl` or Postman, you must provide a valid JWT. That JWT is cryptographically signed by the server and binds the request to your specific user identity. To pretend to be another admin, you would need to steal their specific secret `JWT_SECRET` or their active session token.
+
+### Summary of Protections
+- **Authentication:** You must be a logged-in user.
+- **Authorization:** You must have the `admin` role.
+- **Identity:** The server *knows* who you are from your token; it never asks you who you are in the request body.
+- **Consensus:** Even an admin cannot "self-resolve" a vote. They can only contribute one vote towards the majority.
+
