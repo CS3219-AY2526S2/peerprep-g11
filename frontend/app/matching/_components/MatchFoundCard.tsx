@@ -5,19 +5,17 @@ import { Card } from '@/components/ui/card';
 import { PreferenceSummaryBadge } from './PreferenceSummaryBadge';
 import type { MatchingPreferences } from '@/app/matching/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
-import { useRouter } from 'next/navigation';
 
 interface MatchFoundCardProps {
     preferences: MatchingPreferences;
     partnerId?: string;
     partnerName?: string;
-    matchId?: string;
     onCancel: () => void;
     isCancelling?: boolean;
+    onEnterSession: () => void;
 }
 
-export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, isCancelling }: MatchFoundCardProps) {
-    const router = useRouter();
+export function MatchFoundCard({ preferences, partnerName, onCancel, isCancelling, onEnterSession}: MatchFoundCardProps) {
     return (
         <Card className="w-[420px] shadow-[var(--shadow-xl)] border-border p-6 flex flex-col items-center gap-5">
             <div className="relative flex items-center justify-center w-20 h-20">
@@ -61,13 +59,7 @@ export function MatchFoundCard({ preferences, partnerName, matchId, onCancel, is
 
             <div className="grid grid-cols-1 gap-2 w-full">
                 <Button
-                    onClick={async () => {
-                        try {
-                            router.push(`/sessions/${matchId}`);
-                        } catch (error) {
-                            console.error('Failed to enter session:', error);
-                        }
-                    }}
+                    onClick={onEnterSession}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold rounded-lg"
                 >
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="mr-2">
