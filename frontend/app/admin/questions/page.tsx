@@ -31,6 +31,7 @@ export default function AdminDashboardPage() {
     defaultValues: {
       title: "",
       topics: "",
+      diffuculty: "",
       description: "",
       examples: "",
       constraints: ""
@@ -49,14 +50,20 @@ export default function AdminDashboardPage() {
       switch (actionType) {
         case "Get":
           method = "GET"
+          endpoint = "/api/questions/retrieve"
+          payload = { "title": values.title }
           break;
 
         case "Upsert":
           method = "POST"
+          endpoint = "/api/questions/upsert"
+          payload = values
           break;
 
         case "Delete":
           method = "DELETE"
+          endpoint = "/api/questions/delete"
+          payload = { "title": values.title }
           break;
       }
 
@@ -72,9 +79,10 @@ export default function AdminDashboardPage() {
         description: `${actionType} completed.`
       })
     } catch (error) {
-        toast("Error", {
-          description: "Failed to process request."
-        })
+      console.log("Hehe")
+      toast("Error", {
+        description: "Failed to process request."
+      })
     } finally {
       setLoadingAction(null)
     }
@@ -124,7 +132,7 @@ export default function AdminDashboardPage() {
                         <FieldLabel>Difficulty</FieldLabel>
                         <Select>
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose difficulty" />
+                            <SelectValue id="difficulty" placeholder="Choose difficulty" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
@@ -161,18 +169,15 @@ export default function AdminDashboardPage() {
                       />
                     </Field>
                     <div className="flex gap-2 pt-4">
-                      {/* Button 1: Only sends Title */}
                       <Button 
                         type="button" 
                         variant="outline"
                         disabled={!!loadingAction}
                         onClick={() => handleAction("Get")}
                       >
-                        {loadingAction === "Get"}
+                        
                         Retrieve
                       </Button>
-
-                      {/* Button 2: Sends Everything */}
                       <Button 
                         type="button" 
                         disabled={!!loadingAction}
@@ -181,8 +186,6 @@ export default function AdminDashboardPage() {
                         {loadingAction === "Upsert"}
                         Save All
                       </Button>
-
-                      {/* Button 3: Specific Delete logic */}
                       <Button 
                         type="button" 
                         variant="destructive"

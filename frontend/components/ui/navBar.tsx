@@ -130,7 +130,7 @@ export function NavBar({ activePage }: NavBarProps) {
             )}
             {user?.role === 'admin' && (
               <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
-                <Link href="/admin/questions">Questions</Link>
+                <Link href="/admin/questions">Add Questions</Link>
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
