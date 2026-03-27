@@ -174,10 +174,14 @@ export default function MatchingPage() {
 
         try {
             setState('matched_accepted');
-            cancelledRef.current = true; // prevent cleanup from cancelling
+            await fetch(`/api/sessions/${matchRequest.matchId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: matchRequest.matchId, partnerId:matchRequest.partnerId }),
+            });
             router.push(`/sessions/${matchRequest?.matchId}`);
         } catch (error) {
-            cancelledRef.current = false;
+            handleCancel();
             console.error('Failed to enter session:', error);
         }
     };
