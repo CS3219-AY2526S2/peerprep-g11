@@ -2,11 +2,12 @@ package peerprep.matching.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import peerprep.matching.models.MatchRequest;
-import peerprep.matching.service.JwtService;
 import peerprep.matching.service.MatchService;
 import peerprep.matching.documents.UserStateDoc;
 
@@ -17,20 +18,18 @@ public class MatchingController {
     @Autowired
     private MatchService matchService;
 
-    @Autowired
-    private JwtService jwtService;
-
     // --- Start a new match ---
     @PostMapping
-    public ResponseEntity<?> startMatch(@RequestBody MatchRequest req,
-                                        @RequestHeader("Authorization") String authHeader,
-                                        @CookieValue(value = "token", required = false) String cookieToken
-                                        ) {
+    public ResponseEntity<?> startMatch(@RequestBody MatchRequest req) {
+        String[] userInfo = getAuthenticatedUser();
+        if (userInfo == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
 
-        String jwtUserId = extractUserId(authHeader, cookieToken);
-        if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
+        String jwtUserId = userInfo[0];
+        String jwtUserName = userInfo[1];
         req.setUserId(jwtUserId);
+        req.setUserName(jwtUserName);
         UserStateDoc stateDoc = matchService.addUser(req);
 
         return ResponseEntity.status(201).body(Map.of(
@@ -41,17 +40,17 @@ public class MatchingController {
 
     // --- Cancel match ---
     @DeleteMapping("/{requestId}")
-    public ResponseEntity<?> cancelMatch(@PathVariable String requestId,
-                                         @RequestHeader("Authorization") String authHeader,
-                                         @CookieValue(value = "token", required = false) String cookieToken
-                                        ) {
+    public ResponseEntity<?> cancelMatch(@PathVariable String requestId) {
+        String[] userInfo = getAuthenticatedUser();
+        if (userInfo == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
 
-        String jwtUserId = extractUserId(authHeader, cookieToken);
-        if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
+        String jwtUserId = userInfo[0];
         UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
-        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId))
+        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId)) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
 
         boolean cancelled = matchService.cancelMatch(requestId);
         if (cancelled) return ResponseEntity.ok(Map.of("message", "Match cancelled"));
@@ -60,16 +59,17 @@ public class MatchingController {
 
     // --- Get match status ---
     @GetMapping("/{requestId}")
-    public ResponseEntity<?> getMatchStatus(@PathVariable String requestId,
-                                            @RequestHeader("Authorization") String authHeader,
-                                            @CookieValue(value = "token", required = false) String cookieToken
-                                            ) {
-        String jwtUserId = extractUserId(authHeader, cookieToken);
-        if (jwtUserId == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+    public ResponseEntity<?> getMatchStatus(@PathVariable String requestId) {
+        String[] userInfo = getAuthenticatedUser();
+        if (userInfo == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
 
+        String jwtUserId = userInfo[0];
         UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
-        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId))
+        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId)) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
 
         Map<String, Object> statusInfo = matchService.getStatusWithMatchId(requestId);
         if (statusInfo == null) {
@@ -79,17 +79,21 @@ public class MatchingController {
         return ResponseEntity.ok(statusInfo);
     }
 
-    private String extractUserId(String authHeader, String cookieToken) {
-        String token;
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            token = cookieToken;
-        } else {
-            token = authHeader.substring(7);
-        }
-        try {
-            return jwtService.extractUserId(token);
-        } catch (Exception e) {
+    private String[] getAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
+
+        Object principal = authentication.getPrincipal();
+        Object details = authentication.getDetails();
+
+        if (!(principal instanceof String)) {
+            return null;
+        }
+
+        String jwtUserId = (String) principal;
+        String jwtUserName = details != null ? details.toString() : null;
+        return new String[]{jwtUserId, jwtUserName};
     }
 }

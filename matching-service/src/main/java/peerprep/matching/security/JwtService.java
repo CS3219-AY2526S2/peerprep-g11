@@ -1,4 +1,4 @@
-package peerprep.matching.service;
+package peerprep.matching.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -11,14 +11,14 @@ public class JwtService {
     @Value("${JWT_SECRET}")
     private String secret;
 
-    public String extractUserId(String token) {
+    public String[] extractUserIdAndName(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(secret.getBytes())
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            return claims.get("id", String.class);
+            return new String[]{claims.get("id", String.class), claims.get("name", String.class)};
         } catch (Exception e) {
             System.out.println(e.toString());
             throw new RuntimeException("Invalid or expired JWT", e);
