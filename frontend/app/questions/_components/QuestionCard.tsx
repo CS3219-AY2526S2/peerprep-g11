@@ -8,11 +8,24 @@ import type { Question } from '@/app/questions/types';
 
 interface QuestionCardProps {
     question: Question;
+    showBackLink?: boolean;
+    backHref?: string;
+    bare?: boolean;
 }
 
-export function QuestionCard({ question }: QuestionCardProps) {
-    return (
-        <Card className="border-border shadow-[var(--shadow)] p-6 md:p-8 transition-shadow duration-300 hover:shadow-md">
+export function QuestionCard({
+    question,
+    showBackLink = true,
+    backHref = '/questions',
+    bare = false,
+}: QuestionCardProps) {
+    const descriptionParagraphs = question.description
+        .split('\n')
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean);
+
+    const content = (
+        <>
             <div className="flex items-center gap-2 flex-wrap mb-4">
                 <DifficultyBadge difficulty={question.difficulty} />
                 {question.topics.map((topic) => (
@@ -27,11 +40,13 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 {question.title}
             </h2>
 
-            <div className="text-[13.5px] leading-relaxed text-foreground space-y-3">
-                {question.description.split('\n').map((para, i) => (
-                    <p key={i}>{para}</p>
-                ))}
-            </div>
+            {descriptionParagraphs.length > 0 ? (
+                <div className="text-[13.5px] leading-relaxed text-foreground space-y-3">
+                    {descriptionParagraphs.map((paragraph, index) => (
+                        <p key={index}>{paragraph}</p>
+                    ))}
+                </div>
+            ) : null}
 
             {question.constraints.length > 0 && (
                 <div className="mt-4">
@@ -61,27 +76,39 @@ export function QuestionCard({ question }: QuestionCardProps) {
                 </div>
             ))}
 
-            <div className="flex gap-3 mt-6">
-                <Link
-                    href="/questions"
-                    className="group/back inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold px-4 py-2
-                        border border-border bg-card text-foreground no-underline
-                        transition-all duration-200 ease-out
-                        hover:bg-secondary hover:text-foreground hover:shadow-sm
-                        active:scale-[0.97] active:shadow-none"
-                >
-                    <svg
-                        viewBox="0 0 16 16"
-                        width="12"
-                        height="12"
-                        fill="none"
-                        className="transition-transform duration-200 group-hover/back:-translate-x-0.5"
+            {showBackLink ? (
+                <div className="flex gap-3 mt-6">
+                    <Link
+                        href={backHref}
+                        className="group/back inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold px-4 py-2
+                            border border-border bg-card text-foreground no-underline
+                            transition-all duration-200 ease-out
+                            hover:bg-secondary hover:text-foreground hover:shadow-sm
+                            active:scale-[0.97] active:shadow-none"
                     >
-                        <path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Back to Questions
-                </Link>
-            </div>
+                        <svg
+                            viewBox="0 0 16 16"
+                            width="12"
+                            height="12"
+                            fill="none"
+                            className="transition-transform duration-200 group-hover/back:-translate-x-0.5"
+                        >
+                            <path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Back to Questions
+                    </Link>
+                </div>
+            ) : null}
+        </>
+    );
+
+    if (bare) {
+        return <div className="px-4 py-4 md:px-5 md:py-5">{content}</div>;
+    }
+
+    return (
+        <Card className="border-border shadow-[var(--shadow)] p-6 md:p-8 transition-shadow duration-300 hover:shadow-md">
+            {content}
         </Card>
     );
 }

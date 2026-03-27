@@ -15,7 +15,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getAvatarColor } from '@/lib/avatar';
 
 interface NavBarProps {
-  activePage?: 'dashboard' | 'matching' | 'questions';
+  mode?: 'default' | 'admin';
+  activePage?: 'dashboard' | 'matching' | 'questions' | 'admin-dashboard' | 'admin-questions';
 }
 
 const PeerPrepLogo = () => (
@@ -46,9 +47,18 @@ const navLinks = [
   { href: '/questions', label: 'Questions', key: 'questions' },
 ] as const;
 
-export function NavBar({ activePage }: NavBarProps) {
+const adminNavLinks = [
+  { href: '/admin/dashboard', label: 'Dashboard', key: 'admin-dashboard' },
+  { href: '/admin/questions', label: 'Questions', key: 'admin-questions' },
+] as const;
+
+export function NavBar({ mode = 'default', activePage }: NavBarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const isAdminMode = mode === 'admin';
+  const links = isAdminMode ? adminNavLinks : navLinks;
+  const homeHref = isAdminMode ? '/admin/dashboard' : '/dashboard';
+  const brandLabel = isAdminMode ? 'PeerPrep Admin' : 'PeerPrep';
 
   const handleLogout = async () => {
     await logout();
@@ -66,17 +76,17 @@ export function NavBar({ activePage }: NavBarProps) {
         animate-nav-slide-down"
     >
       <Link
-        href="/dashboard"
+        href={homeHref}
         className="flex items-center gap-2.5 font-semibold text-foreground no-underline group"
       >
         <span className="transition-transform duration-200 group-hover:scale-110">
           <PeerPrepLogo />
         </span>
-        <span style={{ fontFamily: 'var(--font-serif)' }}>PeerPrep</span>
+        <span style={{ fontFamily: 'var(--font-serif)' }}>{brandLabel}</span>
       </Link>
 
       <div className="flex justify-center gap-1">
-        {navLinks.map(({ href, label, key }) => {
+        {links.map(({ href, label, key }) => {
           const isActive = activePage === key;
           return (
             <Button
@@ -117,18 +127,25 @@ export function NavBar({ activePage }: NavBarProps) {
               {user?.email ?? ''}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {isAdminMode && (
+              <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
+                <Link href="/dashboard">User View</Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
               <Link href="/profile">Profile</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
-              <Link href="/faq">FAQ</Link>
-            </DropdownMenuItem>
-            {user?.role === 'admin' && (
+            {!isAdminMode && (
+              <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
+                <Link href="/faq">FAQ</Link>
+              </DropdownMenuItem>
+            )}
+            {!isAdminMode && user?.role === 'admin' && (
               <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
                 <Link href="/admin/dashboard">Admin</Link>
               </DropdownMenuItem>
             )}
-            {user?.role === 'admin' && (
+            {!isAdminMode && user?.role === 'admin' && (
               <DropdownMenuItem asChild className="text-[12.5px] cursor-pointer">
                 <Link href="/admin/questions">Questions</Link>
               </DropdownMenuItem>

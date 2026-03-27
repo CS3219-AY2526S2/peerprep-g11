@@ -46,4 +46,26 @@ class QuestionSchema(BaseModel):
     
 class DeleteSchema(BaseModel):
     slug: str
+
+
+class BulkDeleteSchema(BaseModel):
+    slugs: list[str]
+
+    @field_validator('slugs', mode='before')
+    @classmethod
+    def validate_slugs(cls, slugs):
+        if not slugs:
+            raise ValueError('Need at least one slug')
+
+        cleaned = []
+        seen = set()
+        for slug in slugs:
+            if not slug or not isinstance(slug, str):
+                raise ValueError('Each slug must be a non-empty string')
+
+            if slug not in seen:
+                cleaned.append(slug)
+                seen.add(slug)
+
+        return cleaned
     

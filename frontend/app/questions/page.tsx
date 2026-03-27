@@ -29,22 +29,34 @@ export default function QuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available topics for filter dropdown
-  useEffect(() => {
-    async function fetchTopics() {
-      try {
-        // TODO: Replace with GET /api/questions/topics when available
-        const res = await fetch('/api/questions', { method: 'POST', body: JSON.stringify({ action: 'topics' }), headers: { 'Content-Type': 'application/json' } });
-        if (res.ok) {
-          const data = await res.json();
-          setTopics(data.topics ?? []);
-        }
-      } catch {
-        // Non-critical — filter dropdown will be empty
+  const fetchTopics = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch('/api/questions/topics', { signal });
+      if (!res.ok) {
+        throw new Error('Failed to fetch topics');
       }
+
+      const data: { topics?: string[] } = await res.json();
+      setTopics(data.topics ?? []);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+
+      setTopics([]);
     }
-    fetchTopics();
   }, []);
+
+  // Fetch available topics for filter dropdown once on mount.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void fetchTopics(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [fetchTopics]);
 
   // Fetch questions whenever filters or page change
   const fetchQuestions = useCallback(async () => {
@@ -73,7 +85,7 @@ export default function QuestionsPage() {
   }, [search, topic, difficulty, page]);
 
   useEffect(() => {
-    fetchQuestions();
+    void fetchQuestions();
   }, [fetchQuestions]);
 
   // Reset page when filters change

@@ -118,7 +118,7 @@ export default function AdminDashboardPage() {
   if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-background">
-        <NavBar />
+        <NavBar mode="admin" activePage="admin-dashboard" />
         <Skeleton />
       </div>
     );
@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <NavBar />
+      <NavBar mode="admin" activePage="admin-dashboard" />
 
       <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
         <div className="flex items-start justify-between mb-8">
