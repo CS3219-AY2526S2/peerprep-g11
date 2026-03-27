@@ -108,19 +108,19 @@ The request body should look like this. **All elements are required**.
 
 ### DELETE /questions/delete
 
-Delete a question with exact title from the repository.
+Delete a question with exact slug from the repository.
 
 #### Request body
 
 ```json
 {
-    "title": "Two Sum Variations",
+    "slug": "two-sum-variations"
 }
 ```
 
 | Variable          | Description | Constraint                                         |
 |-------------------|----------|------------------------------------------------------|
-| `title`   | Title of the target question      | None  |
+| `slug`   | Slug of the target question      | None  |
 
 #### Responses
 
@@ -128,6 +128,40 @@ Delete a question with exact title from the repository.
 |--------|-----------------------------------------------------|
 | 200    | Question deleted                                    |
 | 404    | Question not found                                  |
+| 503    | Database down, check health status of your database |
+
+---
+
+### POST /questions/bulk-delete
+
+Delete multiple questions by slug in a single request.
+
+The operation is all-or-nothing for missing questions:
+
+- If every slug exists, all matching questions are deleted.
+- If any slug is missing, the endpoint returns `404` and does not delete anything.
+
+#### Request body
+
+```json
+{
+    "slugs": [
+        "two-sum-variations",
+        "valid-parentheses"
+    ]
+}
+```
+
+| Variable          | Description | Constraint                                         |
+|-------------------|----------|------------------------------------------------------|
+| `slugs`   | Slugs of the target questions      | Must contain at least one slug  |
+
+#### Responses
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 200    | Questions deleted                                   |
+| 404    | One or more questions not found                     |
 | 503    | Database down, check health status of your database |
 
 ## Data Model
