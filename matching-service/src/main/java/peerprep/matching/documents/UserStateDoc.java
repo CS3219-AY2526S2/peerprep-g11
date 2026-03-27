@@ -16,6 +16,7 @@ public class UserStateDoc {
     @Indexed(unique = true)
     private String requestId;
     
+    private String userName;
     private String state;  // IDLE, PENDING, MATCHED, TIMED_OUT
     private String category;  // "topic|difficulty|language"
     private Date createdAt;
@@ -24,9 +25,10 @@ public class UserStateDoc {
     public UserStateDoc() {
     }
 
-    public UserStateDoc(String userId, String requestId, String state, String category) {
+    public UserStateDoc(String userId, String requestId, String userName, String state, String category) {
         this.userId = userId;
         this.requestId = requestId;
+        this.userName = userName;
         this.state = state;
         this.category = category;
         this.createdAt = new Date();
@@ -55,6 +57,14 @@ public class UserStateDoc {
 
     public void setRequestId(String requestId) {
         this.requestId = requestId;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
     public String getState() {

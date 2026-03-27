@@ -63,10 +63,14 @@ public class MatchService {
             }
             userStateRepository.delete(stateDoc);
         }
-        String category = req.getCategory();
+
         String requestId = UUID.randomUUID().toString();
         req.setRequestId(requestId);
-        stateDoc = new UserStateDoc(userId, requestId, UserState.PENDING.name(), category);
+
+        String userName = req.getUserName();
+        String category = req.getCategory();
+
+        stateDoc = new UserStateDoc(userId, requestId, userName, UserState.PENDING.name(), category);
         userStateRepository.save(stateDoc);
 
         synchronized (getLock(category)) {
@@ -259,6 +263,17 @@ public class MatchService {
             MatchDoc matchDoc = matchRepository.findActiveMatch(stateDoc.getUserId());
             if (matchDoc != null) {
                 result.put("matchId", matchDoc.getMatchId());
+                
+                String peerUserId;
+                if (matchDoc.getUser1().equals(userId)) {
+                    peerUserId = matchDoc.getUser2();
+                } else {
+                    peerUserId = matchDoc.getUser1();
+                }
+                result.put("partnerId", peerUserId);
+                
+                String peerUserName = userStateRepository.findByUserId(peerUserId).getUserName();
+                result.put("partnerName", peerUserName);
             }
         }
 

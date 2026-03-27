@@ -28,6 +28,9 @@ public class MatchingController {
 
         String jwtUserId = userInfo[0];
         String jwtUserName = userInfo[1];
+
+        // TODO: jwtUserName not included in token yet. Consider modifying token generation, or remove if unneccessary.
+
         req.setUserId(jwtUserId);
         req.setUserName(jwtUserName);
         UserStateDoc stateDoc = matchService.addUser(req);

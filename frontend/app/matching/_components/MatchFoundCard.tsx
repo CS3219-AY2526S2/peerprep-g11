@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 
 interface MatchFoundCardProps {
     preferences: MatchingPreferences;
+    partnerId?: string;
     partnerName?: string;
     matchId?: string;
     onCancel: () => void;
