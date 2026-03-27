@@ -44,19 +44,28 @@ class QuestionSchema(BaseModel):
         
         return constraints
     
-# Schema used for retrieve and delete
 class RetrieveDeleteSchema(BaseModel):
-    title: str
+    slug: str
 
-    @field_validator('title', mode='before')
+
+class BulkDeleteSchema(BaseModel):
+    slugs: list[str]
+
+    @field_validator('slugs', mode='before')
     @classmethod
-    def validate_title(cls, title):
-        if len(title) == 0:
-            raise ValueError('Enter a topic')
+    def validate_slugs(cls, slugs):
+        if not slugs:
+            raise ValueError('Need at least one slug')
 
-        for c in title:
-            if c != ' ' or c.isalnum():
-                raise ValueError('Title must not include special characters')
-            
-        return title
+        cleaned = []
+        seen = set()
+        for slug in slugs:
+            if not slug or not isinstance(slug, str):
+                raise ValueError('Each slug must be a non-empty string')
+
+            if slug not in seen:
+                cleaned.append(slug)
+                seen.add(slug)
+
+        return cleaned
     
