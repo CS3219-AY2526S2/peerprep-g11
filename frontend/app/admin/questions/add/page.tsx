@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react';
@@ -31,6 +31,7 @@ import {
   DEFAULT_ADMIN_QUESTION_FORM_VALUES,
   normalizeAdminQuestionPayload,
 } from '../_components/question-form-utils';
+import { useFloatingPreviewLayout } from '../_components/useFloatingPreviewLayout';
 import type {
   AdminQuestionFormValues,
   QuestionUpsertResponse,
@@ -42,33 +43,6 @@ const previewTransition = {
   duration: 0.34,
   ease: [0.16, 1, 0.3, 1] as const,
 };
-
-const DESKTOP_PREVIEW_BREAKPOINT = 1280;
-const FLOATING_PREVIEW_TOP = 96;
-
-type DesktopPreviewLayout =
-  | { mode: 'static' }
-  | { mode: 'fixed'; left: number; width: number }
-  | { mode: 'absolute'; top: number };
-
-function isSameDesktopPreviewLayout(
-  current: DesktopPreviewLayout,
-  next: DesktopPreviewLayout
-) {
-  if (current.mode !== next.mode) {
-    return false;
-  }
-
-  if (current.mode === 'fixed' && next.mode === 'fixed') {
-    return current.left === next.left && current.width === next.width;
-  }
-
-  if (current.mode === 'absolute' && next.mode === 'absolute') {
-    return current.top === next.top;
-  }
-
-  return true;
-}
 
 function PreviewPanel({ values }: { values: AdminQuestionFormValues }) {
   if (!canRenderQuestionPreview(values)) {
@@ -97,10 +71,14 @@ export default function AddAdminQuestionPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
-  const [desktopPreviewLayout, setDesktopPreviewLayout] = useState<DesktopPreviewLayout>({ mode: 'static' });
-  const previewRowRef = useRef<HTMLDivElement | null>(null);
-  const previewRailRef = useRef<HTMLElement | null>(null);
-  const previewCardRef = useRef<HTMLDivElement | null>(null);
+  const {
+    desktopPreviewLayout,
+    rowRef: previewRowRef,
+    railRef: previewRailRef,
+    cardRef: previewCardRef,
+    railSpacerHeight,
+    floatingPreviewTop,
+  } = useFloatingPreviewLayout(isPreviewOpen);
 
   const form = useForm<AdminQuestionFormValues>({
     resolver: zodResolver(adminQuestionSchema),
@@ -135,88 +113,6 @@ export default function AddAdminQuestionPage() {
 
     fetchTopics();
   }, []);
-
-  useEffect(() => {
-    if (!isPreviewOpen) {
-      setDesktopPreviewLayout((current) =>
-        isSameDesktopPreviewLayout(current, { mode: 'static' }) ? current : { mode: 'static' }
-      );
-      return;
-    }
-
-    let frameId = 0;
-
-    const updateDesktopPreviewLayout = () => {
-      if (
-        typeof window === 'undefined' ||
-        window.innerWidth < DESKTOP_PREVIEW_BREAKPOINT ||
-        !previewRowRef.current ||
-        !previewRailRef.current ||
-        !previewCardRef.current
-      ) {
-        setDesktopPreviewLayout((current) =>
-          isSameDesktopPreviewLayout(current, { mode: 'static' }) ? current : { mode: 'static' }
-        );
-        return;
-      }
-
-      const rowElement = previewRowRef.current;
-      const railElement = previewRailRef.current;
-      const cardElement = previewCardRef.current;
-
-      const rowRect = rowElement.getBoundingClientRect();
-      const railRect = railElement.getBoundingClientRect();
-      const scrollY = window.scrollY;
-      const rowTop = rowRect.top + scrollY;
-      const rowHeight = rowElement.offsetHeight;
-      const cardHeight = cardElement.offsetHeight;
-      const maxAbsoluteTop = Math.max(0, rowHeight - cardHeight);
-      const fixedStart = rowTop - FLOATING_PREVIEW_TOP;
-      const fixedEnd = rowTop + maxAbsoluteTop - FLOATING_PREVIEW_TOP;
-
-      if (scrollY <= fixedStart) {
-        setDesktopPreviewLayout((current) =>
-          isSameDesktopPreviewLayout(current, { mode: 'static' }) ? current : { mode: 'static' }
-        );
-        return;
-      }
-
-      if (scrollY >= fixedEnd) {
-        const nextLayout: DesktopPreviewLayout = {
-          mode: 'absolute',
-          top: maxAbsoluteTop,
-        };
-        setDesktopPreviewLayout((current) =>
-          isSameDesktopPreviewLayout(current, nextLayout) ? current : nextLayout
-        );
-        return;
-      }
-
-      const nextLayout: DesktopPreviewLayout = {
-        mode: 'fixed',
-        left: railRect.left,
-        width: railRect.width,
-      };
-      setDesktopPreviewLayout((current) =>
-        isSameDesktopPreviewLayout(current, nextLayout) ? current : nextLayout
-      );
-    };
-
-    const requestUpdate = () => {
-      cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(updateDesktopPreviewLayout);
-    };
-
-    requestUpdate();
-    window.addEventListener('scroll', requestUpdate, { passive: true });
-    window.addEventListener('resize', requestUpdate);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener('scroll', requestUpdate);
-      window.removeEventListener('resize', requestUpdate);
-    };
-  }, [isPreviewOpen, previewValues]);
 
   async function checkDuplicateTitle(title: string) {
     const normalizedTitle = title.trim();
@@ -562,6 +458,7 @@ export default function AddAdminQuestionPage() {
                     transition={previewTransition}
                     ref={previewRailRef}
                     className="relative hidden overflow-hidden xl:block xl:shrink-0 xl:self-start"
+                    style={railSpacerHeight ? { height: railSpacerHeight } : undefined}
                   >
                     <div
                       ref={previewCardRef}
@@ -570,7 +467,7 @@ export default function AddAdminQuestionPage() {
                         desktopPreviewLayout.mode === 'fixed'
                           ? {
                               position: 'fixed',
-                              top: FLOATING_PREVIEW_TOP,
+                              top: floatingPreviewTop,
                               left: desktopPreviewLayout.left,
                               width: desktopPreviewLayout.width,
                             }
