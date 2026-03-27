@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { NavBar } from '@/components/ui/navBar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { MatchingPreferencesForm } from '@/app/matching/_components/MatchingPreferencesForm';
 import { HowMatchingWorks } from '@/app/matching/_components/HowMatchingWorks';
@@ -23,6 +24,7 @@ export default function MatchingPage() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [matchingError, setMatchingError] = useState('');
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -90,6 +92,7 @@ export default function MatchingPage() {
     const handleStartMatching = async (prefs: MatchingPreferences) => {
         cancelledRef.current = false;
         setIsSubmitting(true);
+        setMatchingError('');
         try {
             const res = await fetch('/api/matching/requests', {
                 method: 'POST',
@@ -131,6 +134,7 @@ export default function MatchingPage() {
             }, 2000);
         } catch (error) {
             console.error('Error starting matching:', error);
+            setMatchingError('Unable to start matching. Please check if you have started matching on another tab.');
         } finally {
             setIsSubmitting(false);
         }
@@ -221,10 +225,17 @@ export default function MatchingPage() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                        <MatchingPreferencesForm
-                            onSubmit={handleStartMatching}
-                            isSubmitting={isSubmitting}
-                        />
+                        <div>
+                            {matchingError && (
+                                <Alert variant="destructive" className="mb-4">
+                                    <AlertDescription className="text-[12px]">{matchingError}</AlertDescription>
+                                </Alert>
+                            )}
+                            <MatchingPreferencesForm
+                                onSubmit={handleStartMatching}
+                                isSubmitting={isSubmitting}
+                            />
+                        </div>
                         <HowMatchingWorks />
                     </div>
                 </div>
