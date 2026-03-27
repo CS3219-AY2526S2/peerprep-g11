@@ -32,7 +32,8 @@ public class UserStateRepositoryImpl implements UserStateRepositoryCustom {
                 .set("requestId", requestId)
                 .set("userName", userName)
                 .set("state", "PENDING")
-                .set("category", category);
+                .set("category", category)
+                .set("createdAt", System.currentTimeMillis());
 
         try {
             UpdateResult result = mongoTemplate.upsert(query, update, UserStateDoc.class);

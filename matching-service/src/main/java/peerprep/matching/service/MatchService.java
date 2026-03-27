@@ -1,111 +1,141 @@
 package peerprep.matching.service;
 
-import peerprep.matching.models.MatchRequest;
-import peerprep.matching.repositories.WaitingQueueRepository;
-import peerprep.matching.repositories.MatchRepository;
-import peerprep.matching.repositories.UserStateRepository;
-import peerprep.matching.documents.WaitingQueueDoc;
+import java.util.*;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import peerprep.matching.documents.MatchDoc;
 import peerprep.matching.documents.UserStateDoc;
-import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.*;
-        import java.util.concurrent.*;
+import peerprep.matching.documents.WaitingQueueDoc;
+import peerprep.matching.models.MatchRequest;
+import peerprep.matching.models.UserState;
+import peerprep.matching.repositories.MatchRepository;
+import peerprep.matching.repositories.UserStateRepository;
+import peerprep.matching.repositories.WaitingQueueRepository;
 
 @Service
 public class MatchService {
 
     private static final long TWO_MIN_IN_MS = 120000;
 
-    @Autowired
-    private WaitingQueueRepository waitingQueueRepository;
+    private final WaitingQueueRepository waitingQueueRepository;
+    private final UserStateRepository userStateRepository;
+    private final MatchRepository matchRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired
-    private MatchRepository matchRepository;
-
-    @Autowired
-    private UserStateRepository userStateRepository;
-
-    // category → lock for synchronized matching
-    private final Map<String, Object> locks = new ConcurrentHashMap<>();
-
-    private Object getLock(String category) {
-        locks.putIfAbsent(category, new Object());
-        return locks.get(category);
-    }
-
-    public enum UserState {
-        IDLE,
-        PENDING,
-        MATCHED,
-        TIMED_OUT
+    public MatchService(
+            WaitingQueueRepository waitingQueueRepository,
+            UserStateRepository userStateRepository,
+            MatchRepository matchRepository,
+            MongoTransactionManager transactionManager) {
+        this.waitingQueueRepository = waitingQueueRepository;
+        this.userStateRepository = userStateRepository;
+        this.matchRepository = matchRepository;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
-     * Adds user to the waiting pool under the selected category (topic|difficulty|language)
+     * Adds user to the waiting pool under the selected category
      * and attempt to match users within the selected category.
-     * If user is already in the waiting pool, an exception is thrown.
-     * If user is currently in an active match, an exception is thrown.
+     * Fully transactional to prevent race conditions with cancelMatch.
+     * If user is already in the waiting pool or matched, an exception is thrown.
      *
-     * @param req A MatchRequest object containing user id, topic, difficulty and language.
+     * @param req A MatchRequest object containing user id and category.
      * @return The request ID of the match request of user.
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
     public String addUser(MatchRequest req) {
-        String userId = req.getUserId();
-        String requestId = UUID.randomUUID().toString();
-        req.setRequestId(requestId);
-        String userName = req.getUserName();
-        String category = req.getCategory();
+        return transactionTemplate.execute(status -> {
+            String userId = req.getUserId();
+            String requestId = UUID.randomUUID().toString();
+            req.setRequestId(requestId);
+            String userName = req.getUserName();
+            String category = req.getCategory();
 
-        boolean success = userStateRepository.upsertIfNotPendingOrMatched(
-            userId, requestId, userName, category);
+            boolean success = userStateRepository.upsertIfNotPendingOrMatched(
+                    userId, requestId, userName, category);
+            if (!success) {
+                throw new RuntimeException("User already in queue or matched");
+            }
 
-        if (!success) {
-            throw new RuntimeException("User already in queue or matched");
-        }
-
-        synchronized (getLock(category)) {
-            WaitingQueueDoc queueDoc = waitingQueueRepository.createIfNotExists(category);
+            waitingQueueRepository.createIfNotExists(category);
             waitingQueueRepository.enqueueUser(category, userId);
-            tryMatch(category);
-        }
 
-        return requestId;
+            tryMatchTransactional(category);
+
+            return requestId;
+        });
     }
 
     /**
-     * Removes user from the waiting pool.
-     *
+     * Try to match users in a category inside a transaction.
+     */
+    private void tryMatchTransactional(String category) {
+        while (true) {
+            String userId1 = waitingQueueRepository.dequeueUserAndReturn(category);
+            String userId2 = waitingQueueRepository.dequeueUserAndReturn(category);
+
+            if (userId1 == null) break;
+            if (userId2 == null) {
+                waitingQueueRepository.enqueueFront(category, userId1);
+                break;
+            }
+
+            UserStateDoc stateDoc1 = userStateRepository.findByUserId(userId1);
+            UserStateDoc stateDoc2 = userStateRepository.findByUserId(userId2);
+
+            boolean valid1 = stateDoc1 != null && stateDoc1.getState().equals(UserState.PENDING.name());
+            boolean valid2 = stateDoc2 != null && stateDoc2.getState().equals(UserState.PENDING.name());
+
+            if (!valid1 || !valid2) {
+                if (valid1) waitingQueueRepository.enqueueFront(category, userId1);
+                if (valid2) waitingQueueRepository.enqueueFront(category, userId2);
+                continue;
+            }
+
+            stateDoc1.setState(UserState.MATCHED.name());
+            stateDoc2.setState(UserState.MATCHED.name());
+            userStateRepository.save(stateDoc1);
+            userStateRepository.save(stateDoc2);
+
+            String matchId = UUID.randomUUID().toString();
+            MatchDoc matchDoc = new MatchDoc(matchId, userId1, userId2);
+            matchRepository.save(matchDoc);
+        }
+    }
+
+    /**
+     * Cancel a match request safely within a transaction.
+     * 
      * @param requestId Request ID of the match request of user.
      * @return true if user removed successfully, false if user was not found.
      */
     public boolean cancelMatch(String requestId) {
-        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
+        return transactionTemplate.execute(status -> {
+            UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
+            if (stateDoc == null) return false;
 
-        if (stateDoc == null) return false;
+            String userId = stateDoc.getUserId();
 
-        String userId = stateDoc.getUserId();
+            if (stateDoc.getState().equals(UserState.MATCHED.name())) {
+                MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
+                if (matchDoc == null) return false;
 
-        if (stateDoc.getState().equals(UserState.MATCHED.name())) {
-            MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
-            
-            if (matchDoc == null) return false;
+                matchRepository.delete(matchDoc);
+                userStateRepository.deleteByUserId(matchDoc.getUser1());
+                userStateRepository.deleteByUserId(matchDoc.getUser2());
+                return true;
+            }
 
-            matchRepository.delete(matchDoc);
-            userStateRepository.deleteByUserId(matchDoc.getUser1());
-            userStateRepository.deleteByUserId(matchDoc.getUser2());
-            return true;
-        }
-
-        String category = stateDoc.getCategory();
-        synchronized (getLock(category)) {
+            String category = stateDoc.getCategory();
             waitingQueueRepository.removeUser(category, userId);
-        }
-
-        userStateRepository.deleteByUserId(stateDoc.getUserId());
-        return true;
+            userStateRepository.deleteByUserId(userId);
+            return true;
+        });
     }
 
     /**
@@ -143,67 +173,35 @@ public class MatchService {
         return true;
     }
 
-    private void tryMatch(String category) {
-        while (true) {
-            String userId1 = waitingQueueRepository.dequeueUserAndReturn(category);
-            String userId2 = waitingQueueRepository.dequeueUserAndReturn(category);
-
-            if (userId1 == null) break;
-            if (userId2 == null) {
-                waitingQueueRepository.enqueueFront(category, userId1);
-                break;
-            }
-
-            UserStateDoc stateDoc1 = userStateRepository.findByUserId(userId1);
-            UserStateDoc stateDoc2 = userStateRepository.findByUserId(userId2);
-
-            Boolean state1Valid = stateDoc1 != null && stateDoc1.getState().equals(UserState.PENDING.name());
-            Boolean state2Valid = stateDoc2 != null && stateDoc2.getState().equals(UserState.PENDING.name());
-
-            if (!state1Valid || !state2Valid) {
-                if (state1Valid) {
-                    waitingQueueRepository.enqueueFront(category, userId1);
-                }
-                if (state2Valid) {
-                    waitingQueueRepository.enqueueFront(category, userId2);
-                }
-                continue;
-            }
-
-            stateDoc1.setState(UserState.MATCHED.name());
-            userStateRepository.save(stateDoc1);
-            stateDoc2.setState(UserState.MATCHED.name());
-            userStateRepository.save(stateDoc2);
-
-            String matchId = UUID.randomUUID().toString();
-            MatchDoc matchDoc = new MatchDoc(matchId, userId1, userId2);
-            matchRepository.save(matchDoc);
-        }
-    }
-
     /**
-     * Removes all users that have entered the waiting pool more than two min ago.
+     * Removes all users that have been in the waiting pool for more than two minutes.
+     * Fully transactional to avoid race conditions with matching or cancelling.
      */
     public void removeTimeoutUsers() {
+        List<WaitingQueueDoc> queues = waitingQueueRepository.findAll();
         long now = System.currentTimeMillis();
 
-        for (WaitingQueueDoc queueDoc : waitingQueueRepository.findAll()) {
+        for (WaitingQueueDoc queueDoc : queues) {
             String category = queueDoc.getCategory();
-            synchronized (getLock(category)) {
-                List<String> userIds = queueDoc.getUserIds();
+
+            transactionTemplate.execute(status -> {
+                List<String> userIds = new ArrayList<>(queueDoc.getUserIds());
 
                 for (String userId : userIds) {
                     UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
-                    if (stateDoc == null || !stateDoc.getState().equals(UserState.PENDING.name())) continue;
+                    if (stateDoc == null) continue;
+                    if (!stateDoc.getState().equals(UserState.PENDING.name())) continue;
 
                     long joinedAt = stateDoc.getCreatedAt().getTime();
                     if ((now - joinedAt) < TWO_MIN_IN_MS) continue;
 
-                    stateDoc.setState(UserState.TIMED_OUT.name());
                     waitingQueueRepository.removeUser(category, userId);
+                    stateDoc.setState(UserState.TIMED_OUT.name());
                     userStateRepository.save(stateDoc);
                 }
-            }
+
+                return null;
+            });
         }
     }
 
