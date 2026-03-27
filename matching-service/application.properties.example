@@ -1,1 +1,5 @@
 JWT_SECRET=ThisIsASuperSecretKeyWithAtLeast32Chars!
+
+# MongoDB Configuration
+spring.data.mongodb.uri=put_uri_here
+spring.data.mongodb.auto-index-creation=true
