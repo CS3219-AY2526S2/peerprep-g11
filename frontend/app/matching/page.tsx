@@ -174,12 +174,9 @@ export default function MatchingPage() {
 
         try {
             setState('matched_accepted');
-            await fetch(`/api/sessions/${matchRequest.matchId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: matchRequest.matchId, partnerId:matchRequest.partnerId }),
-            });
             router.push(`/sessions/${matchRequest?.matchId}`);
+            const res = await fetch(`/api/sessions/${matchRequest.matchId}`);
+            if (!res.ok) throw new Error('Failed to enter session');
         } catch (error) {
             handleCancel();
             console.error('Failed to enter session:', error);
