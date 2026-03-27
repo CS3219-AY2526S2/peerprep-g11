@@ -16,6 +16,7 @@ export interface MatchRequest {
     // These fields are only available after a match is found.
     matchId?: string;
     partnerName?: string;
+    partnerId?: string;
 }
 
 // Backend timeout window, in seconds.

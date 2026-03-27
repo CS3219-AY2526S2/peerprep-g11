@@ -50,6 +50,18 @@ export function LeaveSessionDialog({
         return;
       }
 
+      // matching-service endpoint: allow session participants to participate in matching after leaving a session.
+      try {
+        await fetch(`/api/matches/${sessionId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (endError) {
+        console.warn('Failed to end match session:', endError);
+      }
+
       setOpen(false);
       onError('');
       onSuccess(body as LeaveSessionResponse);
