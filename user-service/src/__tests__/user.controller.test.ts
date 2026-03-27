@@ -18,9 +18,7 @@ async function registerAndLogin(creds: typeof alice): Promise<string> {
   return res.body.token as string;
 }
 
-// ---------------------------------------------------------------------------
 // GET /users/me
-// ---------------------------------------------------------------------------
 describe('GET /users/me', () => {
   it('returns the authenticated user profile', async () => {
     const token = await registerAndLogin(alice);
@@ -46,11 +44,25 @@ describe('GET /users/me', () => {
       .set('Authorization', 'Bearer invalid.token.here');
     expect(res.status).toBe(401);
   });
+
+  it('returns skip_onboarding when it has been persisted', async () => {
+    const token = await registerAndLogin(alice);
+
+    await request(app)
+      .patch(`${USERS}/onboarding-preference`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ skip_onboarding: 1 });
+
+    const res = await request(app)
+      .get(`${USERS}/me`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.skip_onboarding).toBe(1);
+  });
 });
 
-// ---------------------------------------------------------------------------
 // PUT /users/profile
-// ---------------------------------------------------------------------------
 describe('PUT /users/profile', () => {
   it('updates the username successfully', async () => {
     const token = await registerAndLogin(alice);
@@ -123,9 +135,62 @@ describe('PUT /users/profile', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
+// PATCH /users/onboarding-preference
+describe('PATCH /users/onboarding-preference', () => {
+  it('persists skip_onboarding for the authenticated user', async () => {
+    const token = await registerAndLogin(alice);
+
+    const res = await request(app)
+      .patch(`${USERS}/onboarding-preference`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ skip_onboarding: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Onboarding preference updated');
+    expect(res.body.skip_onboarding).toBe(1);
+
+    const me = await request(app)
+      .get(`${USERS}/me`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(me.status).toBe(200);
+    expect(me.body.skip_onboarding).toBe(1);
+  });
+
+  it('returns 400 when the request body is empty', async () => {
+    const token = await registerAndLogin(alice);
+
+    const res = await request(app)
+      .patch(`${USERS}/onboarding-preference`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/skip_onboarding must be set to 1/i);
+  });
+
+  it('returns 400 when skip_onboarding is not 1', async () => {
+    const token = await registerAndLogin(alice);
+
+    const res = await request(app)
+      .patch(`${USERS}/onboarding-preference`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ skip_onboarding: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/skip_onboarding must be set to 1/i);
+  });
+
+  it('returns 401 without a token', async () => {
+    const res = await request(app)
+      .patch(`${USERS}/onboarding-preference`)
+      .send({ skip_onboarding: 1 });
+
+    expect(res.status).toBe(401);
+  });
+});
+
 // GET /users  (admin only)
-// ---------------------------------------------------------------------------
 describe('GET /users', () => {
   it('returns all users for an admin', async () => {
     // Register a normal user first
@@ -174,9 +239,7 @@ describe('GET /users', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // DELETE /users/:id  (admin only)
-// ---------------------------------------------------------------------------
 describe('DELETE /users/:id', () => {
   it('allows an admin to delete another user', async () => {
     await request(app).post(`${AUTH}/register`).send(bob);

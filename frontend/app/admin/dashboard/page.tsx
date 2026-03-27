@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AdminUserTable } from './AdminUserTable';
 import { AdminRequestsTable, AdminRequestItem } from './AdminRequestsTable';
+import { DemotionVoteItem } from './DemotionVoteDialog';
 import { NavBar } from '@/components/ui/navBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ export default function AdminDashboardPage() {
   const [fetchError, setFetchError] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
   const [adminRequests, setAdminRequests] = useState<AdminRequestItem[]>([]);
+  const [demotionVotes, setDemotionVotes] = useState<DemotionVoteItem[]>([]);
 
   const getAllUsers = async () => {
 
@@ -80,6 +82,38 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchDemotionVotes = async () => {
+    try {
+      const res = await fetch('/api/users/demotion-votes');
+      if (res.ok) {
+        const data = await res.json();
+        setDemotionVotes(data);
+      }
+    } catch {
+    }
+  };
+
+  const handleStartVote = async (targetUserId: string) => {
+    if (!confirm('Start a demotion vote against this admin?')) return;
+
+    try {
+      const res = await fetch('/api/users/demotion-votes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      });
+
+      if (res.ok) {
+        fetchDemotionVotes();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to start demotion vote');
+      }
+    } catch {
+      alert('A network error occurred.');
+    }
+  };
+
   const handleRequestAction = async (id: string, status: 'approved' | 'rejected') => {
     try {
       const res = await fetch(`/api/users/admin-requests/${id}`, {
@@ -113,12 +147,13 @@ export default function AdminDashboardPage() {
       .finally(() => setUsersLoading(false));
 
     fetchAdminRequests();
+    fetchDemotionVotes();
   }, [isLoading, user]);
 
   if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-background">
-        <NavBar />
+        <NavBar mode="admin" activePage="admin-dashboard" />
         <Skeleton />
       </div>
     );
@@ -126,7 +161,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <NavBar />
+      <NavBar mode="admin" activePage="admin-dashboard" />
 
       <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
         <div className="flex items-start justify-between mb-8">
@@ -193,7 +228,14 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <AdminUserTable users={users} onDelete={deleteUser} />
+            <AdminUserTable
+              users={users}
+              currentUserId={user.id}
+              demotionVotes={demotionVotes}
+              onDelete={deleteUser}
+              onStartVote={handleStartVote}
+              onVoteCast={fetchDemotionVotes}
+            />
           </CardContent>
         </Card>
       </div>

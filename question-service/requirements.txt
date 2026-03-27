@@ -1,0 +1,3 @@
+dotenv
+pymongo[srv]
+fastapi[standard]

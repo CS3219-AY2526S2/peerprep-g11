@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { SessionPageSkeleton } from '@/app/sessions/[sessionId]/_components/SessionPageSkeleton';
@@ -66,6 +66,7 @@ export default function SessionPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const currentUsernameRef = useRef('You');
 
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -79,7 +80,7 @@ export default function SessionPage() {
   const [walkthroughState, setWalkthroughState] =
     useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
-  const loadSessionPage = useCallback(async (sessionId: string) => {
+  const loadSessionPage = useCallback(async (sessionId: string, currentUsername: string) => {
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
@@ -102,7 +103,7 @@ export default function SessionPage() {
 
       const sessionData = applyCurrentUserToSession(
         sessionBody as SessionDetails,
-        user?.username ?? 'You'
+        currentUsername
       );
       setSession(sessionData);
       setSelectedLanguage(sessionData.selectedLanguage);
@@ -135,15 +136,31 @@ export default function SessionPage() {
       setLoadingSession(false);
       setLoadingQuestion(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (user?.username) {
+      currentUsernameRef.current = user.username;
+    }
   }, [user?.username]);
 
   useEffect(() => {
-    if (!params.sessionId || authLoading || !user) {
+    if (!params.sessionId || authLoading || !user?.id) {
       return;
     }
 
-    void loadSessionPage(params.sessionId);
-  }, [authLoading, loadSessionPage, params.sessionId, user]);
+    void loadSessionPage(params.sessionId, currentUsernameRef.current);
+  }, [authLoading, loadSessionPage, params.sessionId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.username) {
+      return;
+    }
+
+    setSession((currentSession) =>
+      currentSession ? applyCurrentUserToSession(currentSession, user.username) : currentSession
+    );
+  }, [user?.username]);
 
   function handleRetry() {
     if (!params.sessionId || authLoading || !user) {
@@ -159,7 +176,7 @@ export default function SessionPage() {
     setError(null);
     setLeaveError(null);
 
-    void loadSessionPage(params.sessionId);
+    void loadSessionPage(params.sessionId, user.username);
   }
 
   function handleLanguageChange(language: SessionLanguage) {

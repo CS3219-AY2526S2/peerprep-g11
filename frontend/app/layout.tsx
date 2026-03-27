@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/sonner";
 import { Open_Sans, Source_Serif_4, IBM_Plex_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

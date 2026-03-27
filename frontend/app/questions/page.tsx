@@ -8,7 +8,7 @@ import { QuestionTable } from '@/app/questions/_components/QuestionTable';
 import { PaginationControls } from '@/app/questions/_components/PaginationControls';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { PaginatedResponse } from '@/lib/types';
-import type { Question } from '@/app/questions/types';
+import type { QuestionListElement } from '@/app/questions/types';
 
 const PAGE_SIZE = 10;
 
@@ -22,29 +22,41 @@ export default function QuestionsPage() {
   const [page, setPage] = useState(1);
 
   // Data state
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuestionListElement[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available topics for filter dropdown
-  useEffect(() => {
-    async function fetchTopics() {
-      try {
-        // TODO: Replace with GET /api/questions/topics when available
-        const res = await fetch('/api/questions', { method: 'POST', body: JSON.stringify({ action: 'topics' }), headers: { 'Content-Type': 'application/json' } });
-        if (res.ok) {
-          const data = await res.json();
-          setTopics(data.topics ?? []);
-        }
-      } catch {
-        // Non-critical — filter dropdown will be empty
+  const fetchTopics = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch('/api/questions/topics', { signal });
+      if (!res.ok) {
+        throw new Error('Failed to fetch topics');
       }
+
+      const data: { topics?: string[] } = await res.json();
+      setTopics(data.topics ?? []);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+
+      setTopics([]);
     }
-    fetchTopics();
   }, []);
+
+  // Fetch available topics for filter dropdown once on mount.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void fetchTopics(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [fetchTopics]);
 
   // Fetch questions whenever filters or page change
   const fetchQuestions = useCallback(async () => {
@@ -61,7 +73,7 @@ export default function QuestionsPage() {
       const res = await fetch(`/api/questions?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch questions');
 
-      const body: PaginatedResponse<Question> = await res.json();
+      const body: PaginatedResponse<QuestionListElement> = await res.json();
       setQuestions(body.data);
       setTotal(body.total);
       setTotalPages(body.totalPages);
@@ -73,7 +85,7 @@ export default function QuestionsPage() {
   }, [search, topic, difficulty, page]);
 
   useEffect(() => {
-    fetchQuestions();
+    void fetchQuestions();
   }, [fetchQuestions]);
 
   // Reset page when filters change

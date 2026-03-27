@@ -1,15 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { User } from '../models/User';
 
 export interface AuthRequest extends Request {
   user?: { id: string; email: string; role: string };
 }
 
-export function authenticate(
+export async function authenticate(
   req: AuthRequest,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   let token: string | undefined;
 
   const authHeader = req.headers.authorization;
@@ -30,8 +31,22 @@ export function authenticate(
       id: string;
       email: string;
       role: string;
+      iat?: number;
     };
-    req.user = payload;
+
+    // Check if token was issued before a forced invalidation
+    if (payload.iat) {
+      const user = await User.findById(payload.id).select('tokenInvalidatedAt').lean();
+      if (user?.tokenInvalidatedAt) {
+        const invalidatedAtSec = Math.floor(new Date(user.tokenInvalidatedAt).getTime() / 1000);
+        if (payload.iat < invalidatedAtSec) {
+          res.status(401).json({ error: 'Invalid or expired token' });
+          return;
+        }
+      }
+    }
+
+    req.user = { id: payload.id, email: payload.email, role: payload.role };
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });
