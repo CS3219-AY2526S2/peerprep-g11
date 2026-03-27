@@ -33,11 +33,11 @@ public class MatchingController {
 
         req.setUserId(jwtUserId);
         req.setUserName(jwtUserName);
-        UserStateDoc stateDoc = matchService.addUser(req);
+        String requestId = matchService.addUser(req);
 
         return ResponseEntity.status(201).body(Map.of(
                 "message", "Matching started",
-                "requestId", stateDoc.getRequestId()
+                "requestId", requestId
         ));
     }
 

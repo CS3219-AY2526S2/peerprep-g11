@@ -1,19 +1,33 @@
 package peerprep.matching.repositories;
 
+import java.util.ArrayList;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
-import peerprep.matching.documents.WaitingQueueDoc;
 import org.springframework.stereotype.Repository;
+
+import peerprep.matching.documents.WaitingQueueDoc;
 
 @Repository
 public class WaitingQueueRepositoryImpl implements WaitingQueueRepositoryCustom {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+    @Override
+    public WaitingQueueDoc createIfNotExists(String category) {
+        Query query = Query.query(Criteria.where("category").is(category));
+        WaitingQueueDoc doc = mongoTemplate.findOne(query, WaitingQueueDoc.class);
+        if (doc == null) {
+            doc = new WaitingQueueDoc(category, new ArrayList<>());
+            mongoTemplate.save(doc);
+        }
+        return doc;
+    }
 
     @Override
     public void enqueueUser(String category, String userId) {

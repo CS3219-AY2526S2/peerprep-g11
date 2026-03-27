@@ -49,46 +49,30 @@ public class MatchService {
      * If user is currently in an active match, an exception is thrown.
      *
      * @param req A MatchRequest object containing user id, topic, difficulty and language.
+     * @return The request ID of the match request of user.
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
-    public UserStateDoc addUser(MatchRequest req) {
+    public String addUser(MatchRequest req) {
         String userId = req.getUserId();
-        UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
-        if (stateDoc != null) {
-            if (stateDoc.getState().equals(UserState.PENDING.name())) {
-                throw new RuntimeException("User already in queue");
-            }
-            if (stateDoc.getState().equals(UserState.MATCHED.name())) {
-                throw new RuntimeException("User already matched");
-            }
-            userStateRepository.delete(stateDoc);
-        }
-
         String requestId = UUID.randomUUID().toString();
         req.setRequestId(requestId);
-
         String userName = req.getUserName();
         String category = req.getCategory();
 
-        stateDoc = new UserStateDoc(userId, requestId, userName, UserState.PENDING.name(), category);
-        userStateRepository.save(stateDoc);
+        boolean success = userStateRepository.upsertIfNotPendingOrMatched(
+            userId, requestId, userName, category);
+
+        if (!success) {
+            throw new RuntimeException("User already in queue or matched");
+        }
 
         synchronized (getLock(category)) {
-            stateDoc = userStateRepository.findByUserId(userId);
-            if (stateDoc == null || !stateDoc.getState().equals(UserState.PENDING.name())) {
-                return null;
-            }
-            WaitingQueueDoc queueDoc = waitingQueueRepository.findByCategory(category);
-            if (queueDoc == null) {
-                queueDoc = new WaitingQueueDoc(category, new ArrayList<>());
-                waitingQueueRepository.save(queueDoc);
-            }
+            WaitingQueueDoc queueDoc = waitingQueueRepository.createIfNotExists(category);
             waitingQueueRepository.enqueueUser(category, userId);
             tryMatch(category);
         }
 
-        stateDoc = userStateRepository.findByUserId(userId);
-        return stateDoc;
+        return requestId;
     }
 
     /**
