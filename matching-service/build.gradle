@@ -18,6 +18,9 @@ repositories {
 dependencies {
     // Spring Boot web starter (REST + MVC)
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // WebClient for HTTP calls to other services
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
     // Scheduling support for @Scheduled
     implementation 'org.springframework.boot:spring-boot-starter'
