@@ -70,7 +70,7 @@ public class MatchService {
             String userName = req.getUserName();
             String category = req.getCategory();
 
-            boolean success = userStateRepository.upsertIfNotPendingOrMatched(
+            boolean success = userStateRepository.upsertIfNotActive(
                     userId, requestId, userName, category);
             if (!success) {
                 throw new RuntimeException("User already in queue or matched");
@@ -93,8 +93,7 @@ public class MatchService {
 
     /**
      * Try to match users in a category inside a transaction. 
-     * If matched, assign a question and save the match document. 
-     * If not, put users back into the waiting pool.
+     * If match is found, assign a question and save the match document. 
      * 
      * @param category The category to match users in.
      * @return List of created match info for notification to collaboration-service.
@@ -124,8 +123,8 @@ public class MatchService {
                 continue;
             }
 
-            stateDoc1.setState(UserState.MATCHED.name());
-            stateDoc2.setState(UserState.MATCHED.name());
+            stateDoc1.setState(UserState.MATCH_FOUND.name());
+            stateDoc2.setState(UserState.MATCH_FOUND.name());
             userStateRepository.save(stateDoc1);
             userStateRepository.save(stateDoc2);
 
@@ -151,6 +150,8 @@ public class MatchService {
         for (MatchNotificationRequest request : createdMatches) {
             try {
                 collaborationServiceClient.notifyMatchCreated(request);
+                userStateRepository.updateState(request.getUserId1(), UserState.MATCHED);
+                userStateRepository.updateState(request.getUserId2(), UserState.MATCHED);
             } catch (Exception e) {
                 logger.error("Failed to notify collaboration-service for match {}: {}",
                         request.getMatchId(), e.getMessage());

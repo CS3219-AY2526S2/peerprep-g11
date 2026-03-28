@@ -17,7 +17,7 @@ public class UserStateDoc {
     private String requestId;
     
     private String userName;
-    private String state;  // IDLE, PENDING, MATCHED, TIMED_OUT
+    private String state;  // IDLE, PENDING, MATCH_FOUND, MATCHED, TIMED_OUT
     private String category;  // "topic|difficulty|language"
     private Date createdAt;
     private Date expiresAt;  // TTL index
