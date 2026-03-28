@@ -1,24 +1,29 @@
-FROM eclipse-temurin:17 AS builder
+FROM eclipse-temurin:17-jdk AS builder
 WORKDIR /workspace
 
-# Copy working files and run gradle wrapper build
-COPY . .
-RUN chmod +x ./gradlew && ./gradlew bootJar -x test --no-daemon
+COPY gradlew build.gradle ./
+COPY gradle ./gradle
+
+RUN chmod +x ./gradlew
+
+COPY src ./src
+
+RUN ./gradlew bootJar -x test --no-daemon
 
 # Run stage
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre AS runner
 WORKDIR /app
 
-# Copy application properties
-COPY application.properties application.properties
+RUN groupadd --system spring && useradd --system --gid spring spring
 
-# Copy jar from builder
 COPY --from=builder /workspace/build/libs/*.jar app.jar
+COPY application.properties* ./
 
 EXPOSE 8080
 
-# Environment variables - only use external config file
-ENV SPRING_CONFIG_LOCATION=file:./application.properties
 ENV SPRING_APPLICATION_NAME=matching-service
+ENV SERVER_PORT=8080
+
+USER spring
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

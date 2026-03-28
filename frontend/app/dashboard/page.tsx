@@ -63,13 +63,6 @@ export default function DashboardPage() {
             </h1>
             <p className="text-[12.5px] text-muted-foreground">What would you like to do today?</p>
           </div>
-          <Badge
-            variant="outline"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11.5px] bg-card border-border text-muted-foreground shadow-sm"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground inline-block" />
-            Not in a session
-          </Badge>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">

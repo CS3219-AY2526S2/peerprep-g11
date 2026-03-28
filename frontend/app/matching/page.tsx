@@ -25,6 +25,7 @@ export default function MatchingPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
     const [matchingError, setMatchingError] = useState('');
+    const [topics, setTopics] = useState<string[]>([]);
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -37,6 +38,34 @@ export default function MatchingPage() {
         stateRef.current = state;
         matchRequestRef.current = matchRequest;
     });
+
+    const fetchTopics = useCallback(async (signal?: AbortSignal) => {
+        try {
+            const res = await fetch('/api/questions/topics', { signal });
+            if (!res.ok) {
+                throw new Error('Failed to fetch topics');
+            }
+
+            const data: { topics?: string[] } = await res.json();
+            setTopics(data.topics ?? []);
+        } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                return;
+            }
+
+            setTopics([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        const controller = new AbortController();
+
+        void fetchTopics(controller.signal);
+
+        return () => {
+            controller.abort();
+        };
+    }, [fetchTopics]);
 
     // Clear both intervals whenever matching ends or the page unmounts.
     const stopTimers = useCallback(() => {
@@ -232,6 +261,7 @@ export default function MatchingPage() {
                                 </Alert>
                             )}
                             <MatchingPreferencesForm
+                                topics={topics}
                                 onSubmit={handleStartMatching}
                                 isSubmitting={isSubmitting}
                             />
