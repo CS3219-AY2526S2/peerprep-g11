@@ -63,6 +63,37 @@ export async function updateUser(req: AuthRequest, res: Response): Promise<void>
   }
 }
 
+export async function updateOnboardingPreference(
+  req: AuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const { skip_onboarding } = req.body ?? {};
+
+    if (skip_onboarding !== 1) {
+      res.status(400).json({ error: 'skip_onboarding must be set to 1' });
+      return;
+    }
+
+    user.skip_onboarding = 1;
+    await user.save();
+
+    res.json({
+      message: 'Onboarding preference updated',
+      skip_onboarding: user.skip_onboarding,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 export async function deleteUser(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;

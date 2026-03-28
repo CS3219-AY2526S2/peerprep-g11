@@ -66,19 +66,6 @@ export default function CreateAccountPage() {
     }
   };
 
-  const CriterionRow = ({ met, label }: { met: boolean; label: string }) => (
-    <span className={`flex items-center gap-1.5 text-[11px] ${met ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-      <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 shrink-0">
-        {met ? (
-          <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        ) : (
-          <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-        )}
-      </svg>
-      {label}
-    </span>
-  );
-
   return (
     <div className="min-h-screen grid place-items-center px-6 py-10 bg-background">
       <div className="w-full max-w-[380px] grid gap-6">
@@ -103,7 +90,6 @@ export default function CreateAccountPage() {
                 </Alert>
               )}
 
-              {/* Username */}
               <div className="grid gap-1.5">
                 <Label htmlFor="username" className="text-[12.5px] font-semibold">Username</Label>
                 <Input
@@ -120,7 +106,6 @@ export default function CreateAccountPage() {
                 )}
               </div>
 
-              {/* Email */}
               <div className="grid gap-1.5">
                 <Label htmlFor="email" className="text-[12.5px] font-semibold">Email</Label>
                 <Input
@@ -137,7 +122,6 @@ export default function CreateAccountPage() {
                 )}
               </div>
 
-              {/* Password */}
               <div className="grid gap-1.5">
                 <Label htmlFor="password" className="text-[12.5px] font-semibold">Password</Label>
                 <Input
@@ -157,7 +141,6 @@ export default function CreateAccountPage() {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div className="grid gap-1.5">
                 <Label htmlFor="confirmPassword" className="text-[12.5px] font-semibold">Confirm Password</Label>
                 <Input

@@ -15,7 +15,6 @@ interface TimedOutCardProps {
 export function TimedOutCard({ preferences, onRetry, onBack }: TimedOutCardProps) {
     return (
         <Card className="w-[380px] shadow-[var(--shadow)] border-border p-5 flex flex-col gap-3.5">
-            {/* Timeout icon */}
             <div className="flex justify-center">
                 <div className="w-12 h-12 rounded-full bg-destructive/10 grid place-items-center">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" className="text-destructive">

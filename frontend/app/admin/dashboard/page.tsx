@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { AdminUserTable } from './AdminUserTable';
+import { AdminRequestsTable, AdminRequestItem } from './AdminRequestsTable';
+import { DemotionVoteItem } from './DemotionVoteDialog';
 import { NavBar } from '@/components/ui/navBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +25,8 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [fetchError, setFetchError] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [adminRequests, setAdminRequests] = useState<AdminRequestItem[]>([]);
+  const [demotionVotes, setDemotionVotes] = useState<DemotionVoteItem[]>([]);
 
   const getAllUsers = async () => {
 
@@ -54,7 +58,7 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
-  
+
       if (res.ok) {
         setUsers((prev) => prev.filter((u) => u._id !== userId));
       } else {
@@ -67,6 +71,72 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchAdminRequests = async () => {
+    try {
+      const res = await fetch('/api/users/admin-requests');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminRequests(data);
+      }
+    } catch {
+    }
+  };
+
+  const fetchDemotionVotes = async () => {
+    try {
+      const res = await fetch('/api/users/demotion-votes');
+      if (res.ok) {
+        const data = await res.json();
+        setDemotionVotes(data);
+      }
+    } catch {
+    }
+  };
+
+  const handleStartVote = async (targetUserId: string) => {
+    if (!confirm('Start a demotion vote against this admin?')) return;
+
+    try {
+      const res = await fetch('/api/users/demotion-votes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      });
+
+      if (res.ok) {
+        fetchDemotionVotes();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to start demotion vote');
+      }
+    } catch {
+      alert('A network error occurred.');
+    }
+  };
+
+  const handleRequestAction = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch(`/api/users/admin-requests/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (res.ok) {
+        setAdminRequests((prev) => prev.filter((r) => r._id !== id));
+        if (status === 'approved') {
+          // Refresh user list to reflect role change
+          getAllUsers().then(setUsers).catch(() => {});
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to process request');
+      }
+    } catch {
+      alert('A network error occurred.');
+    }
+  };
+
   useEffect(() => {
     // Don't fetch until auth is resolved
     if (isLoading || !user) return;
@@ -75,12 +145,15 @@ export default function AdminDashboardPage() {
       .then(setUsers)
       .catch(() => setFetchError(true))
       .finally(() => setUsersLoading(false));
+
+    fetchAdminRequests();
+    fetchDemotionVotes();
   }, [isLoading, user]);
 
   if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-background">
-        <NavBar />
+        <NavBar mode="admin" activePage="admin-dashboard" />
         <Skeleton />
       </div>
     );
@@ -88,10 +161,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <NavBar />
+      <NavBar mode="admin" activePage="admin-dashboard" />
 
-      <div className="px-10 py-8 pb-16 max-w-[1100px] mx-auto">
-        {/* Header */}
+      <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1
@@ -114,7 +186,6 @@ export default function AdminDashboardPage() {
           </Badge>
         </div>
 
-        {/* Error state */}
         {fetchError && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription className="text-[12.5px]">
@@ -123,7 +194,30 @@ export default function AdminDashboardPage() {
           </Alert>
         )}
 
-        {/* Users table */}
+        {adminRequests.length > 0 && (
+          <Card className="border-border shadow-[var(--shadow)] mb-6">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle
+                  className="text-[15px] font-semibold"
+                  style={{ fontFamily: 'var(--font-serif)' }}
+                >
+                  Admin Requests
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className="text-[11px] rounded-full px-2.5 font-medium text-accent bg-accent-soft border-accent/20"
+                >
+                  {adminRequests.length} pending
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <AdminRequestsTable requests={adminRequests} onAction={handleRequestAction} />
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-border shadow-[var(--shadow)]">
           <CardHeader className="pb-3">
             <CardTitle
@@ -134,7 +228,14 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <AdminUserTable users={users} onDelete={deleteUser}/>
+            <AdminUserTable
+              users={users}
+              currentUserId={user.id}
+              demotionVotes={demotionVotes}
+              onDelete={deleteUser}
+              onStartVote={handleStartVote}
+              onVoteCast={fetchDemotionVotes}
+            />
           </CardContent>
         </Card>
       </div>

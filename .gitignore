@@ -2,3 +2,7 @@
 .DS_Store
 AGENTS.md
 CLAUDE.md
+__pycache__
+.DS_Store
+.env
+.venv

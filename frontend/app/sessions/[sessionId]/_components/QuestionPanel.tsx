@@ -11,7 +11,7 @@ interface QuestionPanelProps {
 
 export function QuestionPanel({ question }: QuestionPanelProps) {
   return (
-    <Card className="border-border bg-card shadow-[var(--shadow)]">
+    <Card data-nextstep="question-panel" className="border-border bg-card shadow-[var(--shadow)]">
       <CardHeader className="gap-4 pb-0">
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

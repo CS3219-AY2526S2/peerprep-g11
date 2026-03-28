@@ -1,55 +1,76 @@
+import { fetchWithAuth, forwardAuthHeaders } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-// TODO: Replace mock data with real matching-service call
+const MATCHING_SERVICE_URL =
+  process.env.MATCHING_SERVICE_URL ?? 'http://localhost:8080';
 
-// Simple in-memory store to track mock request creation times (dev only)
-const createdAtMap = new Map<string, number>();
-
+/**
+ * Gets the current user's matching status.
+ * @returns Match data if successful, error message otherwise
+ */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
 
   try {
-    // Track when we first saw this request
-    if (!createdAtMap.has(requestId)) {
-      const ts = parseInt(requestId.split('-').pop() ?? '0', 10) || Date.now();
-      createdAtMap.set(requestId, ts);
+    const res = await fetchWithAuth(
+      `${MATCHING_SERVICE_URL}/matching/requests/${requestId}`,
+      {
+        headers: {
+          ...forwardAuthHeaders(request),
+        },
+      }
+    );
+
+    const text = await res.text();
+
+    try {
+      const data = JSON.parse(text);
+      return NextResponse.json(data, { status: res.status });
+    } catch {
+      return NextResponse.json(
+        { message: text },
+        { status: res.status }
+      );
     }
-
-    const elapsed = (Date.now() - createdAtMap.get(requestId)!) / 1000;
-
-    // TODO: Poll real matching microservice for status
-    // Mock: transition to "matched" after ~10s
-    const isMatched = elapsed >= 10;
-
-    return NextResponse.json({
-      requestId,
-      status: isMatched ? 'matched' : 'pending',
-      preferences: {
-        topic: 'Arrays',
-        difficulty: 'Easy',
-        language: 'python',
-      },
-      ...(isMatched && { matchId: 'mock-match-001', partnerName: 'Alex P.' }),
-    });
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch match status' }, { status: 500 });
+  } catch (err) {
+    console.error('Fetch match status error:', err);
+    return NextResponse.json(
+      { error: 'Failed to fetch match status' },
+      { status: 503 }
+    );
   }
 }
 
+
+/**
+ * Cancels the current user's matching attempt.
+ * @returns Success message if successful, error message if unsuccessful
+ */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   const { requestId } = await params;
 
   try {
-    // TODO: Forward cancellation to matching microservice
-    createdAtMap.delete(requestId);
+    await fetchWithAuth(
+      `${MATCHING_SERVICE_URL}/matching/requests/${requestId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          ...forwardAuthHeaders(request),
+        },
+      }
+    );
+
     return NextResponse.json({ requestId, status: 'cancelled' });
   } catch {
-    return NextResponse.json({ error: 'Failed to cancel match request' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to cancel match request' },
+      { status: 500 }
+    );
   }
 }

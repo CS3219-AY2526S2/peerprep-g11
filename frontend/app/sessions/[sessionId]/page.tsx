@@ -1,16 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { NavBar } from '@/components/ui/navBar';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { SessionPageSkeleton } from '@/app/sessions/[sessionId]/_components/SessionPageSkeleton';
 import { SessionErrorState } from '@/app/sessions/[sessionId]/_components/SessionErrorState';
 import { SessionHeader } from '@/app/sessions/[sessionId]/_components/SessionHeader';
 import { QuestionPanel } from '@/app/sessions/[sessionId]/_components/QuestionPanel';
 import { EditorPanel } from '@/app/sessions/[sessionId]/_components/EditorPanel';
+import { SessionOnboardingTour } from '@/app/sessions/[sessionId]/_components/SessionOnboardingTour';
+import { AiSidebar } from '@/app/sessions/[sessionId]/_components/AiSidebar';
+import { AiSidebarToggle } from '@/app/sessions/[sessionId]/_components/AiSidebarToggle';
+import { SESSION_TOUR_STEP_INDEX } from '@/app/sessions/[sessionId]/_components/sessionTourSteps';
+import { useSessionAi } from '@/app/sessions/[sessionId]/useSessionAi';
 import type { Question } from '@/app/questions/types';
 import type {
+  AiTab,
   LeaveSessionResponse,
   SessionDetails,
   SessionLanguage,
@@ -21,6 +26,26 @@ const EMPTY_DRAFTS: Record<SessionLanguage, string> = {
   python: '',
   java: '',
 };
+
+interface SessionWalkthroughState {
+  activeStepIndex: number | null;
+  isEditorExplainDemoActive: boolean;
+  isAiSidebarForcedOpen: boolean;
+  forcedAiTab: AiTab | null;
+  stepFiveVisitedTabs: AiTab[];
+  canAdvanceFromStepFive: boolean;
+}
+
+function createInitialWalkthroughState(): SessionWalkthroughState {
+  return {
+    activeStepIndex: null,
+    isEditorExplainDemoActive: false,
+    isAiSidebarForcedOpen: false,
+    forcedAiTab: null,
+    stepFiveVisitedTabs: [],
+    canAdvanceFromStepFive: false,
+  };
+}
 
 function applyCurrentUserToSession(session: SessionDetails, username: string) {
   return {
@@ -41,6 +66,7 @@ export default function SessionPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const currentUsernameRef = useRef('You');
 
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -51,8 +77,10 @@ export default function SessionPage() {
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [walkthroughState, setWalkthroughState] =
+    useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
-  const loadSessionPage = useCallback(async (sessionId: string) => {
+  const loadSessionPage = useCallback(async (sessionId: string, currentUsername: string) => {
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
@@ -75,7 +103,7 @@ export default function SessionPage() {
 
       const sessionData = applyCurrentUserToSession(
         sessionBody as SessionDetails,
-        user?.username ?? 'You'
+        currentUsername
       );
       setSession(sessionData);
       setSelectedLanguage(sessionData.selectedLanguage);
@@ -108,15 +136,31 @@ export default function SessionPage() {
       setLoadingSession(false);
       setLoadingQuestion(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (user?.username) {
+      currentUsernameRef.current = user.username;
+    }
   }, [user?.username]);
 
   useEffect(() => {
-    if (!params.sessionId || authLoading || !user) {
+    if (!params.sessionId || authLoading || !user?.id) {
       return;
     }
 
-    void loadSessionPage(params.sessionId);
-  }, [authLoading, loadSessionPage, params.sessionId, user]);
+    void loadSessionPage(params.sessionId, currentUsernameRef.current);
+  }, [authLoading, loadSessionPage, params.sessionId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.username) {
+      return;
+    }
+
+    setSession((currentSession) =>
+      currentSession ? applyCurrentUserToSession(currentSession, user.username) : currentSession
+    );
+  }, [user?.username]);
 
   function handleRetry() {
     if (!params.sessionId || authLoading || !user) {
@@ -132,7 +176,7 @@ export default function SessionPage() {
     setError(null);
     setLeaveError(null);
 
-    void loadSessionPage(params.sessionId);
+    void loadSessionPage(params.sessionId, user.username);
   }
 
   function handleLanguageChange(language: SessionLanguage) {
@@ -152,6 +196,96 @@ export default function SessionPage() {
     });
   }
 
+  const handleTourStepChange = useCallback((stepIndex: number | null) => {
+    setWalkthroughState((current) => {
+      if (stepIndex === null) {
+        return createInitialWalkthroughState();
+      }
+
+      if (stepIndex === SESSION_TOUR_STEP_INDEX.EXPLAIN_DEMO) {
+        return {
+          activeStepIndex: stepIndex,
+          isEditorExplainDemoActive: true,
+          isAiSidebarForcedOpen: false,
+          forcedAiTab: null,
+          stepFiveVisitedTabs: [],
+          canAdvanceFromStepFive: false,
+        };
+      }
+
+      if (stepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
+        const stayingOnSidebarStep =
+          current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
+
+        return {
+          activeStepIndex: stepIndex,
+          isEditorExplainDemoActive: false,
+          isAiSidebarForcedOpen: true,
+          forcedAiTab: stayingOnSidebarStep ? current.forcedAiTab : 'hints',
+          stepFiveVisitedTabs: stayingOnSidebarStep ? current.stepFiveVisitedTabs : [],
+          canAdvanceFromStepFive: stayingOnSidebarStep
+            ? current.canAdvanceFromStepFive
+            : false,
+        };
+      }
+
+      return {
+        activeStepIndex: stepIndex,
+        isEditorExplainDemoActive: false,
+        isAiSidebarForcedOpen: false,
+        forcedAiTab: null,
+        stepFiveVisitedTabs: [],
+        canAdvanceFromStepFive: false,
+      };
+    });
+  }, []);
+
+  const handleWalkthroughTabClick = useCallback((tab: AiTab) => {
+    setWalkthroughState((current) => {
+      if (current.activeStepIndex !== SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
+        return current;
+      }
+
+      const nextVisitedTabs = current.stepFiveVisitedTabs.includes(tab)
+        ? current.stepFiveVisitedTabs
+        : [...current.stepFiveVisitedTabs, tab];
+
+      return {
+        ...current,
+        forcedAiTab: null,
+        stepFiveVisitedTabs: nextVisitedTabs,
+        canAdvanceFromStepFive: tab === 'explain',
+      };
+    });
+  }, []);
+
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    activeAiTab,
+    setActiveAiTab,
+    explanations,
+    activeExplainIndex,
+    setActiveExplainIndex,
+    handleExplainCode,
+    hintMessages,
+    isHintStreaming,
+    handleSendHint,
+    handleClearHints,
+  } = useSessionAi({
+    sessionId: params.sessionId,
+    question,
+    selectedLanguage,
+    codeByLanguage,
+  });
+
+  const isAiSidebarVisible = sidebarOpen || walkthroughState.isAiSidebarForcedOpen;
+  const isStepFiveActive =
+    walkthroughState.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
+  const nextDisabledMessage = isStepFiveActive
+    ? 'Click the Explain tab in the AI sidebar to continue the walkthrough.'
+    : null;
+
   if (authLoading || !user) {
     return <SessionPageSkeleton />;
   }
@@ -168,8 +302,7 @@ export default function SessionPage() {
 
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <NavBar />
-        <div className="mx-auto max-w-[1680px] px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
+        <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
           <SessionErrorState
             title={notFound ? 'Session unavailable' : 'Unable to open session'}
             message={
@@ -186,26 +319,58 @@ export default function SessionPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <NavBar />
-      <div className="mx-auto max-w-[1680px] px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
-        <SessionHeader
-          sessionId={session.sessionId}
-          participants={session.participants}
-          leaveError={leaveError}
-          onLeaveSuccess={handleLeaveSuccess}
-          onLeaveError={setLeaveError}
+      <AiSidebarToggle
+        onClick={() => setSidebarOpen(true)}
+        visible={!isAiSidebarVisible}
+      />
+      <div className="flex min-h-screen">
+        <AiSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          activeTab={activeAiTab}
+          onTabChange={setActiveAiTab}
+          explanations={explanations}
+          activeExplainIndex={activeExplainIndex}
+          onActiveExplainIndexChange={setActiveExplainIndex}
+          hintMessages={hintMessages}
+          isHintStreaming={isHintStreaming}
+          onSendHint={handleSendHint}
+          onClearHints={handleClearHints}
+          walkthroughForceOpen={walkthroughState.isAiSidebarForcedOpen}
+          walkthroughForcedTab={walkthroughState.forcedAiTab}
+          onWalkthroughTabClick={handleWalkthroughTabClick}
+          walkthroughDisableTransition={walkthroughState.activeStepIndex !== null}
         />
+        <div className="min-w-0 flex-1">
+          <SessionOnboardingTour
+            onStepChange={handleTourStepChange}
+            isNextDisabled={isStepFiveActive && !walkthroughState.canAdvanceFromStepFive}
+            nextDisabledMessage={nextDisabledMessage}
+          >
+            <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
+              <SessionHeader
+                sessionId={session.sessionId}
+                participants={session.participants}
+                leaveError={leaveError}
+                onLeaveSuccess={handleLeaveSuccess}
+                onLeaveError={setLeaveError}
+              />
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
-          <QuestionPanel question={question} />
-          <EditorPanel
-            sessionId={session.sessionId}
-            selectedLanguage={selectedLanguage}
-            allowedLanguages={session.allowedLanguages}
-            value={codeByLanguage[selectedLanguage]}
-            onLanguageChange={handleLanguageChange}
-            onChange={handleEditorChange}
-          />
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
+                <QuestionPanel question={question} />
+                <EditorPanel
+                  sessionId={session.sessionId}
+                  selectedLanguage={selectedLanguage}
+                  allowedLanguages={session.allowedLanguages}
+                  value={codeByLanguage[selectedLanguage]}
+                  onLanguageChange={handleLanguageChange}
+                  onChange={handleEditorChange}
+                  onExplainCode={handleExplainCode}
+                  walkthroughShowExplainDemo={walkthroughState.isEditorExplainDemoActive}
+                />
+              </div>
+            </div>
+          </SessionOnboardingTour>
         </div>
       </div>
     </div>

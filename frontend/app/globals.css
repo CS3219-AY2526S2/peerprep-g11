@@ -51,6 +51,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -69,6 +70,9 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
   --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-fade-in-up: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-nav-slide-down: navSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-bounce-dot: bounce-dot 1.2s ease-in-out infinite;
 }
 
 @keyframes shimmer {
@@ -78,6 +82,41 @@
 
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navSlideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
   }
 }
 
@@ -94,8 +133,9 @@
   --secondary-foreground: oklch(0.2570 0.0105 242.1169);
   --muted: oklch(0.9666 0.0086 67.7242);
   --muted-foreground: oklch(0.5251 0.0100 84.5884);
-  --accent: oklch(0.4908 0.0547 180.4743);
+  --accent: oklch(0.50 0.08 180);
   --accent-foreground: oklch(1.0000 0 0);
+  --accent-soft: oklch(0.94 0.025 178);
   --destructive: oklch(0.5824 0.1620 22.7259);
   --destructive-foreground: oklch(1.0000 0 0);
   --border: oklch(0.9067 0.0144 74.4171);
@@ -150,8 +190,9 @@
   --secondary-foreground: oklch(0.2570 0.0105 242.1169);
   --muted: oklch(0.9666 0.0086 67.7242);
   --muted-foreground: oklch(0.5251 0.0100 84.5884);
-  --accent: oklch(0.4908 0.0547 180.4743);
+  --accent: oklch(0.50 0.08 180);
   --accent-foreground: oklch(1.0000 0 0);
+  --accent-soft: oklch(0.94 0.025 178);
   --destructive: oklch(0.5824 0.1620 22.7259);
   --destructive-foreground: oklch(1.0000 0 0);
   --border: oklch(0.9067 0.0144 74.4171);
@@ -196,4 +237,78 @@
   body {
     letter-spacing: var(--tracking-normal);
   }
+}
+
+/* ── Monaco context menu customizations ────────────── */
+
+/* Hide Command Palette and Change All Occurrences */
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="Command Palette"]),
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="Change All Occurrences"]) {
+  display: none !important;
+}
+
+/* Also hide orphan separators that sit between hidden items */
+.monaco-menu-container li.action-item.separator:has(+ li.action-item:has(> .action-label[aria-label="Command Palette"])) {
+  display: none !important;
+}
+
+/* Style the "PeerPrep AI: Explain Code" context menu item */
+.monaco-menu-container li.action-item:has(> .action-label[aria-label="PeerPrep AI: Explain Code"])>.action-label {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+/* ── Floating Explain selection widget ─────────────── */
+
+.peerprep-explain-widget {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: oklch(1.0 0 0 / 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.10), 0 0 0 1px hsl(0 0% 0% / 0.04);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  transition: all 0.15s ease-out;
+  white-space: nowrap;
+  z-index: 2147483647;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.peerprep-explain-widget:hover {
+  background: oklch(0.94 0.025 178);
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px hsl(0 0% 0% / 0.14), 0 0 0 1px var(--accent);
+  transform: translateY(-1px);
+}
+
+.peerprep-explain-widget:disabled {
+  cursor: default;
+  opacity: 0.75;
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.08), 0 0 0 1px hsl(0 0% 0% / 0.03);
+}
+
+.peerprep-explain-widget:disabled:hover {
+  background: oklch(1.0 0 0 / 0.85);
+  border-color: var(--border);
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.08), 0 0 0 1px hsl(0 0% 0% / 0.03);
+  transform: none;
+}
+
+.peerprep-explain-widget:active {
+  transform: scale(0.96);
+}
+
+.peerprep-explain-widget svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }

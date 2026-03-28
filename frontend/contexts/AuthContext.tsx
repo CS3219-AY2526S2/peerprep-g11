@@ -8,6 +8,16 @@ export interface AuthUser {
   username: string;
   email: string;
   role: Role;
+  skipOnboarding: boolean;
+}
+
+interface RawAuthUser {
+  id?: string;
+  _id?: string;
+  username?: string;
+  email?: string;
+  role?: Role;
+  skip_onboarding?: number;
 }
 
 interface AuthContextValue {
@@ -20,11 +30,27 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function mapAuthUser(data: RawAuthUser): AuthUser | null {
+  const userId = data.id ?? data._id;
+
+  if (!userId || !data.username || !data.email || !data.role) {
+    return null;
+  }
+
+  return {
+    id: userId,
+    username: data.username,
+    email: data.email,
+    role: data.role,
+    skipOnboarding: data.skip_onboarding === 1,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch the current user from /api/users/me (which reads the HttpOnly cookie server-side)
+  // Load the current user from the cookie-backed session.
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/users/me', {
@@ -32,8 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
       if (res.ok) {
-        const data = await res.json();
-        setUser(data);
+        const data = (await res.json()) as RawAuthUser;
+        setUser(mapAuthUser(data));
       } else {
         setUser(null);
       }
@@ -55,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Hydrate on mount
+  // Load auth state once on mount.
   useEffect(() => {
     refresh();
   }, [refresh]);
