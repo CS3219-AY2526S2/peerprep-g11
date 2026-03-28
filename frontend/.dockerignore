@@ -1,6 +1,9 @@
 # Dependencies & build output
 node_modules
 .next
+.env
+.env.local
+.env.*.local
 
 # Version control
 .git

@@ -7,7 +7,7 @@ import { PROGRAMMING_LANGUAGES } from '@/lib/programming-languages';
 
 const MOCK_SESSIONS: Record<string, Omit<SessionDetails, 'sessionId'>> = {
   'mock-match-001': {
-    questionId: 'q2',
+    questionSlug: 'two-sum-variations',
     status: 'active',
     selectedLanguage: 'python',
     allowedLanguages: [...PROGRAMMING_LANGUAGES],
@@ -42,7 +42,7 @@ class Solution {
     ],
   },
   'mock-match-002': {
-    questionId: 'q3',
+    questionSlug: 'two-sum-variations',
     status: 'active',
     selectedLanguage: 'javascript',
     allowedLanguages: [...PROGRAMMING_LANGUAGES],
