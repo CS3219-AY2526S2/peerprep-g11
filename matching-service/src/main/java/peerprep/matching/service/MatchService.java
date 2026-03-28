@@ -208,14 +208,8 @@ public class MatchService {
 
             String userId = stateDoc.getUserId();
 
-            if (stateDoc.getState().equals(UserState.MATCHED.name())) {
-                MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
-                if (matchDoc == null) return false;
-
-                matchRepository.delete(matchDoc);
-                userStateRepository.deleteByUserId(matchDoc.getUser1());
-                userStateRepository.deleteByUserId(matchDoc.getUser2());
-                return true;
+            if (!stateDoc.getState().equals(UserState.PENDING.name())) {
+                return false;
             }
 
             String category = stateDoc.getCategory();
@@ -247,17 +241,19 @@ public class MatchService {
      * @return true if session ended successfully, false otherwise.
      */
     public boolean endSession(String matchId) {
-        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
-        if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
+        return transactionTemplate.execute(status -> {
+            MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+            if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
 
-        matchDoc.setStatus("ended");
-        matchDoc.setEndedAt(new Date());
-        matchRepository.save(matchDoc);
+            matchDoc.setStatus("ended");
+            matchDoc.setEndedAt(new Date());
+            matchRepository.save(matchDoc);
 
-        userStateRepository.deleteByUserId(matchDoc.getUser1());
-        userStateRepository.deleteByUserId(matchDoc.getUser2());
+            userStateRepository.deleteByUserId(matchDoc.getUser1());
+            userStateRepository.deleteByUserId(matchDoc.getUser2());
 
-        return true;
+            return true;
+        });
     }
 
     /**
