@@ -4,10 +4,12 @@ import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import Cookie, FastAPI, HTTPException
+from fastapi import Cookie, Depends, FastAPI, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
+from typing import Annotated
 
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
@@ -17,6 +19,7 @@ client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
 
+# Make the slug column be index for faster search
 @asynccontextmanager
 async def lifespan(app):
     await collection.create_index(
@@ -26,6 +29,7 @@ async def lifespan(app):
     yield
 
 app = FastAPI(lifespan=lifespan)
+auth = HTTPBearer(auto_error=False)
 
 def create_slug(title: str):
     '''
@@ -36,15 +40,22 @@ def create_slug(title: str):
     title = re.sub(r'[\s_-]+', '-', title) # Replace spaces/underscores with hyphens
     return title
 
-def check_roles(token: str):
+def check_roles(token, bearer_token):
     '''
     Checks the role from jwt for verification
     '''
-    payload = jwt.decode(token, options={"verify_signature": False})
-    if 'role' not in payload:
+    try:
+        jwt_token = token
+        if jwt_token is None:
+            jwt_token = bearer_token.credentials
+
+        payload = jwt.decode(jwt_token, options={"verify_signature": False})
+        if 'role' not in payload:
+            return False
+        
+        return payload['role'].lower() == "admin"
+    except Exception as e:
         return False
-    
-    return payload['role'].lower() == "admin"
 
 @app.get('/')
 async def home():
@@ -147,7 +158,8 @@ async def get_question_by_topic(topic: str, difficulty: str):
 # ============================================
 
 @app.post('/questions/upsert', status_code=201)
-async def add_question(question: QuestionSchema):
+async def add_question(question: QuestionSchema, token: Annotated[str | None, Cookie()] = None,
+                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
     '''
     Upsert (update/insert) a question to the database.
     Admin access only.
@@ -155,6 +167,9 @@ async def add_question(question: QuestionSchema):
     - If no document with exact title exists, inserts a new one.
     - If matching title is found, updates the content and updated_at.
     '''
+    if not check_roles(token, bearer_token):
+        raise HTTPException(status_code=403, detail="Forbidden Access")
+
     data = question.model_dump()
     title = data['title']
     slug = create_slug(title)
@@ -186,11 +201,15 @@ async def add_question(question: QuestionSchema):
     return result
 
 @app.get('/questions/retrieve')
-async def get_question_admin(question: RetrieveDeleteSchema):
+async def get_question_admin(question: RetrieveDeleteSchema, token: Annotated[str | None, Cookie()] = None,
+                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
     '''
     Retrieves a question based on the generated slug of a title.
     Admin access only.
     '''
+    if not check_roles(token, bearer_token):
+        raise HTTPException(status_code=403, detail="Forbidden Access")
+
     title = question.title
     filter = {'slug': create_slug(title)}
     print(title)
@@ -205,12 +224,16 @@ async def get_question_admin(question: RetrieveDeleteSchema):
     return result
 
 @app.delete('/questions/delete')
-async def delete_question(question: RetrieveDeleteSchema):
+async def delete_question(question: RetrieveDeleteSchema, token: Annotated[str | None, Cookie()] = None,
+                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
     '''
     Deletes a question by its exact slug.
     Returns 404 if the question is not found.
     Admin access only.
     '''
+    if not check_roles(token, bearer_token):
+        raise HTTPException(status_code=403, detail="Forbidden Access")
+
     title = question.title
     filter = {'slug': create_slug(title)}
 
@@ -226,11 +249,15 @@ async def delete_question(question: RetrieveDeleteSchema):
 
 
 @app.post('/questions/bulk-delete')
-async def bulk_delete_questions(payload: BulkDeleteSchema):
+async def bulk_delete_questions(payload: BulkDeleteSchema, token: Annotated[str | None, Cookie()] = None,
+                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
     '''
     Deletes multiple questions by slug.
     Returns 404 without deleting anything if any requested slug does not exist.
     '''
+    if not check_roles(token, bearer_token):
+        raise HTTPException(status_code=403, detail="Forbidden Access")
+
     requested_slugs = payload.slugs
     filter = {'slug': {'$in': requested_slugs}}
     projection = {'title': 1, 'slug': 1}
