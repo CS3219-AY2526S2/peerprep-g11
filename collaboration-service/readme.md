@@ -15,47 +15,39 @@ node server.ts
 
 ```javascript
 {
-  sessionId: "mock-match-001",
-    questionId: "q2",
-    status: "active",
-    selectedLanguage: "python",
-    allowedLanguages: [...PROGRAMMING_LANGUAGES],
-    participants: [
-      {
-        id: "user-current",
-        username: "Current User",
-        isCurrentUser: true,
-        presence: "connected",
-      },
-      {
-        id: "user-partner",
-        username: "Alex P.",
-        isCurrentUser: false,
-        presence: "connected",
-      },
-    ],
-  },
-   {
-  sessionId: "mock-match-002",
-    questionId: "q3",
-    status: "active",
-    selectedLanguage: "javascript",
-    allowedLanguages: [...PROGRAMMING_LANGUAGES],
-    participants: [
-      {
-        id: "user-current",
-        username: "Current User",
-        isCurrentUser: true,
-        presence: "connected",
-      },
-      {
-        id: "user-partner",
-        username: "Taylor G.",
-        isCurrentUser: false,
-        presence: "disconnected",
-      },
-    ],
-  },
+  "sessionId": "mock-match-001",
+  "questionId": "q2",
+  "status": "active",
+  "selectedLanguage": "python",
+  "allowedLanguages": ["python", "java"],
+  "participants": [
+    {
+      "id": "user-current",
+      "username": "Current User"
+    },
+    {
+      "id": "user-partner",
+      "username": "Alex P."
+    }
+  ]
+},
+{
+  "sessionId": "mock-match-002",
+  "questionId": "q3",
+  "status": "active",
+  "selectedLanguage": "javascript",
+  "allowedLanguages": ["javascript", "python"],
+  "participants": [
+    {
+      "id": "user-current",
+      "username": "Current User"
+    },
+    {
+      "id": "user-partner",
+      "username": "Taylor G."
+    }
+  ]
+},
 
 ```
 

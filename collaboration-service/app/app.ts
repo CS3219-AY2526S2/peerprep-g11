@@ -1,6 +1,7 @@
-import express, { Request, Response } from "express";
+import express from "express";
+import type { Request, Response } from "express";
 import cookieParser from "cookie-parser";
-import { Session } from "./model/Session";
+import { Session } from "./model/Session.ts";
 
 const app = express();
 app.use(express.json());
@@ -17,9 +18,10 @@ app.get("/health", (_req: Request, res: Response) => {
 // This endpoint does NOT re-check auth — it trusts the BFF.
 app.get("/sessions/:sessionId", async (req: Request, res: Response) => {
   try {
-    const session = await Session.findOne({ sessionId: req.params.sessionId })
-      .lean();  // .lean() returns a plain JS object instead of a Mongoose document,
-                // which serialises cleanly to JSON
+    const session = await Session.findOne({
+      sessionId: req.params.sessionId,
+    }).lean(); // .lean() returns a plain JS object instead of a Mongoose document,
+    // which serialises cleanly to JSON
 
     if (!session) {
       res.status(404).json({ error: "Session not found" });
@@ -57,7 +59,9 @@ app.post("/matched", async (req: Request, res: Response) => {
     }
 
     if (!Array.isArray(participants) || participants.length !== 2) {
-      res.status(400).json({ error: "participants must be an array of exactly two users" });
+      res
+        .status(400)
+        .json({ error: "participants must be an array of exactly two users" });
       return;
     }
 
@@ -75,7 +79,9 @@ app.post("/matched", async (req: Request, res: Response) => {
       participants,
     });
 
-    res.status(201).json({ message: "Session created", sessionId: session.sessionId });
+    res
+      .status(201)
+      .json({ message: "Session created", sessionId: session.sessionId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

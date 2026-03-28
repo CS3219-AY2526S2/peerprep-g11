@@ -1,12 +1,12 @@
 import "dotenv/config";
-import { connectDB } from "./app/config/db";
+import { connectDB } from "./app/config/db.ts";
 
 const PORT = process.env.PORT || 4001;
 import { setupWSConnection } from "@y/websocket-server/utils";
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
 import jwt from "jsonwebtoken";
-import app from "./app/app";
+import app from "./app/app.ts";
 
 async function main() {
   await connectDB();
@@ -16,13 +16,16 @@ async function main() {
 
   // auth gate — runs during HTTP upgrade, before WebSocket is accepted
   httpServer.on("upgrade", (req, socket, head) => {
+    console.log("Upgrade request received:");
     const url = new URL(req.url!, "http://localhost");
     const ticket = url.searchParams.get("ticket");
     try {
+      //verify the short term ticket from frontend BFF
       const payload = jwt.verify(ticket!, process.env.JWT_SECRET!) as {
         userId: string;
         roomId: string;
       };
+      console.log("ticket verified");
       (req as any).user = payload;
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
