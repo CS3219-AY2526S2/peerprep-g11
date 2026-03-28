@@ -16,13 +16,14 @@ export async function GET(
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await params;
-  //check JWT
+
+  //check User Identity with JWT
   let decoded;
   try {
-    const token = _request.cookies.get("token"); // Ensure cookies are included
+    const token = _request.cookies.get("token")?.get("value"); // Ensure cookies are included
     decoded = jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    return NextResponse.json({ error: "invalid token" }, { status: 503 });
+    return NextResponse.json({ error: "invalid token" }, { status: 401 });
   }
 
   // 2. fetch session from collab service — this also proves the session exists
@@ -41,11 +42,12 @@ export async function GET(
   }
 
   const userId = decoded.id;
-  const roomId = session.roomId;
 
   // 4. mint short-lived ticket now that both checks passed
-  const ticket = jwt.sign({ userId, roomId }, JWT_SECRET, { expiresIn: "30s" });
+  const ticket = jwt.sign({ userId, sessionId }, JWT_SECRET, {
+    expiresIn: "30s",
+  });
 
-  // 5. return session details AND ticket together in o
+  // 5. return session details AND ticket together
   return NextResponse.json({ ...session, ticket });
 }
