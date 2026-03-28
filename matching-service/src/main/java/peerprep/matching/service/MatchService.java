@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import peerprep.matching.client.QuestionServiceClient;
 import peerprep.matching.documents.MatchDoc;
 import peerprep.matching.documents.UserStateDoc;
 import peerprep.matching.documents.WaitingQueueDoc;
@@ -25,17 +26,20 @@ public class MatchService {
     private final UserStateRepository userStateRepository;
     private final MatchRepository matchRepository;
     private final TransactionTemplate transactionTemplate;
+    private final QuestionServiceClient questionServiceClient;
 
     @Autowired
     public MatchService(
             WaitingQueueRepository waitingQueueRepository,
             UserStateRepository userStateRepository,
             MatchRepository matchRepository,
-            MongoTransactionManager transactionManager) {
+            MongoTransactionManager transactionManager,
+            QuestionServiceClient questionServiceClient) {
         this.waitingQueueRepository = waitingQueueRepository;
         this.userStateRepository = userStateRepository;
         this.matchRepository = matchRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.questionServiceClient = questionServiceClient;
     }
 
     /**
@@ -72,7 +76,11 @@ public class MatchService {
     }
 
     /**
-     * Try to match users in a category inside a transaction.
+     * Try to match users in a category inside a transaction. 
+     * If matched, assign a question and save the match document. 
+     * If not, put users back into the waiting pool.
+     * 
+     * @param category The category to match users in.
      */
     private void tryMatchTransactional(String category) {
         while (true) {
@@ -104,6 +112,13 @@ public class MatchService {
 
             String matchId = UUID.randomUUID().toString();
             MatchDoc matchDoc = new MatchDoc(matchId, userId1, userId2);
+            
+            String[] categoryParts = category.split("\\|");
+            String topic = categoryParts[0];
+            String difficulty = categoryParts[1];
+            String questionSlug = questionServiceClient.getQuestionByTopicAndDifficulty(topic, difficulty);
+            matchDoc.setQuestionSlug(questionSlug);
+            
             matchRepository.save(matchDoc);
         }
     }
@@ -256,6 +271,8 @@ public class MatchService {
                 
                 String peerUserName = userStateRepository.findByUserId(peerUserId).getUserName();
                 result.put("partnerName", peerUserName);
+                
+                result.put("questionSlug", matchDoc.getQuestionSlug());
             }
         }
 
