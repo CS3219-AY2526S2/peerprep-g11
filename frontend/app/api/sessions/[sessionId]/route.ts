@@ -33,6 +33,7 @@ export async function GET(
   }
   const session: SessionDetails = await sessionRes.json();
 
+  const userId = decoded.id;
   // 3. room auth — is this user actually a participant?
   const isParticipant = session.participants.some(
     (p: { id: string }) => p.id === userId,
@@ -40,8 +41,6 @@ export async function GET(
   if (!isParticipant) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-
-  const userId = decoded.id;
 
   // 4. mint short-lived ticket now that both checks passed
   const ticket = jwt.sign({ userId, sessionId }, JWT_SECRET, {
