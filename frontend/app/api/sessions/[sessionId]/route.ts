@@ -1,101 +1,51 @@
 // TODO: Replace this mock implementation with an actual collaboration service
 // session lookup when the backend session flow is available.
 
-import { NextResponse } from 'next/server';
-import type { SessionDetails } from '@/app/sessions/[sessionId]/types';
-import { PROGRAMMING_LANGUAGES } from '@/lib/programming-languages';
+import { NextRequest, NextResponse } from "next/server";
+import type { SessionDetails } from "@/app/sessions/[sessionId]/types";
+import { PROGRAMMING_LANGUAGES } from "@/lib/programming-languages";
+import { forwardAuthHeaders } from "@/lib/auth";
+import * as jwt from "jsonwebtoken";
 
-const MOCK_SESSIONS: Record<string, Omit<SessionDetails, 'sessionId'>> = {
-  'mock-match-001': {
-    questionId: 'q2',
-    status: 'active',
-    selectedLanguage: 'python',
-    allowedLanguages: [...PROGRAMMING_LANGUAGES],
-    starterCode: {
-      javascript: `function networkDelayTime(times, n, k) {
-}
-`,
-      python: `def network_delay_time(times, n, k):
-    pass
-`,
-      java: `import java.util.*;
-
-class Solution {
-    public int networkDelayTime(int[][] times, int n, int k) {
-    }
-}
-`,
-    },
-    participants: [
-      {
-        id: 'user-current',
-        username: 'Current User',
-        isCurrentUser: true,
-        presence: 'connected',
-      },
-      {
-        id: 'user-partner',
-        username: 'Alex P.',
-        isCurrentUser: false,
-        presence: 'connected',
-      },
-    ],
-  },
-  'mock-match-002': {
-    questionId: 'q3',
-    status: 'active',
-    selectedLanguage: 'javascript',
-    allowedLanguages: [...PROGRAMMING_LANGUAGES],
-    starterCode: {
-      javascript: `function lengthOfLIS(nums) {
-}
-`,
-      python: `def length_of_lis(nums):
-    pass
-`,
-      java: `class Solution {
-    public int lengthOfLIS(int[] nums) {
-    }
-}
-`,
-    },
-    participants: [
-      {
-        id: 'user-current',
-        username: 'Current User',
-        isCurrentUser: true,
-        presence: 'connected',
-      },
-      {
-        id: 'user-partner',
-        username: 'Taylor G.',
-        isCurrentUser: false,
-        presence: 'disconnected',
-      },
-    ],
-  },
-};
+const COLLAB_SERVICE_URL =
+  process.env.COLLAB_SERVICE_URL ?? "http://localhost:1234";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ sessionId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
+  const { sessionId } = await params;
+  //check JWT
+  let decoded;
   try {
-    const { sessionId } = await params;
-    const mockSession = MOCK_SESSIONS[sessionId];
-
-    if (!mockSession) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      sessionId,
-      ...mockSession,
-    } satisfies SessionDetails);
-  } catch {
-    return NextResponse.json(
-      { error: 'Collaboration session service unavailable' },
-      { status: 503 }
-    );
+    const token = _request.cookies.get("token"); // Ensure cookies are included
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return NextResponse.json({ error: "invalid token" }, { status: 503 });
   }
+
+  // 2. fetch session from collab service — this also proves the session exists
+  const sessionRes = await fetch(`${COLLAB_SERVICE_URL}/sessions/${sessionId}`);
+  if (!sessionRes.ok) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  const session: SessionDetails = await sessionRes.json();
+
+  // 3. room auth — is this user actually a participant?
+  const isParticipant = session.participants.some(
+    (p: { id: string }) => p.id === userId,
+  );
+  if (!isParticipant) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const userId = decoded.id;
+  const roomId = session.roomId;
+
+  // 4. mint short-lived ticket now that both checks passed
+  const ticket = jwt.sign({ userId, roomId }, JWT_SECRET, { expiresIn: "30s" });
+
+  // 5. return session details AND ticket together in o
+  return NextResponse.json({ ...session, ticket });
 }
