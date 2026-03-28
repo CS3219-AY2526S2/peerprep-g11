@@ -61,12 +61,7 @@ function applyCurrentUserToSession(session: SessionDetails, username: string) {
   };
 }
 
-export default async function SessionPage({
-  params,
-}: {
-  params: Promise<{ sessionId: string }>;
-}) {
-  const { sessionId } = await params;
+export default function SessionPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
