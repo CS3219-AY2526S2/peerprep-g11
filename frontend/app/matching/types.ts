@@ -17,6 +17,7 @@ export interface MatchRequest {
     matchId?: string;
     partnerName?: string;
     partnerId?: string;
+    questionSlug?: string;
 }
 
 // Backend timeout window, in seconds.
