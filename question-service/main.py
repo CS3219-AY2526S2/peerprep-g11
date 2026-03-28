@@ -53,6 +53,10 @@ async def home():
     '''
     return "Peerprep Questions Service"
 
+# ============================================
+#             User access APIs
+# ============================================
+
 @app.get('/questions/all')
 async def get_all_questions():
     '''
@@ -113,6 +117,30 @@ async def get_question(question_slug: str):
 
     question['_id'] = str(question['_id'])
     return question
+
+@app.get('/questions/topic/{topic}')
+async def get_question_by_topic(topic: str, difficulty: str):
+    '''
+    Retrieves a question by topic and dffficulty
+    '''
+    filter = {
+        'topics': {'$in': topic},
+        'difficulty': difficulty
+    }
+
+    try:
+        cursor = collection.find(filter)
+        questions = await cursor.to_list()
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    return questions
+
+    
+
+# ============================================
+#             Admin access APIs
+# ============================================
 
 @app.post('/questions/upsert', status_code=201)
 async def add_question(question: QuestionSchema):
@@ -240,6 +268,7 @@ async def health_check():
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     return {'status': "ok"}
+
 
 if __name__ == "__main__":
     import uvicorn
