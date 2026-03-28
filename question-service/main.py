@@ -10,7 +10,7 @@ from pymongo.errors import PyMongoError
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
 
 load_dotenv()
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_URI = os.getenv("MONGODB_URI")
 PORT = int(os.getenv("PORT", "8000"))
 
 client = AsyncMongoClient(MONGODB_URI)
@@ -124,19 +124,23 @@ async def get_question_by_topic(topic: str, difficulty: str):
     Retrieves a question by topic and dffficulty
     '''
     filter = {
-        'topics': {'$in': topic},
+        'topics': {'$in': [topic]},
         'difficulty': difficulty
+    }
+    projection = {
+        '_id': 0,
+        'status': 0,
+        'created_at': 0,
+        'updated_at': 0
     }
 
     try:
-        cursor = collection.find(filter)
-        questions = await cursor.to_list()
+        cursor = collection.find(filter, projection)
+        results = await cursor.to_list()
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
-    
-    return questions
 
-    
+    return results
 
 # ============================================
 #             Admin access APIs
