@@ -200,29 +200,6 @@ async def add_question(question: QuestionSchema, token: Annotated[str | None, Co
     result['message'] = "Question updated."
     return result
 
-@app.get('/questions/retrieve')
-async def get_question_admin(question: RetrieveDeleteSchema, token: Annotated[str | None, Cookie()] = None,
-                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
-    '''
-    Retrieves a question based on the generated slug of a title.
-    Admin access only.
-    '''
-    if not check_roles(token, bearer_token):
-        raise HTTPException(status_code=403, detail="Forbidden Access")
-
-    title = question.title
-    filter = {'slug': create_slug(title)}
-    print(title)
-
-    return {"message": "retrieved"}
-
-    try:
-        result = await collection.find_one(filter)
-    except PyMongoError as e:
-        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
-    
-    return result
-
 @app.delete('/questions/delete')
 async def delete_question(question: RetrieveDeleteSchema, token: Annotated[str | None, Cookie()] = None,
                         bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
