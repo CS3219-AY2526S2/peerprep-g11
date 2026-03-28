@@ -1,0 +1,13 @@
+**/build
+**/.gradle
+**/out
+**/*.log
+**/*.tmp
+**/*.bak
+**/.idea
+**/.vscode
+**/*.iml
+**/node_modules
+**/.git
+**/.gitignore
+**/npm-debug.log

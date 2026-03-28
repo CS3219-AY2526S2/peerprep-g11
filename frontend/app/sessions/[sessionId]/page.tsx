@@ -114,7 +114,7 @@ export default function SessionPage() {
       });
       setLoadingSession(false);
 
-      const questionResponse = await fetch(`/api/questions/${sessionData.questionId}`);
+      const questionResponse = await fetch(`/api/questions/${sessionData.questionSlug}`);
       const questionBody = (await questionResponse.json()) as Question | { error?: string };
 
       if (!questionResponse.ok) {

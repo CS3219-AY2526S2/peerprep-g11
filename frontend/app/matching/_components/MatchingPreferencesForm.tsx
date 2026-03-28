@@ -21,22 +21,27 @@ import {
     type ProgrammingLanguage,
 } from '@/lib/programming-languages';
 
-// TODO: Fetch from question service
-const TOPICS = ['Arrays', 'Graphs', 'Dynamic Programming', 'System Design', 'Data Structures'];
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
 
 interface MatchingPreferencesFormProps {
+    topics: string[];
     onSubmit: (preferences: MatchingPreferences) => void;
     isSubmitting?: boolean;
 }
 
-export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPreferencesFormProps) {
-    const [topic, setTopic] = useState<string>(TOPICS[0]);
+export function MatchingPreferencesForm({
+    topics,
+    onSubmit,
+    isSubmitting,
+}: MatchingPreferencesFormProps) {
+    const [topic, setTopic] = useState<string>('');
     const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
     const [language, setLanguage] = useState<ProgrammingLanguage>(PROGRAMMING_LANGUAGES[0]);
+    const selectedTopic = topics.includes(topic) ? topic : (topics[0] ?? '');
 
     const handleSubmit = () => {
-        onSubmit({ topic, difficulty, language });
+        if (!selectedTopic) return;
+        onSubmit({ topic: selectedTopic, difficulty, language });
     };
 
     return (
@@ -46,12 +51,16 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                     <Label className="text-[11.5px] font-semibold text-muted-foreground whitespace-nowrap">
                         Topic
                     </Label>
-                    <Select value={topic} onValueChange={setTopic}>
+                    <Select
+                        value={selectedTopic}
+                        onValueChange={setTopic}
+                        disabled={topics.length === 0}
+                    >
                         <SelectTrigger className="border-none shadow-none p-0 h-auto text-[12.5px] text-foreground focus:ring-0 w-auto gap-1.5 [&>svg]:opacity-50">
-                            <SelectValue />
+                            <SelectValue placeholder={topics.length > 0 ? 'Select Topic' : 'No Topics Available'} />
                         </SelectTrigger>
                         <SelectContent>
-                            {TOPICS.map((t) => (
+                            {topics.map((t) => (
                                 <SelectItem key={t} value={t} className="text-[12.5px]">
                                     {t}
                                 </SelectItem>
@@ -113,7 +122,7 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                 <div className="flex items-center gap-4 mt-2">
                     <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || topics.length === 0 || !selectedTopic}
                         className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold px-5 py-2.5 rounded-lg"
                     >
                         {isSubmitting ? 'Starting\u2026' : 'Start Matching'}
@@ -127,8 +136,9 @@ export function MatchingPreferencesForm({ onSubmit, isSubmitting }: MatchingPref
                 </div>
 
                 <p className="text-[11.5px] text-muted-foreground leading-relaxed">
-                    We&apos;ll keep you in the matching lobby for up to 2 minutes. If no match is found, you
-                    can refine your preferences or try again.
+                    {topics.length > 0
+                        ? "We'll keep you in the matching lobby for up to 2 minutes. If no match is found, you can refine your preferences or try again."
+                        : 'Topics are currently unavailable. Please try again once the question service is reachable.'}
                 </p>
             </div>
         </Card>
