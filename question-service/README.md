@@ -43,15 +43,23 @@ Get a question with full details based on `question_slug`. Refer to [Data Model]
 
 ---
 
-### GET /questions/all
+### GET /questions
 
-Get all available questions in the repository.
+Get questions from the repository, optionally filtered by exact topic and/or difficulty.
+
+#### Query parameters
+
+| Parameter    | Required | Description |
+|--------------|----------|-------------|
+| `topic`      | No       | Exact topic match, case-insensitive |
+| `difficulty` | No       | Exact difficulty match: `Easy`, `Medium`, or `Hard` |
 
 #### Responses
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
 | 200    | Question retrieved                                  |
+| 400    | Invalid difficulty                                  |
 | 503    | Database down, check health status of your database |
 
 ---

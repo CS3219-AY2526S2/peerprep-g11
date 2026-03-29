@@ -33,8 +33,16 @@ export async function GET(request: NextRequest) {
     const difficulty = searchParams.get('difficulty') ?? '';
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
     const pageSize = Math.max(1, parseInt(searchParams.get('pageSize') ?? '10', 10));
+    const upstreamParams = new URLSearchParams();
 
-    const res = await fetch(`${QUESTION_SERVICE_URL}/questions/all`);
+    if (topic) upstreamParams.set('topic', topic);
+    if (difficulty) upstreamParams.set('difficulty', difficulty);
+
+    const queryString = upstreamParams.toString();
+    const res = await fetch(
+      `${QUESTION_SERVICE_URL}/questions${queryString ? `?${queryString}` : ''}`,
+      { cache: 'no-store' }
+    );
     if (!res.ok) {
       return NextResponse.json(
         { error: 'Question service unavailable' },
@@ -54,18 +62,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (topic) {
-      filtered = filtered.filter((item) =>
-        item.topics.some((t) => t.toLowerCase() === topic.toLowerCase())
-      );
-    }
-
-    if (difficulty) {
-      filtered = filtered.filter(
-        (item) => item.difficulty.toLowerCase() === difficulty.toLowerCase()
-      );
-    }
-
     const total = filtered.length;
     const totalPages = Math.ceil(total / pageSize);
     const start = (page - 1) * pageSize;
@@ -80,35 +76,6 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch {
-    return NextResponse.json(
-      { error: 'Question service unavailable' },
-      { status: 503 }
-    );
-  }
-}
-
-/** Return the list of available topics for filter dropdowns */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    if (body.action === 'topics') {
-      const res = await fetch(`${QUESTION_SERVICE_URL}/questions/all`);
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: 'Question service unavailable' },
-          { status: res.status }
-        );
-      }
-
-      const rawQuestions: QuestionServiceResponse[] = await res.json();
-      const topics = Array.from(
-        new Set(rawQuestions.flatMap((q) => q.topics))
-      ).sort();
-
-      return NextResponse.json({ topics });
-    }
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch {
     return NextResponse.json(
       { error: 'Question service unavailable' },

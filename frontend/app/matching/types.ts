@@ -9,6 +9,13 @@ export interface MatchingPreferences {
     language: ProgrammingLanguage;
 }
 
+export type TopicDifficulties = Partial<Record<string, Difficulty[]>>;
+
+export interface AvailableMatchingTopicsResponse {
+    topics?: string[];
+    topicDifficulties?: TopicDifficulties;
+}
+
 export interface MatchRequest {
     requestId: string;
     status: MatchRequestStatus;

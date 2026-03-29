@@ -4,7 +4,7 @@ from bson import ObjectId
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from schema import QuestionSchema, DeleteSchema, BulkDeleteSchema
@@ -16,6 +16,9 @@ PORT = int(os.getenv("PORT", "8000"))
 client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
+
+VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
+DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
 
 @asynccontextmanager
 async def lifespan(app):
@@ -36,6 +39,18 @@ def create_slug(title: str):
     title = re.sub(r'[\s_-]+', '-', title) # Replace spaces/underscores with hyphens
     return title
 
+def normalize_topic(topic: str):
+    '''
+    Normalizes topic values for API responses and lookups.
+    '''
+    return topic.strip()
+
+def sort_difficulties(difficulties: set[str]):
+    '''
+    Sorts difficulties in the fixed PeerPrep order.
+    '''
+    return sorted(difficulties, key=lambda difficulty: DIFFICULTY_ORDER[difficulty])
+
 @app.get('/')
 async def home():
     '''
@@ -43,11 +58,21 @@ async def home():
     '''
     return "Peerprep Questions Service"
 
-@app.get('/questions/all')
-async def get_all_questions():
+@app.get('/questions')
+async def get_questions(
+    topic: str | None = Query(default=None),
+    difficulty: str | None = Query(default=None),
+):
     '''
-    Retrieves all questions in the database.
+    Retrieves questions in the database, optionally filtered by
+    exact topic and/or exact difficulty.
     '''
+    normalized_topic = normalize_topic(topic) if isinstance(topic, str) else ''
+    normalized_difficulty = difficulty.strip() if isinstance(difficulty, str) else ''
+
+    if normalized_difficulty and normalized_difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(status_code=400, detail="Invalid difficulty")
+
     projection = {
         'title': 1,
         'slug': 1,
@@ -55,10 +80,20 @@ async def get_all_questions():
         'difficulty': 1,
         'status': 1
     }
+    filter = {}
+
+    if normalized_topic:
+        filter['topics'] = {
+            '$regex': rf'^\s*{re.escape(normalized_topic)}\s*$',
+            '$options': 'i',
+        }
+
+    if normalized_difficulty:
+        filter['difficulty'] = normalized_difficulty
     
     try:
-        cursor = collection.find({}, projection)
-        results = await cursor.to_list(length=100)
+        cursor = collection.find(filter, projection)
+        results = await cursor.to_list(length=10000)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
@@ -69,22 +104,46 @@ async def get_all_questions():
 @app.get('/questions/topics')
 async def get_all_topics():
     '''
-    Retrieves all distinct topics in the database.
+    Retrieves all distinct topics in the database, along with the
+    available difficulty levels for each topic.
     '''
+    projection = {
+        'topics': 1,
+        'difficulty': 1,
+    }
+
     try:
-        raw_topics = await collection.distinct('topics')
+        raw_questions = await collection.find({}, projection).to_list(length=10000)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
-    topics = sorted(
-        {
-            topic.strip()
-            for topic in raw_topics
-            if isinstance(topic, str) and topic.strip()
-        },
-        key=str.lower,
-    )
-    return {'topics': topics}
+    topic_difficulties = {}
+    for question in raw_questions:
+        difficulty = question.get('difficulty')
+        if difficulty not in VALID_DIFFICULTIES:
+            continue
+
+        for raw_topic in question.get('topics', []):
+            if not isinstance(raw_topic, str):
+                continue
+
+            topic = normalize_topic(raw_topic)
+            if not topic:
+                continue
+
+            if topic not in topic_difficulties:
+                topic_difficulties[topic] = set()
+            topic_difficulties[topic].add(difficulty)
+
+    topics = sorted(topic_difficulties.keys(), key=str.lower)
+    serialized_topic_difficulties = {
+        topic: sort_difficulties(topic_difficulties[topic])
+        for topic in topics
+    }
+    return {
+        'topics': topics,
+        'topicDifficulties': serialized_topic_difficulties,
+    }
 
 @app.get('/questions/{question_slug}')
 async def get_question(question_slug: str):
