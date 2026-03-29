@@ -197,30 +197,6 @@ async def get_question(question_slug: str):
     question['_id'] = str(question['_id'])
     return question
 
-@app.get('/questions/topic/{topic}')
-async def get_question_by_topic(topic: str, difficulty: str):
-    '''
-    Retrieves a question by topic and dffficulty
-    '''
-    filter = {
-        'topics': {'$in': [topic]},
-        'difficulty': difficulty
-    }
-    projection = {
-        '_id': 0,
-        'status': 0,
-        'created_at': 0,
-        'updated_at': 0
-    }
-
-    try:
-        cursor = collection.find(filter, projection)
-        results = await cursor.to_list()
-    except PyMongoError as e:
-        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
-
-    return results
-
 # ============================================
 #             Admin access APIs
 # ============================================
