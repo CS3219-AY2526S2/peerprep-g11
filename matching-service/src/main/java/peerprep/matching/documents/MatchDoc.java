@@ -16,6 +16,7 @@ public class MatchDoc {
     private String user1;
     private String user2;
     private String status;  // "active" or "ended"
+    private String questionSlug;
     private Date createdAt;
     private Date endedAt;
 
@@ -84,5 +85,13 @@ public class MatchDoc {
 
     public void setEndedAt(Date endedAt) {
         this.endedAt = endedAt;
+    }
+
+    public String getQuestionSlug() {
+        return questionSlug;
+    }
+
+    public void setQuestionSlug(String questionSlug) {
+        this.questionSlug = questionSlug;
     }
 }
