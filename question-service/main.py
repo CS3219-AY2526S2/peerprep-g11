@@ -1,6 +1,5 @@
 import jwt
 import os
-import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -10,11 +9,17 @@ from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
 from typing import Annotated
+from utils import create_slug
 
+# Load constants from environment values
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
-PORT = int(os.getenv("PORT", "8000"))
+PORT = int(os.getenv("PORT"))
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = "HS256"
+auth = HTTPBearer(auto_error=False)
 
+# Init mongodb client
 client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
@@ -28,34 +33,43 @@ async def lifespan(app):
         background=True)
     yield
 
-app = FastAPI(lifespan=lifespan)
-auth = HTTPBearer(auto_error=False)
+async def verify_jwt(token: Annotated[str | None, Cookie()] = None, 
+                     bearer: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
+    jwt_token = token
 
-def create_slug(title: str):
-    '''
-    Creates a slug from provided title.
-    '''
-    title = title.lower().strip()
-    title = re.sub(r'[^\w\s-]', '', title) # Remove special chars
-    title = re.sub(r'[\s_-]+', '-', title) # Replace spaces/underscores with hyphens
-    return title
+    if not token and bearer:
+        jwt_token = bearer.credentials
 
-def check_roles(token, bearer_token):
-    '''
-    Checks the role from jwt for verification
-    '''
+    if not jwt_token:
+        raise HTTPException(
+            status_code=401, 
+            detail="Unauthenticated. Missing cookie or bearer token."
+        )
+    
     try:
-        jwt_token = token
-        if jwt_token is None:
-            jwt_token = bearer_token.credentials
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail=f"Invalid token.")
+    
+async def verify_admin_access(payload: dict = Depends(verify_jwt)):
+    if 'role' not in payload:
+        raise HTTPException(
+            status_code=401, 
+            detail="User role not found."
+        )
+    elif payload['role'] != "admin":
+        raise HTTPException(
+            status_code=403, 
+            detail="Operation restricted to administrators."
+        )
+    
+    return payload
 
-        payload = jwt.decode(jwt_token, options={"verify_signature": False})
-        if 'role' not in payload:
-            return False
-        
-        return payload['role'].lower() == "admin"
-    except Exception as e:
-        return False
+# Initialize the application and bearer authentication
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(verify_jwt)])
 
 @app.get('/')
 async def home():
@@ -158,8 +172,7 @@ async def get_question_by_topic(topic: str, difficulty: str):
 # ============================================
 
 @app.post('/questions/upsert', status_code=201)
-async def add_question(question: QuestionSchema, token: Annotated[str | None, Cookie()] = None,
-                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
+async def add_question(question: QuestionSchema, admin: dict = Depends(verify_admin_access)):
     '''
     Upsert (update/insert) a question to the database.
     Admin access only.
@@ -167,8 +180,6 @@ async def add_question(question: QuestionSchema, token: Annotated[str | None, Co
     - If no document with exact title exists, inserts a new one.
     - If matching title is found, updates the content and updated_at.
     '''
-    if not check_roles(token, bearer_token):
-        raise HTTPException(status_code=403, detail="Forbidden Access")
 
     data = question.model_dump()
     title = data['title']
@@ -201,16 +212,12 @@ async def add_question(question: QuestionSchema, token: Annotated[str | None, Co
     return result
 
 @app.delete('/questions/delete')
-async def delete_question(question: RetrieveDeleteSchema, token: Annotated[str | None, Cookie()] = None,
-                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
+async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(verify_admin_access)):
     '''
     Deletes a question by its exact slug.
     Returns 404 if the question is not found.
     Admin access only.
     '''
-    if not check_roles(token, bearer_token):
-        raise HTTPException(status_code=403, detail="Forbidden Access")
-
     title = question.title
     filter = {'slug': create_slug(title)}
 
@@ -226,15 +233,11 @@ async def delete_question(question: RetrieveDeleteSchema, token: Annotated[str |
 
 
 @app.post('/questions/bulk-delete')
-async def bulk_delete_questions(payload: BulkDeleteSchema, token: Annotated[str | None, Cookie()] = None,
-                        bearer_token: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
+async def bulk_delete_questions(payload: BulkDeleteSchema, admin: dict = Depends(verify_admin_access)):
     '''
     Deletes multiple questions by slug.
     Returns 404 without deleting anything if any requested slug does not exist.
     '''
-    if not check_roles(token, bearer_token):
-        raise HTTPException(status_code=403, detail="Forbidden Access")
-
     requested_slugs = payload.slugs
     filter = {'slug': {'$in': requested_slugs}}
     projection = {'title': 1, 'slug': 1}
@@ -268,7 +271,7 @@ async def bulk_delete_questions(payload: BulkDeleteSchema, token: Annotated[str 
 
     return {'deletedCount': result.deleted_count, 'deleted': deleted}
 
-@app.get('/health')
+@app.get('/health', dependencies=[])
 async def health_check():
     try:
         await client.admin.command("ping")

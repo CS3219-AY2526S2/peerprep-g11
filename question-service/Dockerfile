@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
 
 COPY main.py ./
 COPY schema.py ./
+COPY utils.py ./
 
 RUN chown -R appuser:appgroup /app
 
