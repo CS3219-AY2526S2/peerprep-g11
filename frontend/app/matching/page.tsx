@@ -8,12 +8,16 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { MatchingPreferencesForm } from '@/app/matching/_components/MatchingPreferencesForm';
 import { HowMatchingWorks } from '@/app/matching/_components/HowMatchingWorks';
 import { WaitingCard } from '@/app/matching/_components/WaitingCard';
-import { MatchFoundCard } from '@/app/matching/_components/MatchFoundCard';
 import { TimedOutCard } from '@/app/matching/_components/TimedOutCard';
-import type { MatchingPreferences, MatchRequest } from '@/app/matching/types';
+import type {
+    AvailableMatchingTopicsResponse,
+    MatchingPreferences,
+    MatchRequest,
+    TopicDifficulties,
+} from '@/app/matching/types';
 import { useRouter } from 'next/navigation';
 
-type MatchingState = 'preferences' | 'searching' | 'matched_pending' | 'matched_accepted' | 'timed_out';
+type MatchingState = 'preferences' | 'searching' | 'matched' |'timed_out';
 
 export default function MatchingPage() {
     const { user, isLoading } = useRequireAuth();
@@ -26,6 +30,7 @@ export default function MatchingPage() {
     const [isCancelling, setIsCancelling] = useState(false);
     const [matchingError, setMatchingError] = useState('');
     const [topics, setTopics] = useState<string[]>([]);
+    const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficulties>({});
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -46,14 +51,16 @@ export default function MatchingPage() {
                 throw new Error('Failed to fetch topics');
             }
 
-            const data: { topics?: string[] } = await res.json();
+            const data: AvailableMatchingTopicsResponse = await res.json();
             setTopics(data.topics ?? []);
+            setTopicDifficulties(data.topicDifficulties ?? {});
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') {
                 return;
             }
 
             setTopics([]);
+            setTopicDifficulties({});
         }
     }, []);
 
@@ -80,7 +87,7 @@ export default function MatchingPage() {
     }, []);
 
     const cancelMatchRequest = useCallback(async (requestId: string) => {
-        if (stateRef.current !== 'searching' && stateRef.current !== 'matched_pending') return;
+        if (stateRef.current !== 'searching') return;
         if (cancelledRef.current) return;
         cancelledRef.current = true;
         try {
@@ -104,7 +111,7 @@ export default function MatchingPage() {
     }, [stopTimers]);
 
     useEffect(() => {
-        if (state !== 'searching' && state !== 'matched_pending') return;
+        if (state !== 'searching') return;
         if (!matchRequest?.requestId) return;
 
         const handleBeforeUnload = () => {
@@ -128,9 +135,18 @@ export default function MatchingPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(prefs),
             });
-            if (!res.ok) throw new Error('Failed to start matching');
 
-            const data: MatchRequest = await res.json();
+            const payload = (await res.json().catch(() => null)) as
+                | { error?: string; message?: string }
+                | null;
+
+            if (!res.ok) {
+                throw new Error(
+                    payload?.error ?? payload?.message ?? 'Failed to start matching'
+                );
+            }
+
+            const data: MatchRequest = payload as MatchRequest;
             setPreferences(prefs);
             setMatchRequest(data);
             setElapsedSeconds(0);
@@ -151,7 +167,10 @@ export default function MatchingPage() {
                     if (statusData.status === 'matched') {
                         stopTimers();
                         setMatchRequest(statusData);
-                        setState('matched_pending');
+                        if (statusData.matchId) {
+                            setState('matched');
+                            router.push(`/sessions/${statusData.matchId}`);
+                        }
                     } else if (statusData.status === 'timed_out') {
                         stopTimers();
                         setMatchRequest(statusData);
@@ -163,7 +182,11 @@ export default function MatchingPage() {
             }, 2000);
         } catch (error) {
             console.error('Error starting matching:', error);
-            setMatchingError('Unable to start matching. Please check if you have started matching on another tab.');
+            setMatchingError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to start matching. Please check if you have started matching on another tab.'
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -200,20 +223,6 @@ export default function MatchingPage() {
         setMatchRequest(null);
         setElapsedSeconds(0);
         setState('preferences');
-    };
-
-    const handleEnterSession = async () => {
-        if (!matchRequest) return;
-
-        try {
-            setState('matched_accepted');
-            router.push(`/sessions/${matchRequest?.matchId}`);
-            const res = await fetch(`/api/sessions/${matchRequest.matchId}`);
-            if (!res.ok) throw new Error('Failed to enter session');
-        } catch (error) {
-            handleCancel();
-            console.error('Failed to enter session:', error);
-        }
     };
 
     if (isLoading || !user) {
@@ -262,6 +271,7 @@ export default function MatchingPage() {
                             )}
                             <MatchingPreferencesForm
                                 topics={topics}
+                                topicDifficulties={topicDifficulties}
                                 onSubmit={handleStartMatching}
                                 isSubmitting={isSubmitting}
                             />
@@ -277,18 +287,6 @@ export default function MatchingPage() {
                         preferences={preferences}
                         elapsedSeconds={elapsedSeconds}
                         onCancel={handleCancel}
-                        isCancelling={isCancelling}
-                    />
-                </div>
-            )}
-
-            {state === 'matched_pending' && preferences && (
-                <div className="min-h-[calc(100vh-56px)] grid place-items-center">
-                    <MatchFoundCard
-                        preferences={preferences}
-                        partnerName={matchRequest?.partnerName}
-                        onCancel={handleCancel}
-                        onEnterSession={handleEnterSession}
                         isCancelling={isCancelling}
                     />
                 </div>

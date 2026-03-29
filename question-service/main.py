@@ -1,15 +1,16 @@
 import jwt
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import Cookie, Depends, FastAPI, HTTPException
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
 from typing import Annotated
-from utils import create_slug
+from utils import create_slug, normalize_topic
 
 # Load constants from environment values
 load_dotenv()
@@ -17,6 +18,9 @@ MONGODB_URI = os.getenv("MONGODB_URI")
 PORT = int(os.getenv("PORT"))
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
+EXEMPT_ROUTES = ["/", "/health", "/questions"]
+VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
+DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
 auth = HTTPBearer(auto_error=False)
 
 # Init mongodb client
@@ -33,19 +37,24 @@ async def lifespan(app):
         background=True)
     yield
 
-async def verify_jwt(token: Annotated[str | None, Cookie()] = None, 
+async def verify_jwt(request: Request, token: Annotated[str | None, Cookie()] = None, 
                      bearer: Annotated[HTTPAuthorizationCredentials, Depends(auth)] = None):
-    jwt_token = token
+    # Check is route is exempted
+    if request.url.path in EXEMPT_ROUTES:
+        return None
 
+    # Extract token from cookie, or bearer if not found
+    jwt_token = token
     if not token and bearer:
         jwt_token = bearer.credentials
 
     if not jwt_token:
         raise HTTPException(
-            status_code=401, 
+            status_code=404, 
             detail="Unauthenticated. Missing cookie or bearer token."
         )
     
+    # Decode the token with stored secret
     try:
         payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -55,6 +64,7 @@ async def verify_jwt(token: Annotated[str | None, Cookie()] = None,
         raise HTTPException(status_code=401, detail=f"Invalid token.")
     
 async def verify_admin_access(payload: dict = Depends(verify_jwt)):
+    # Check for existance of role key and respective values
     if 'role' not in payload:
         raise HTTPException(
             status_code=401, 
@@ -68,10 +78,10 @@ async def verify_admin_access(payload: dict = Depends(verify_jwt)):
     
     return payload
 
-# Initialize the application and bearer authentication
+# Initialize the application
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(verify_jwt)])
 
-@app.get('/')
+@app.get('/', dependencies=[])
 async def home():
     '''
     The root page of the service.
@@ -82,11 +92,21 @@ async def home():
 #             User access APIs
 # ============================================
 
-@app.get('/questions/all')
-async def get_all_questions():
+@app.get('/questions', dependencies=[])
+async def get_questions(
+    topic: str | None = Query(default=None),
+    difficulty: str | None = Query(default=None),
+):
     '''
-    Retrieves all questions in the database.
+    Retrieves questions in the database, optionally filtered by
+    exact topic and/or exact difficulty.
     '''
+    normalized_topic = normalize_topic(topic) if isinstance(topic, str) else ''
+    normalized_difficulty = difficulty.strip() if isinstance(difficulty, str) else ''
+
+    if normalized_difficulty and normalized_difficulty not in VALID_DIFFICULTIES:
+        raise HTTPException(status_code=400, detail="Invalid difficulty")
+
     projection = {
         'title': 1,
         'slug': 1,
@@ -94,10 +114,20 @@ async def get_all_questions():
         'difficulty': 1,
         'status': 1
     }
+    filter = {}
+
+    if normalized_topic:
+        filter['topics'] = {
+            '$regex': rf'^\s*{re.escape(normalized_topic)}\s*$',
+            '$options': 'i',
+        }
+
+    if normalized_difficulty:
+        filter['difficulty'] = normalized_difficulty
     
     try:
-        cursor = collection.find({}, projection)
-        results = await cursor.to_list(length=100)
+        cursor = collection.find(filter, projection)
+        results = await cursor.to_list(length=10000)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
@@ -108,22 +138,46 @@ async def get_all_questions():
 @app.get('/questions/topics')
 async def get_all_topics():
     '''
-    Retrieves all distinct topics in the database.
+    Retrieves all distinct topics in the database, along with the
+    available difficulty levels for each topic.
     '''
+    projection = {
+        'topics': 1,
+        'difficulty': 1,
+    }
+
     try:
-        raw_topics = await collection.distinct('topics')
+        raw_questions = await collection.find({}, projection).to_list(length=10000)
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
-    topics = sorted(
-        {
-            topic.strip()
-            for topic in raw_topics
-            if isinstance(topic, str) and topic.strip()
-        },
-        key=str.lower,
-    )
-    return {'topics': topics}
+    topic_difficulties = {}
+    for question in raw_questions:
+        difficulty = question.get('difficulty')
+        if difficulty not in VALID_DIFFICULTIES:
+            continue
+
+        for raw_topic in question.get('topics', []):
+            if not isinstance(raw_topic, str):
+                continue
+
+            topic = normalize_topic(raw_topic)
+            if not topic:
+                continue
+
+            if topic not in topic_difficulties:
+                topic_difficulties[topic] = set()
+            topic_difficulties[topic].add(difficulty)
+
+    topics = sorted(topic_difficulties.keys(), key=str.lower)
+    serialized_topic_difficulties = {
+        topic: sorted(topic_difficulties[topic], key=lambda difficulty: DIFFICULTY_ORDER[difficulty])
+        for topic in topics
+    }
+    return {
+        'topics': topics,
+        'topicDifficulties': serialized_topic_difficulties,
+    }
 
 @app.get('/questions/{question_slug}')
 async def get_question(question_slug: str):

@@ -20,17 +20,21 @@ import {
     PROGRAMMING_LANGUAGE_LABELS,
     type ProgrammingLanguage,
 } from '@/lib/programming-languages';
+import type { TopicDifficulties } from '@/app/matching/types';
 
-const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
+const ALL_DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
+const EMPTY_DIFFICULTIES: Difficulty[] = [];
 
 interface MatchingPreferencesFormProps {
     topics: string[];
+    topicDifficulties: TopicDifficulties;
     onSubmit: (preferences: MatchingPreferences) => void;
     isSubmitting?: boolean;
 }
 
 export function MatchingPreferencesForm({
     topics,
+    topicDifficulties,
     onSubmit,
     isSubmitting,
 }: MatchingPreferencesFormProps) {
@@ -38,10 +42,18 @@ export function MatchingPreferencesForm({
     const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
     const [language, setLanguage] = useState<ProgrammingLanguage>(PROGRAMMING_LANGUAGES[0]);
     const selectedTopic = topics.includes(topic) ? topic : (topics[0] ?? '');
+    const availableDifficulties = selectedTopic
+        ? (topicDifficulties[selectedTopic] ?? EMPTY_DIFFICULTIES)
+        : EMPTY_DIFFICULTIES;
+    const selectedDifficulty = availableDifficulties.includes(difficulty)
+        ? difficulty
+        : (availableDifficulties[0] ?? difficulty);
+    const hasAvailableDifficulty = availableDifficulties.includes(selectedDifficulty);
+    const canSubmit = Boolean(selectedTopic) && hasAvailableDifficulty && availableDifficulties.length > 0;
 
     const handleSubmit = () => {
-        if (!selectedTopic) return;
-        onSubmit({ topic: selectedTopic, difficulty, language });
+        if (!canSubmit) return;
+        onSubmit({ topic: selectedTopic, difficulty: selectedDifficulty, language });
     };
 
     return (
@@ -72,29 +84,44 @@ export function MatchingPreferencesForm({
                 <div className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col gap-2">
                     <Label className="text-[11.5px] font-semibold text-muted-foreground">Difficulty</Label>
                     <RadioGroup
-                        value={difficulty}
+                        value={selectedDifficulty}
                         onValueChange={(v) => setDifficulty(v as Difficulty)}
                         className="flex gap-2.5"
                     >
-                        {DIFFICULTIES.map((d) => (
+                        {ALL_DIFFICULTIES.map((d) => {
+                            const isAvailable = availableDifficulties.includes(d);
+
+                            return (
                             <Label
                                 key={d}
                                 htmlFor={`difficulty-${d}`}
-                                className={`flex-1 flex items-center justify-center gap-2 border rounded-full px-3 py-2 text-[12px] font-semibold cursor-pointer transition-all duration-200 ease-out active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)] ${difficulty === d
-                                    ? 'border-accent bg-accent/10 text-accent shadow-[0_0_0_1px_hsl(var(--accent)/0.15)]'
-                                    : 'border-border bg-card text-accent hover:bg-secondary hover:border-ring/30 hover:shadow-sm'
+                                aria-disabled={!isAvailable}
+                                className={`flex-1 flex items-center justify-center gap-2 border rounded-full px-3 py-2 text-[12px] font-semibold transition-all duration-200 ease-out ${isAvailable
+                                    ? `cursor-pointer active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)] ${selectedDifficulty === d
+                                        ? 'border-accent bg-accent/10 text-accent shadow-[0_0_0_1px_hsl(var(--accent)/0.15)]'
+                                        : 'border-border bg-card text-accent hover:bg-secondary hover:border-ring/30 hover:shadow-sm'
+                                    }`
+                                    : 'cursor-not-allowed border-border bg-muted/40 text-muted-foreground/70'
                                     }`}
                             >
-                                <RadioGroupItem value={d} id={`difficulty-${d}`} className="sr-only" />
+                                <RadioGroupItem
+                                    value={d}
+                                    id={`difficulty-${d}`}
+                                    className="sr-only"
+                                    disabled={!isAvailable}
+                                />
                                 <span
-                                    className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${difficulty === d ? 'border-accent' : 'border-muted-foreground/40'
+                                    className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedDifficulty === d && isAvailable
+                                        ? 'border-accent'
+                                        : 'border-muted-foreground/40'
                                         }`}
                                 >
-                                    {difficulty === d && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                                    {selectedDifficulty === d && isAvailable && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
                                 </span>
                                 {d}
                             </Label>
-                        ))}
+                            );
+                        })}
                     </RadioGroup>
                 </div>
 
@@ -122,7 +149,7 @@ export function MatchingPreferencesForm({
                 <div className="flex items-center gap-4 mt-2">
                     <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || topics.length === 0 || !selectedTopic}
+                        disabled={isSubmitting || !canSubmit}
                         className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[13px] font-semibold px-5 py-2.5 rounded-lg"
                     >
                         {isSubmitting ? 'Starting\u2026' : 'Start Matching'}
@@ -136,9 +163,11 @@ export function MatchingPreferencesForm({
                 </div>
 
                 <p className="text-[11.5px] text-muted-foreground leading-relaxed">
-                    {topics.length > 0
-                        ? "We'll keep you in the matching lobby for up to 2 minutes. If no match is found, you can refine your preferences or try again."
-                        : 'Topics are currently unavailable. Please try again once the question service is reachable.'}
+                    {topics.length === 0
+                        ? 'Topics are currently unavailable. Please try again once the question service is reachable.'
+                        : availableDifficulties.length === 0
+                            ? 'No questions are currently available for the selected topic. Please choose another topic.'
+                            : "We'll keep you in the matching lobby for up to 2 minutes. If no match is found, you can refine your preferences or try again."}
                 </p>
             </div>
         </Card>

@@ -2,16 +2,22 @@ package peerprep.matching.service;
 
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import peerprep.matching.client.CollaborationServiceClient;
 import peerprep.matching.client.QuestionServiceClient;
 import peerprep.matching.documents.MatchDoc;
 import peerprep.matching.documents.UserStateDoc;
 import peerprep.matching.documents.WaitingQueueDoc;
+import peerprep.matching.models.MatchNotificationRequest;
+import peerprep.matching.models.MatchNotificationRequestDto;
 import peerprep.matching.models.MatchRequest;
+import peerprep.matching.models.Participant;
 import peerprep.matching.models.UserState;
 import peerprep.matching.repositories.MatchRepository;
 import peerprep.matching.repositories.UserStateRepository;
@@ -22,11 +28,14 @@ public class MatchService {
 
     private static final long TWO_MIN_IN_MS = 120000;
 
+    private final Logger logger = LoggerFactory.getLogger(MatchService.class);
+
     private final WaitingQueueRepository waitingQueueRepository;
     private final UserStateRepository userStateRepository;
     private final MatchRepository matchRepository;
     private final TransactionTemplate transactionTemplate;
     private final QuestionServiceClient questionServiceClient;
+    private final CollaborationServiceClient collaborationServiceClient;
 
     @Autowired
     public MatchService(
@@ -34,17 +43,20 @@ public class MatchService {
             UserStateRepository userStateRepository,
             MatchRepository matchRepository,
             MongoTransactionManager transactionManager,
-            QuestionServiceClient questionServiceClient) {
+            QuestionServiceClient questionServiceClient,
+            CollaborationServiceClient collaborationServiceClient) {
         this.waitingQueueRepository = waitingQueueRepository;
         this.userStateRepository = userStateRepository;
         this.matchRepository = matchRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.questionServiceClient = questionServiceClient;
+        this.collaborationServiceClient = collaborationServiceClient;
     }
 
     /**
      * Adds user to the waiting pool under the selected category
      * and attempt to match users within the selected category.
+     * Notify collaboration-service of the created matches, and roll back if notification fails.
      * Fully transactional to prevent race conditions with cancelMatch.
      * If user is already in the waiting pool or matched, an exception is thrown.
      *
@@ -53,14 +65,19 @@ public class MatchService {
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
     public String addUser(MatchRequest req) {
-        return transactionTemplate.execute(status -> {
+        if (!questionServiceClient.hasQuestionsByTopicAndDifficulty(req.getTopic(), req.getDifficulty())) {
+            throw new InvalidMatchPreferenceException(
+                    "No questions are available for the selected topic and difficulty.");
+        }
+
+        List<MatchNotificationRequest> createdMatches = transactionTemplate.execute(status -> {
             String userId = req.getUserId();
             String requestId = UUID.randomUUID().toString();
             req.setRequestId(requestId);
             String userName = req.getUserName();
             String category = req.getCategory();
 
-            boolean success = userStateRepository.upsertIfNotPendingOrMatched(
+            boolean success = userStateRepository.upsertIfNotActive(
                     userId, requestId, userName, category);
             if (!success) {
                 throw new RuntimeException("User already in queue or matched");
@@ -69,20 +86,28 @@ public class MatchService {
             waitingQueueRepository.createIfNotExists(category);
             waitingQueueRepository.enqueueUser(category, userId);
 
-            tryMatchTransactional(category);
+            return tryMatchTransactional(category);
+        });
 
-            return requestId;
+        if (createdMatches != null) {
+            notifyCollaborationService(createdMatches);
+        }
+
+        return transactionTemplate.execute(status -> {
+            return req.getRequestId();
         });
     }
 
     /**
      * Try to match users in a category inside a transaction. 
-     * If matched, assign a question and save the match document. 
-     * If not, put users back into the waiting pool.
+     * If match is found, assign a question and save the match document. 
      * 
      * @param category The category to match users in.
+     * @return List of created match info for notification to collaboration-service.
      */
-    private void tryMatchTransactional(String category) {
+    private List<MatchNotificationRequest> tryMatchTransactional(String category) {
+        List<MatchNotificationRequest> createdMatches = new ArrayList<>();
+
         while (true) {
             String userId1 = waitingQueueRepository.dequeueUserAndReturn(category);
             String userId2 = waitingQueueRepository.dequeueUserAndReturn(category);
@@ -105,8 +130,8 @@ public class MatchService {
                 continue;
             }
 
-            stateDoc1.setState(UserState.MATCHED.name());
-            stateDoc2.setState(UserState.MATCHED.name());
+            stateDoc1.setState(UserState.MATCH_FOUND.name());
+            stateDoc2.setState(UserState.MATCH_FOUND.name());
             userStateRepository.save(stateDoc1);
             userStateRepository.save(stateDoc2);
 
@@ -116,11 +141,70 @@ public class MatchService {
             String[] categoryParts = category.split("\\|");
             String topic = categoryParts[0];
             String difficulty = categoryParts[1];
+            String language = categoryParts[2];
             String questionSlug = questionServiceClient.getQuestionByTopicAndDifficulty(topic, difficulty);
+            if (questionSlug == null || questionSlug.isBlank()) {
+                throw new IllegalStateException("Unable to assign a question for category " + category);
+            }
             matchDoc.setQuestionSlug(questionSlug);
             
             matchRepository.save(matchDoc);
+
+            createdMatches.add(new MatchNotificationRequest(matchId, userId1, userId2, questionSlug, language, category));
         }
+
+        return createdMatches;
+    }
+
+    private void notifyCollaborationService(List<MatchNotificationRequest> createdMatches) {
+        for (MatchNotificationRequest request : createdMatches) {
+            try {
+                MatchNotificationRequestDto dto = toDto(request);
+                collaborationServiceClient.notifyMatchCreated(dto);
+                userStateRepository.updateState(request.getUserId1(), UserState.MATCHED);
+                userStateRepository.updateState(request.getUserId2(), UserState.MATCHED);
+            } catch (Exception e) {
+                logger.error("Failed to notify collaboration-service for match {}: {}",
+                        request.getMatchId(), e.getMessage());
+                rollbackMatch(request);
+            }
+        }
+    }
+
+    private void rollbackMatch(MatchNotificationRequest request) {
+        transactionTemplate.execute(status -> {
+            try {
+                MatchDoc matchDoc = matchRepository.findByMatchId(request.getMatchId());
+                if (matchDoc != null) {
+                    matchRepository.delete(matchDoc);
+                }
+
+                UserStateDoc stateDoc1 = userStateRepository.findByUserId(request.getUserId1());
+                UserStateDoc stateDoc2 = userStateRepository.findByUserId(request.getUserId2());
+
+                if (stateDoc1 != null) {
+                    stateDoc1.setState(UserState.PENDING.name());
+                    userStateRepository.save(stateDoc1);
+                    waitingQueueRepository.createIfNotExists(request.getCategory());
+                    waitingQueueRepository.enqueueUser(request.getCategory(), request.getUserId1());
+                }
+
+                if (stateDoc2 != null) {
+                    stateDoc2.setState(UserState.PENDING.name());
+                    userStateRepository.save(stateDoc2);
+                    waitingQueueRepository.createIfNotExists(request.getCategory());
+                    waitingQueueRepository.enqueueUser(request.getCategory(), request.getUserId2());
+                }
+
+                logger.info("Rolled back match {} and re-queued users {} and {}",
+                        request.getMatchId(), request.getUserId1(), request.getUserId2());
+            } catch (Exception e) {
+                logger.error("Failed to rollback match {}: {}", request.getMatchId(), e.getMessage());
+                status.setRollbackOnly();
+            }
+
+            return null;
+        });
     }
 
     /**
@@ -136,14 +220,8 @@ public class MatchService {
 
             String userId = stateDoc.getUserId();
 
-            if (stateDoc.getState().equals(UserState.MATCHED.name())) {
-                MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
-                if (matchDoc == null) return false;
-
-                matchRepository.delete(matchDoc);
-                userStateRepository.deleteByUserId(matchDoc.getUser1());
-                userStateRepository.deleteByUserId(matchDoc.getUser2());
-                return true;
+            if (!stateDoc.getState().equals(UserState.PENDING.name())) {
+                return false;
             }
 
             String category = stateDoc.getCategory();
@@ -175,17 +253,19 @@ public class MatchService {
      * @return true if session ended successfully, false otherwise.
      */
     public boolean endSession(String matchId) {
-        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
-        if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
+        return transactionTemplate.execute(status -> {
+            MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+            if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
 
-        matchDoc.setStatus("ended");
-        matchDoc.setEndedAt(new Date());
-        matchRepository.save(matchDoc);
+            matchDoc.setStatus("ended");
+            matchDoc.setEndedAt(new Date());
+            matchRepository.save(matchDoc);
 
-        userStateRepository.deleteByUserId(matchDoc.getUser1());
-        userStateRepository.deleteByUserId(matchDoc.getUser2());
+            userStateRepository.deleteByUserId(matchDoc.getUser1());
+            userStateRepository.deleteByUserId(matchDoc.getUser2());
 
-        return true;
+            return true;
+        });
     }
 
     /**
@@ -277,5 +357,20 @@ public class MatchService {
         }
 
         return result;
+    }
+
+    private MatchNotificationRequestDto toDto(MatchNotificationRequest request) {
+        List<Participant> participants = List.of(
+            new Participant(request.getUserId1()),
+            new Participant(request.getUserId2())
+        );
+
+        MatchNotificationRequestDto dto = new MatchNotificationRequestDto();
+        dto.setSessionId(request.getMatchId());
+        dto.setQuestionId(request.getQuestionSlug());
+        dto.setSelectedLanguage(request.getLanguage());
+        dto.setParticipants(participants);
+
+        return dto;
     }
 }

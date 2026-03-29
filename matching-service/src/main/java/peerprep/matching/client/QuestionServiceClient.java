@@ -1,5 +1,7 @@
 package peerprep.matching.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -9,9 +11,9 @@ import java.util.*;
 @Component
 public class QuestionServiceClient {
 
+    private final Logger logger = LoggerFactory.getLogger(QuestionServiceClient.class);
     private final WebClient webClient;
-
-    private static final List<String> DIFFICULTY_ORDER = Arrays.asList("Easy", "Medium", "Hard");
+    private final Random random = new Random();
 
     public QuestionServiceClient(@Value("${question.service.url:http://localhost:8000}") String questionServiceUrl) {
         this.webClient = WebClient.builder()
@@ -19,54 +21,46 @@ public class QuestionServiceClient {
                 .build();
     }
 
+    public boolean hasQuestionsByTopicAndDifficulty(String topic, String difficulty) {
+        return !getQuestionsByTopicAndDifficulty(topic, difficulty).isEmpty();
+    }
+
     public String getQuestionByTopicAndDifficulty(String topic, String difficulty) {
-        if (topic == null || topic.isEmpty()) {
+        List<Map<String, Object>> questions = getQuestionsByTopicAndDifficulty(topic, difficulty);
+        if (questions.isEmpty()) {
             return null;
         }
 
-        List<String> difficultiesToTry = new ArrayList<>();
-        
-        if (difficulty != null && !difficulty.isEmpty()) {
-            int requestedIndex = DIFFICULTY_ORDER.indexOf(difficulty);
-            if (requestedIndex >= 0) {
-                difficultiesToTry.addAll(DIFFICULTY_ORDER.subList(requestedIndex, DIFFICULTY_ORDER.size()));
-            }
-        } else {
-            difficultiesToTry.addAll(DIFFICULTY_ORDER);
-        }
-
-        for (String diff : difficultiesToTry) {
-            String slug = tryGetQuestion(topic, diff);
-            if (slug != null) {
-                return slug;
-            }
-        }
-
-        return null;
+        Map<String, Object> randomQuestion = questions.get(random.nextInt(questions.size()));
+        return (String) randomQuestion.get("slug");
     }
 
     @SuppressWarnings("unchecked")
-    private String tryGetQuestion(String topic, String difficulty) {
+    private List<Map<String, Object>> getQuestionsByTopicAndDifficulty(String topic, String difficulty) {
+        if (topic == null || topic.isBlank()) {
+            return Collections.emptyList();
+        }
+
         try {
             List<Map<String, Object>> questions = (List<Map<String, Object>>) (List<?>) webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/questions/topic/{topic}")
-                            .queryParam("difficulty", difficulty)
-                            .build(topic))
+                            .path("/questions")
+                            .queryParam("topic", topic)
+                            .queryParamIfPresent("difficulty", Optional.ofNullable(difficulty).filter(diff -> !diff.isBlank()))
+                            .build())
                     .retrieve()
                     .bodyToFlux(Map.class)
                     .collectList()
                     .block();
 
-            if (questions == null || questions.isEmpty()) {
-                return null;
-            }
-
-            Map<String, Object> randomQuestion = questions.get(new Random().nextInt(questions.size()));
-            return (String) randomQuestion.get("slug");
+            return questions == null ? Collections.emptyList() : questions;
         } catch (Exception e) {
-            System.err.println("Failed to fetch questions for topic=" + topic + ", difficulty=" + difficulty + ": " + e.getMessage());
-            return null;
+            logger.error(
+                    "Failed to fetch questions for topic={} difficulty={}: {}",
+                    topic,
+                    difficulty,
+                    e.getMessage());
+            return Collections.emptyList();
         }
     }
 }
