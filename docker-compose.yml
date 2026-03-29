@@ -49,6 +49,14 @@ services:
       ai-assistant-service:
         condition: service_started
     restart: unless-stopped
+
+  collaboration-service:
+    build:
+      context: ./collaboration-service
+    restart: unless-stopped
+    env_file:
+      - ./collaboration-service/.env
+
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
