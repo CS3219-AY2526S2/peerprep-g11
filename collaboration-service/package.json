@@ -4,11 +4,12 @@
   "description": "collaboration service that syncs monaco code editors in PeerPrep.",
   "license": "ISC",
   "author": "",
-  "type": "module",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node server.ts"
+    "dev": "ts-node-dev --respawn --transpile-only server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "0": "^0.0.0",
@@ -23,6 +24,11 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/jsonwebtoken": "^9.0.10",
-    "patch-package": "^8.0.1"
+    "patch-package": "^8.0.1",
+    "typescript": "^6.0.2",
+    "ts-node-dev": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "@types/express": "^5.0.0",
+    "@types/ws": "^8.5.10"
   }
 }

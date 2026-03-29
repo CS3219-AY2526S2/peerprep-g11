@@ -1,7 +1,7 @@
 import express from "express";
 import type { Request, Response } from "express";
 import cookieParser from "cookie-parser";
-import { Session } from "./model/Session.ts";
+import { Session } from "./model/Session";
 
 const app = express();
 app.use(express.json());

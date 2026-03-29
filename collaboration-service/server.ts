@@ -1,12 +1,12 @@
 import "dotenv/config";
-import { connectDB } from "./app/config/db.ts";
+import { connectDB } from "./app/config/db";
 
 const PORT = process.env.PORT || 1234;
 import { setupWSConnection } from "@y/websocket-server/utils";
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
 import jwt from "jsonwebtoken";
-import app from "./app/app.ts";
+import app from "./app/app";
 
 async function main() {
   await connectDB();
