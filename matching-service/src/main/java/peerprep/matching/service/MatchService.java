@@ -15,7 +15,9 @@ import peerprep.matching.documents.MatchDoc;
 import peerprep.matching.documents.UserStateDoc;
 import peerprep.matching.documents.WaitingQueueDoc;
 import peerprep.matching.models.MatchNotificationRequest;
+import peerprep.matching.models.MatchNotificationRequestDto;
 import peerprep.matching.models.MatchRequest;
+import peerprep.matching.models.Participant;
 import peerprep.matching.models.UserState;
 import peerprep.matching.repositories.MatchRepository;
 import peerprep.matching.repositories.UserStateRepository;
@@ -157,7 +159,8 @@ public class MatchService {
     private void notifyCollaborationService(List<MatchNotificationRequest> createdMatches) {
         for (MatchNotificationRequest request : createdMatches) {
             try {
-                collaborationServiceClient.notifyMatchCreated(request);
+                MatchNotificationRequestDto dto = toDto(request);
+                collaborationServiceClient.notifyMatchCreated(dto);
                 userStateRepository.updateState(request.getUserId1(), UserState.MATCHED);
                 userStateRepository.updateState(request.getUserId2(), UserState.MATCHED);
             } catch (Exception e) {
@@ -354,5 +357,20 @@ public class MatchService {
         }
 
         return result;
+    }
+
+    private MatchNotificationRequestDto toDto(MatchNotificationRequest request) {
+        List<Participant> participants = List.of(
+            new Participant(request.getUserId1()),
+            new Participant(request.getUserId2())
+        );
+
+        MatchNotificationRequestDto dto = new MatchNotificationRequestDto();
+        dto.setSessionId(request.getMatchId());
+        dto.setQuestionId(request.getQuestionSlug());
+        dto.setSelectedLanguage(request.getLanguage());
+        dto.setParticipants(participants);
+
+        return dto;
     }
 }

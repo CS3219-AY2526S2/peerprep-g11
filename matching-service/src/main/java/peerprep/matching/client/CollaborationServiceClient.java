@@ -4,7 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import peerprep.matching.models.MatchNotificationRequest;
+import peerprep.matching.models.MatchNotificationRequestDto;
 
 @Component
 public class CollaborationServiceClient {
@@ -16,7 +16,7 @@ public class CollaborationServiceClient {
         this.webClient = WebClient.builder().baseUrl(url).build();
     }
 
-    public void notifyMatchCreated(MatchNotificationRequest request) {
+    public void notifyMatchCreated(MatchNotificationRequestDto request) {
         webClient.post()
                 .uri("/matches")
                 .bodyValue(request)

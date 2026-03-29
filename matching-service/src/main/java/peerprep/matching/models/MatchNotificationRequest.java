@@ -8,8 +8,6 @@ public class MatchNotificationRequest {
     private String language;
     private String category;
 
-    public MatchNotificationRequest() {}
-
     public MatchNotificationRequest(String matchId, String userId1, String userId2,
                                      String questionSlug, String language, String category) {
         this.matchId = matchId;
