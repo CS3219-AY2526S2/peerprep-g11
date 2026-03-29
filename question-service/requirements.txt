@@ -1,3 +1,4 @@
 dotenv
-pymongo[srv]
 fastapi[standard]
+pyjwt[crypto]
+pymongo[srv]
