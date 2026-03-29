@@ -117,14 +117,14 @@ export function EditorPanel({
 
         if (cancelled) return; // component unmounted before async import finished
 
-        const collabServiceUrl = process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL
-          ?? `${location.protocol === 'http:' ? 'ws:' : 'wss:'}//localhost:4003`;
+        const COLLAB_SERVICE_URL = process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL
+          ?? `${location.protocol === 'http:' ? 'ws:' : 'wss:'}//localhost:1234`;
 
         const yDocument = new Y.Doc();
         yjsDocRef.current = yDocument;
 
         const provider = new WebsocketProvider(
-          collabServiceUrl,
+          COLLAB_SERVICE_URL,
           sessionId,          // used as the Yjs room name — matches sessionId on the server
           yDocument,
           { params: { ticket: ticket! } }, // ticket appended as ?ticket=<value> on the WS URL
