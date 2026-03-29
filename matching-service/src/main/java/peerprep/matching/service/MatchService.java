@@ -63,6 +63,11 @@ public class MatchService {
      * @throws RuntimeException If user is already in waiting pool or in an active match.
      */
     public String addUser(MatchRequest req) {
+        if (!questionServiceClient.hasQuestionsByTopicAndDifficulty(req.getTopic(), req.getDifficulty())) {
+            throw new InvalidMatchPreferenceException(
+                    "No questions are available for the selected topic and difficulty.");
+        }
+
         List<MatchNotificationRequest> createdMatches = transactionTemplate.execute(status -> {
             String userId = req.getUserId();
             String requestId = UUID.randomUUID().toString();
@@ -136,6 +141,9 @@ public class MatchService {
             String difficulty = categoryParts[1];
             String language = categoryParts[2];
             String questionSlug = questionServiceClient.getQuestionByTopicAndDifficulty(topic, difficulty);
+            if (questionSlug == null || questionSlug.isBlank()) {
+                throw new IllegalStateException("Unable to assign a question for category " + category);
+            }
             matchDoc.setQuestionSlug(questionSlug);
             
             matchRepository.save(matchDoc);

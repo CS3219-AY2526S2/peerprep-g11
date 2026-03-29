@@ -9,7 +9,12 @@ import { MatchingPreferencesForm } from '@/app/matching/_components/MatchingPref
 import { HowMatchingWorks } from '@/app/matching/_components/HowMatchingWorks';
 import { WaitingCard } from '@/app/matching/_components/WaitingCard';
 import { TimedOutCard } from '@/app/matching/_components/TimedOutCard';
-import type { MatchingPreferences, MatchRequest } from '@/app/matching/types';
+import type {
+    AvailableMatchingTopicsResponse,
+    MatchingPreferences,
+    MatchRequest,
+    TopicDifficulties,
+} from '@/app/matching/types';
 import { useRouter } from 'next/navigation';
 
 type MatchingState = 'preferences' | 'searching' | 'matched' |'timed_out';
@@ -25,6 +30,7 @@ export default function MatchingPage() {
     const [isCancelling, setIsCancelling] = useState(false);
     const [matchingError, setMatchingError] = useState('');
     const [topics, setTopics] = useState<string[]>([]);
+    const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficulties>({});
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -45,14 +51,16 @@ export default function MatchingPage() {
                 throw new Error('Failed to fetch topics');
             }
 
-            const data: { topics?: string[] } = await res.json();
+            const data: AvailableMatchingTopicsResponse = await res.json();
             setTopics(data.topics ?? []);
+            setTopicDifficulties(data.topicDifficulties ?? {});
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') {
                 return;
             }
 
             setTopics([]);
+            setTopicDifficulties({});
         }
     }, []);
 
@@ -127,9 +135,18 @@ export default function MatchingPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(prefs),
             });
-            if (!res.ok) throw new Error('Failed to start matching');
 
-            const data: MatchRequest = await res.json();
+            const payload = (await res.json().catch(() => null)) as
+                | { error?: string; message?: string }
+                | null;
+
+            if (!res.ok) {
+                throw new Error(
+                    payload?.error ?? payload?.message ?? 'Failed to start matching'
+                );
+            }
+
+            const data: MatchRequest = payload as MatchRequest;
             setPreferences(prefs);
             setMatchRequest(data);
             setElapsedSeconds(0);
@@ -165,7 +182,11 @@ export default function MatchingPage() {
             }, 2000);
         } catch (error) {
             console.error('Error starting matching:', error);
-            setMatchingError('Unable to start matching. Please check if you have started matching on another tab.');
+            setMatchingError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to start matching. Please check if you have started matching on another tab.'
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -250,6 +271,7 @@ export default function MatchingPage() {
                             )}
                             <MatchingPreferencesForm
                                 topics={topics}
+                                topicDifficulties={topicDifficulties}
                                 onSubmit={handleStartMatching}
                                 isSubmitting={isSubmitting}
                             />

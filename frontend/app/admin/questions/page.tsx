@@ -43,11 +43,7 @@ export default function AdminQuestionsPage() {
   useEffect(() => {
     async function fetchTopics() {
       try {
-        const res = await fetch('/api/questions', {
-          method: 'POST',
-          body: JSON.stringify({ action: 'topics' }),
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const res = await fetch('/api/questions/topics');
 
         if (res.ok) {
           const data = await res.json();

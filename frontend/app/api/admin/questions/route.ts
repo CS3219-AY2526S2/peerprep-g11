@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${QUESTION_SERVICE_URL}/questions/all`, {
+    const response = await fetch(`${QUESTION_SERVICE_URL}/questions`, {
       headers: {
         ...forwardAuthHeaders(request),
       },
