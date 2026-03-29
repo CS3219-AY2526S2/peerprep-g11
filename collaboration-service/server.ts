@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { connectDB } from "./app/config/db.ts";
 
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 1234;
 import { setupWSConnection } from "@y/websocket-server/utils";
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
