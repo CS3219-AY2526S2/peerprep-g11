@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { forwardAuthHeaders } from '@/lib/auth';
 
 const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:8000';
 
@@ -7,9 +8,12 @@ interface TopicsResponse {
   topicDifficulties?: Record<string, string[]>;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const res = await fetch(`${QUESTION_SERVICE_URL}/questions/topics`, {
+      headers: {
+        ...forwardAuthHeaders(request),
+      },
       cache: 'no-store',
     });
 

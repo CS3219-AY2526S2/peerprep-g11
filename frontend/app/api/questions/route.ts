@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Difficulty, PaginatedResponse } from '@/lib/types';
 import type { QuestionListElement, QuestionStatus } from '@/app/questions/types';
+import { forwardAuthHeaders } from '@/lib/auth';
 
 const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:8000';
 
@@ -41,7 +42,12 @@ export async function GET(request: NextRequest) {
     const queryString = upstreamParams.toString();
     const res = await fetch(
       `${QUESTION_SERVICE_URL}/questions${queryString ? `?${queryString}` : ''}`,
-      { cache: 'no-store' }
+      {
+        headers: {
+          ...forwardAuthHeaders(request),
+        },
+        cache: 'no-store',
+      }
     );
     if (!res.ok) {
       return NextResponse.json(
