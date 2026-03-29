@@ -69,6 +69,7 @@ export default function SessionPage() {
   const currentUsernameRef = useRef("You");
 
   const [session, setSession] = useState<SessionDetails | null>(null);
+  const [collabTicket, setCollabTicket] = useState<string | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
@@ -105,10 +106,11 @@ export default function SessionPage() {
           return;
         }
 
-        const sessionData = applyCurrentUserToSession(
-          sessionBody as SessionDetails,
-          currentUsername,
-        );
+        const rawSession = sessionBody as SessionDetails & { ticket?: string };
+        if (rawSession.ticket) {
+          setCollabTicket(rawSession.ticket);
+        }
+        const sessionData = applyCurrentUserToSession(rawSession, currentUsername);
         setSession(sessionData);
         setSelectedLanguage(sessionData.selectedLanguage);
         setCodeByLanguage({
@@ -380,6 +382,7 @@ export default function SessionPage() {
                 <QuestionPanel question={question} />
                 <EditorPanel
                   sessionId={session.sessionId}
+                  ticket={collabTicket}
                   selectedLanguage={selectedLanguage}
                   allowedLanguages={session.allowedLanguages}
                   value={codeByLanguage[selectedLanguage]}

@@ -15,6 +15,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { SessionLanguage } from '@/app/sessions/[sessionId]/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
+import * as Y from "yjs";
 
 type MonacoInstance = typeof import('monaco-editor');
 
@@ -29,6 +30,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 
 interface EditorPanelProps {
   sessionId: string;
+  ticket: string | null;           // short-lived JWT from BFF — passed as WS query param
   selectedLanguage: SessionLanguage;
   allowedLanguages: SessionLanguage[];
   value: string;
@@ -73,6 +75,7 @@ function handleEditorWillMount(monaco: typeof import('monaco-editor')) {
 
 export function EditorPanel({
   sessionId,
+  ticket,
   selectedLanguage,
   allowedLanguages,
   value,
@@ -81,6 +84,7 @@ export function EditorPanel({
   onExplainCode,
   walkthroughShowExplainDemo = false,
 }: EditorPanelProps) {
+
   const onExplainCodeRef = useRef(onExplainCode);
   useEffect(() => {
     onExplainCodeRef.current = onExplainCode;
@@ -94,6 +98,68 @@ export function EditorPanel({
     left: 0,
   });
 
+  const [isEditorReady, setEditorReady] = useState(false);
+
+  // refs to hold Yjs objects so we can destroy them on unmount
+  const yjsProviderRef = useRef<import('y-websocket').WebsocketProvider | null>(null);
+  const yjsDocRef = useRef<Y.Doc | null>(null);
+
+  // initialise Yjs once the monaco editor is mounted AND the ticket is available
+  useEffect(() => {
+    if (!isEditorReady || !ticket) return;
+
+    let cancelled = false;
+
+    async function initYjs(): Promise<void> {
+      try {
+        const { WebsocketProvider } = await import('y-websocket');
+        const { MonacoBinding } = await import('y-monaco');
+
+        if (cancelled) return; // component unmounted before async import finished
+
+        const collabServiceUrl = process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL
+          ?? `${location.protocol === 'http:' ? 'ws:' : 'wss:'}//localhost:4003`;
+
+        const yDocument = new Y.Doc();
+        yjsDocRef.current = yDocument;
+
+        const provider = new WebsocketProvider(
+          collabServiceUrl,
+          sessionId,          // used as the Yjs room name — matches sessionId on the server
+          yDocument,
+          { params: { ticket: ticket! } }, // ticket appended as ?ticket=<value> on the WS URL
+        );
+        yjsProviderRef.current = provider;
+
+        provider.on('status', (event: { status: string }) => {
+          console.log(`[Yjs] WebSocket status: ${event.status}`);
+        });
+
+        const type = yDocument.getText('monaco');
+
+        new MonacoBinding(
+          type,
+          editorRef.current!.getModel()!,
+          new Set([editorRef.current!]),
+          provider.awareness,
+        );
+
+      } catch (error) {
+        console.error('[Yjs] Error during initialisation:', error);
+      }
+    }
+
+    initYjs();
+
+    // cleanup: destroy provider and doc when component unmounts or ticket/sessionId changes
+    return () => {
+      cancelled = true;
+      yjsProviderRef.current?.destroy();
+      yjsDocRef.current?.destroy();
+      yjsProviderRef.current = null;
+      yjsDocRef.current = null;
+    };
+  }, [isEditorReady, ticket, sessionId]);
   const getSelectedText = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return '';
@@ -309,6 +375,7 @@ export function EditorPanel({
             editorRef.current = monacoEditor;
             monacoRef.current = monaco;
 
+            setEditorReady(true);
             monacoEditor.addAction({
               id: 'peerprep.explainCode',
               label: 'PeerPrep AI: Explain Code',
