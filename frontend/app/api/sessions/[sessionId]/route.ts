@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { SessionDetails, SessionLanguage } from "@/app/sessions/[sessionId]/types";
+import type {
+  SessionDetails,
+  SessionLanguage,
+} from "@/app/sessions/[sessionId]/types";
 import * as jwt from "jsonwebtoken";
 
-const COLLAB_SERVICE_URL = process.env.COLLAB_SERVICE_URL ?? "http://localhost:4003";
-const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? "http://localhost:8000";
+const COLLAB_SERVICE_URL =
+  process.env.COLLAB_SERVICE_URL ?? "http://localhost:1234";
+const QUESTION_SERVICE_URL =
+  process.env.QUESTION_SERVICE_URL ?? "http://localhost:8000";
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 export async function GET(
@@ -16,7 +21,8 @@ export async function GET(
   let userId: string;
   try {
     const token = _request.cookies.get("token")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
     userId = decoded.id as string;
   } catch {
@@ -48,7 +54,9 @@ export async function GET(
     java: "",
   };
   try {
-    const questionRes = await fetch(`${QUESTION_SERVICE_URL}/questions/${session.questionId}`);
+    const questionRes = await fetch(
+      `${QUESTION_SERVICE_URL}/questions/${session.questionId}`,
+    );
     if (questionRes.ok) {
       const question = await questionRes.json();
       // use question.starterCode if the question service provides it,
@@ -63,7 +71,7 @@ export async function GET(
 
   // 5. mark which participant is the current user (computed, not stored in DB)
   const participants = session.participants.map(
-    (p: { id: string; username: string }) => ({
+    (p: { id: string; presence?: string }) => ({
       ...p,
       isCurrentUser: p.id === userId,
       presence: p.presence ?? "connected",
