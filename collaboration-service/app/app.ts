@@ -35,6 +35,28 @@ app.get("/sessions/:sessionId", async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /sessions/:sessionId
+// Called by the BFF when a user leaves a session.
+// Deletes the session document from the DB.
+// Either participant leaving is sufficient to end the session.
+app.delete("/sessions/:sessionId", async (req: Request, res: Response) => {
+  try {
+    const deleted = await Session.findOneAndDelete({
+      sessionId: req.params.sessionId,
+    });
+
+    if (!deleted) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+
+    res.json({ message: "Session deleted", sessionId: req.params.sessionId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /matched
 // Called by the matching service when two users have been matched.
 // Creates a new session document in the DB recording who is matched
