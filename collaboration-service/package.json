@@ -13,22 +13,23 @@
   },
   "dependencies": {
     "0": "^0.0.0",
-    "@y/websocket-server": "^0.1.5",
+    "@y/websocket-server": "^0.1.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.3",
-    "ws": "^8.20.0"
+    "ws": "^8.20.0",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
-    "@types/jsonwebtoken": "^9.0.10",
-    "patch-package": "^8.0.1",
-    "typescript": "^6.0.2",
-    "ts-node-dev": "^2.0.0",
-    "@types/node": "^22.0.0",
     "@types/express": "^5.0.0",
-    "@types/ws": "^8.5.10"
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "patch-package": "^8.0.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.2"
   }
 }
