@@ -18,7 +18,7 @@ MONGODB_URI = os.getenv("MONGODB_URI")
 PORT = int(os.getenv("PORT"))
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
-EXEMPT_ROUTES = ["/", "/health", "/questions"]
+EXEMPT_ROUTES = ["/", "/health", "/questions", "/questions/topics"]
 VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
 DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
 auth = HTTPBearer(auto_error=False)
