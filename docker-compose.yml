@@ -49,14 +49,6 @@ services:
       ai-assistant-service:
         condition: service_started
     restart: unless-stopped
-
-  collaboration-service:
-    build:
-      context: ./collaboration-service
-    restart: unless-stopped
-    env_file:
-      - ./collaboration-service/.env
-
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
@@ -65,5 +57,16 @@ services:
       QUESTION_SERVICE_URL: http://question-service:8000
       MATCHING_SERVICE_URL: http://matching-service:8080
       AI_ASSISTANT_SERVICE_URL: http://ai-assistant-service:4002
+      COLLAB_SERVICE_URL: http://collaboration-service:1234
+      NEXT_PUBLIC_COLLAB_SERVICE_WS_URL: ${NEXT_PUBLIC_COLLAB_SERVICE_WS_URL:-ws://localhost:1234}
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
+
+  collaboration-service:
+    build:
+      context: ./collaboration-service
+    restart: unless-stopped
+    env_file:
+      - ./collaboration-service/.env
+    ports:
+      - "${COLLAB_PORT:-1234}:1234"
