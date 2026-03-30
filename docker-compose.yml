@@ -19,10 +19,10 @@ services:
     build:
       context: ./matching-service
     restart: unless-stopped
-    env_file:
-      - ./matching-service/application.properties
     environment:
       SERVER_PORT: 8080
+      QUESTION_SERVICE_URL: http://question-service:8000
+      COLLABORATION_SERVICE_URL: http://collaboration-service:1234
 
   ai-assistant-service:
     build:
@@ -49,6 +49,8 @@ services:
       ai-assistant-service:
         condition: service_started
     restart: unless-stopped
+    env_file:
+      - ./frontend/.env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
