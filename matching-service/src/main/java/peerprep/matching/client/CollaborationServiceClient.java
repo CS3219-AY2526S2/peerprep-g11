@@ -18,7 +18,7 @@ public class CollaborationServiceClient {
 
     public void notifyMatchCreated(MatchNotificationRequestDto request) {
         webClient.post()
-                .uri("/matches")
+                .uri("/matched")
                 .bodyValue(request)
                 .retrieve()
                 .toBodilessEntity()

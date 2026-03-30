@@ -1,20 +1,27 @@
-// TODO: Replace this mock implementation with a collaboration/matching service
-// leave call when session lifecycle APIs are available.
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { LeaveSessionResponse } from '@/app/sessions/[sessionId]/types';
 
-const KNOWN_SESSION_IDS = new Set(['mock-match-001', 'mock-match-002']);
+const COLLAB_SERVICE_URL = process.env.COLLAB_SERVICE_URL ?? 'http://localhost:4003';
 
 export async function POST(
-  _request: Request,
+  _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const { sessionId } = await params;
 
-    if (!KNOWN_SESSION_IDS.has(sessionId)) {
+    // call collab service to delete the session from the DB
+    const deleteResponse = await fetch(
+      `${COLLAB_SERVICE_URL}/sessions/${sessionId}`, // ← full path including sessionId
+      { method: 'DELETE' }
+    );
+
+    if (deleteResponse.status === 404) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (!deleteResponse.ok) {
+      return NextResponse.json({ error: 'Failed to leave session' }, { status: 502 });
     }
 
     return NextResponse.json({
@@ -23,9 +30,7 @@ export async function POST(
       redirectTo: '/dashboard',
     } satisfies LeaveSessionResponse);
   } catch {
-    return NextResponse.json(
-      { error: 'Unable to leave session right now' },
-      { status: 503 }
-    );
+    // collab service unreachable
+    return NextResponse.json({ error: 'Collaboration service unavailable' }, { status: 503 });
   }
 }

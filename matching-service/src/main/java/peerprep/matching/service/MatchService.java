@@ -361,8 +361,8 @@ public class MatchService {
 
     private MatchNotificationRequestDto toDto(MatchNotificationRequest request) {
         List<Participant> participants = List.of(
-            new Participant(request.getUserId1()),
-            new Participant(request.getUserId2())
+            toParticipant(request.getUserId1()),
+            toParticipant(request.getUserId2())
         );
 
         MatchNotificationRequestDto dto = new MatchNotificationRequestDto();
@@ -372,5 +372,13 @@ public class MatchService {
         dto.setParticipants(participants);
 
         return dto;
+    }
+
+    private Participant toParticipant(String userId) {
+        Participant participant = new Participant(userId);
+        UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
+        String userName = stateDoc != null ? stateDoc.getUserName() : null;
+        participant.setUsername(userName != null && !userName.isBlank() ? userName : userId);
+        return participant;
     }
 }

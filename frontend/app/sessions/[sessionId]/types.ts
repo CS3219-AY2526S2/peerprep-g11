@@ -13,6 +13,7 @@ export interface SessionParticipant {
 
 export interface SessionDetails {
   sessionId: string;
+  questionId: string;
   questionSlug: string;
   status: 'active';
   selectedLanguage: SessionLanguage;

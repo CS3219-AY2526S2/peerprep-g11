@@ -17,6 +17,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.38.0",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.575.0",
     "monaco-editor": "^0.55.1",
     "next": "16.1.6",
@@ -30,10 +31,14 @@
     "react-syntax-highlighter": "^16.1.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "y-monaco": "^0.1.6",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
