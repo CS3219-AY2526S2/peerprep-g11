@@ -1,16 +1,16 @@
 # Question Service
 
-Handles CRUD operations on PeerPrep question repository. Built with FastAPI and MongoDB.
+Standalone service for managing CRUD operations on PeerPrep question repository. Built with FastAPI and MongoDB.
 
 ## Prerequisites
 
-- Python 3
-- A MongoDB instance (local or MongoDB Atlas)
+- Python 3.9 and above
+- Existing MongoDB instance (local or MongoDB Atlas)
 
 ## Getting Started
 
 ```bash
-# Copy the environment variable and fill in the values
+# Copy the environment file and fill in the values
 cp .env.example .env
 
 # Build the docker image
@@ -25,36 +25,48 @@ docker run -p 8000:8000 question-service
 | Variable          | Required | Description                                          | Example                          |
 |-------------------|----------|------------------------------------------------------|----------------------------------|
 | `MONGODB_URI`     | Yes      | MongoDB connection string                            | `mongodb+srv://...`              |
+| `JWT_SECRET`      | Yes      | Secret used for JWT verification                     | `some_random_string`             |
 | `PORT`            | No       | Port the server listens on (default: `8000`)         | `8000`                           |
+
+Refer to [MongoDB connection string](https://www.mongodb.com/resources/products/fundamentals/mongodb-connection-string) for connecting to your db.
+
+**`JWT_SECRET` must be the same across all services.**
+
+## Authentication
+
+All endpoints, except `\health` and `\questions`, require JWT authenthication. The JWT will be retrieved from cookie parameter `token`, or `Bearer <token>` from `Authorization` header as backup.
 
 ## API Reference
 
-### GET /questions/`{question_slug}`
+### Open routes
 
-Get a question with full details based on `question_slug`. Refer to [Data Model](#data-model) for more details.
+These routes do not require JWT verification.
 
-#### Responses
+#### GET /health
+
+Return health status of the connected MongoDB server.
+
+**Responses:**
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
-| 200    | Question retrieved                                  |
-| 404    | Question not found                                  |
-| 503    | Database down, check health status of your database |
+| 200    | Ok                                                  |
+| 503    | Database down, check the status of your database    |
 
 ---
 
-### GET /questions
+#### GET /questions
 
-Get questions from the repository, optionally filtered by exact topic and/or difficulty.
+Get questions from the repository, optionally filtered by exact `topic` and/or `difficulty`.
 
-#### Query parameters
+**Query parameters:**
 
-| Parameter    | Required | Description |
-|--------------|----------|-------------|
-| `topic`      | No       | Exact topic match, case-insensitive |
+| Parameter    | Required | Description                                         |
+|--------------|----------|-----------------------------------------------------|
+| `topic`      | No       | Exact topic match, case-insensitive                 |
 | `difficulty` | No       | Exact difficulty match: `Easy`, `Medium`, or `Hard` |
 
-#### Responses
+**Responses:**
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
@@ -64,16 +76,36 @@ Get questions from the repository, optionally filtered by exact topic and/or dif
 
 ---
 
-### POST /questions/upsert
+### Protected routes
+
+These routes can be accesed by any user. Basic JWT verification is required.
+
+#### GET /questions/`{question_slug}`
+
+Get a question with full details based on `question_slug`. Refer to [Data Model](#data-model) for more details.
+
+**Responses:**
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 200    | Question retrieved                                  |
+| 404    | Question not found                                  |
+| 503    | Database down, check health status of your database |
+
+---
+
+### Admin routes
+
+Role checking is implemented on top of JWT verification, only admin access is allowed.
+
+#### POST /questions/upsert
 
 Upsert (update/insert) a question to the database. It searches the question with exact title and slug before upsert.
 
 - If no question with exact title and slug exists, inserts the question.
 - If matching question is found, updates the content of the question.
 
-#### Request body
-
-The request body should look like this. **All elements are required**.
+**Request body:**
 
 ```json
 {
@@ -96,16 +128,16 @@ The request body should look like this. **All elements are required**.
 }
 ```
 
-| Variable          | Description | Constraint                                         |
-|-------------------|----------|------------------------------------------------------|
-| `title`   | Title of the question      | None  |
-| `description` | Description of the question       | None         |
-| `topics`   | Relevant data structures and algorithms to solve the question       | Must have at least one topic for all questions         |
-| `difficulty`    | Difficulty of the question       | Must be between `Easy`, `Medium` or `Hard`   |
-| `examples`   | Examples with input and their expected output, provided with explanation for understanding      | At least one example is needed, and each example needs `input` and `output`  |
-| `constraints`   | Designated constraint for inputs of the question      | Must include at least one constraint  |
+| Variable          | Description                                                                                     | Constraint                                         |
+|-------------------|-------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| `title`           | Title of the question                                                                           | Required                                           |
+| `description`     | Description of the question                                                                     | Required                                           |
+| `topics`          | Relevant data structures and algorithms to solve the question                                   | Must have at least one topic for all questions     |
+| `difficulty`      | Difficulty of the question                                                                      | Must be between `Easy`, `Medium` or `Hard`         |
+| `examples`        | Examples with input and their expected output, provided with explanation for understanding      | At least one example is needed, and each example needs `input` and `output`  |
+| `constraints`     | Designated constraint for inputs of the question                                                | Must include at least one constraint               |
 
-#### Responses
+**Responses:**
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
@@ -114,11 +146,11 @@ The request body should look like this. **All elements are required**.
 
 ---
 
-### DELETE /questions/delete
+#### DELETE /questions/delete
 
 Delete a question with exact slug from the repository.
 
-#### Request body
+**Request body:**
 
 ```json
 {
@@ -126,11 +158,11 @@ Delete a question with exact slug from the repository.
 }
 ```
 
-| Variable          | Description | Constraint                                         |
-|-------------------|----------|------------------------------------------------------|
-| `slug`   | Slug of the target question      | None  |
+| Variable    | Description                      | Constraint            |
+|-------------|----------------------------------|-----------------------|
+| `slug`      | Slug of the target question      | None                  |
 
-#### Responses
+**Responses:**
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
@@ -140,7 +172,7 @@ Delete a question with exact slug from the repository.
 
 ---
 
-### POST /questions/bulk-delete
+#### POST /questions/bulk-delete
 
 Delete multiple questions by slug in a single request.
 
@@ -149,7 +181,7 @@ The operation is all-or-nothing for missing questions:
 - If every slug exists, all matching questions are deleted.
 - If any slug is missing, the endpoint returns `404` and does not delete anything.
 
-#### Request body
+**Request body:**
 
 ```json
 {
@@ -160,9 +192,9 @@ The operation is all-or-nothing for missing questions:
 }
 ```
 
-| Variable          | Description | Constraint                                         |
-|-------------------|----------|------------------------------------------------------|
-| `slugs`   | Slugs of the target questions      | Must contain at least one slug  |
+| Variable      | Description                        | Constraint                      |
+|---------------|------------------------------------|---------------------------------|
+| `slugs`       | Slugs of the target questions      | Must contain at least one slug  |
 
 #### Responses
 
@@ -216,5 +248,5 @@ Below demonstrates the data structures stored in question service.
 | `difficulty`  | str        | Required, `Easy`, `Medium` or `Hard` only     |
 | `examples`    | List[dict] | Required, at least one                        |
 | `constraints` | List[str]  | Required, at least one                        |
-| `created_at`  | Date       | Auto-managed by PyMongo                       |
-| `updated_at`  | Date       | Auto-managed by Pymongo                       |
+| `created_at`  | Date       | Auto-managed by service                       |
+| `updated_at`  | Date       | Auto-managed by service                       |
