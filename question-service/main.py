@@ -49,13 +49,22 @@ async def cache_set(key: str, value, ttl: int = CACHE_TTL):
     except Exception:
         pass
 
-async def cache_invalidate_all():
+async def cache_invalidate_question(slug: str):
     try:
-        keys = []
-        async for key in redis.scan_iter(f"{CACHE_PREFIX}*"):
+        keys = [f"{CACHE_PREFIX}question:{slug}", f"{CACHE_PREFIX}topics"]
+        async for key in redis.scan_iter(f"{CACHE_PREFIX}questions:*"):
             keys.append(key)
-        if keys:
-            await redis.delete(*keys)
+        await redis.delete(*keys)
+    except Exception:
+        pass
+
+async def cache_invalidate_questions(slugs: list[str]):
+    try:
+        keys = [f"{CACHE_PREFIX}question:{slug}" for slug in slugs]
+        keys.append(f"{CACHE_PREFIX}topics")
+        async for key in redis.scan_iter(f"{CACHE_PREFIX}questions:*"):
+            keys.append(key)
+        await redis.delete(*keys)
     except Exception:
         pass
 
@@ -279,7 +288,7 @@ async def add_question(question: QuestionSchema, admin: dict = Depends(verify_ad
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     is_inserted = result['created_at'] == now
-    await cache_invalidate_all()
+    await cache_invalidate_question(slug)
     result = {'created_at': result['created_at'],
               'updated_at': now,
               'title': title,
@@ -299,7 +308,8 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     Admin access only.
     '''
     title = question.title
-    filter = {'slug': create_slug(title)}
+    slug = create_slug(title)
+    filter = {'slug': slug}
 
     try:
         result = await collection.delete_one(filter)
@@ -309,7 +319,7 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail=f"Question {question.slug} not found")
 
-    await cache_invalidate_all()
+    await cache_invalidate_question(slug)
     return {'message': "Deleted", 'title': question.slug}
 
 
@@ -350,7 +360,7 @@ async def bulk_delete_questions(payload: BulkDeleteSchema, admin: dict = Depends
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
-    await cache_invalidate_all()
+    await cache_invalidate_questions(requested_slugs)
     return {'deletedCount': result.deleted_count, 'deleted': deleted}
 
 @app.get('/health', dependencies=[])
