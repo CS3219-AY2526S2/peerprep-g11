@@ -8,12 +8,23 @@ services:
     environment:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3001}
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
   question-service:
     build:
       context: ./question-service
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
     env_file:
       - ./question-service/.env
+    environment:
+      REDIS_URI: redis://redis:6379
 
   matching-service:
     build:
