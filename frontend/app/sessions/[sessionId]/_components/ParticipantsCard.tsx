@@ -20,7 +20,10 @@ function initial(name: string) {
 export function ParticipantsCard({ participants }: ParticipantsCardProps) {
   return (
     <TooltipProvider delayDuration={120}>
-      <div data-nextstep="participants-card" className="flex items-center gap-1.5">
+      <div
+        data-nextstep="participants-card"
+        className="flex scroll-mt-8 items-center gap-1.5 lg:scroll-mt-10"
+      >
         {participants.map((p) => {
           const connected = p.presence === 'connected';
           const bg = getAvatarColor(p.username);

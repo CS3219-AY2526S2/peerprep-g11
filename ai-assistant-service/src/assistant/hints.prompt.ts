@@ -210,7 +210,7 @@ export function buildHintsPrompt(request: HintsRequest): {
     '',
     'Current code:',
     '```',
-    request.fullCode,
+    request.fullCode || 'No code provided yet.',
     '```',
     '',
     'Conversation so far:',

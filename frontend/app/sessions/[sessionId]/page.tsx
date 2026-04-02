@@ -74,8 +74,6 @@ export default function SessionPage() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] =
-    useState<SessionLanguage>("python");
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
@@ -110,9 +108,11 @@ export default function SessionPage() {
         if (rawSession.ticket) {
           setCollabTicket(rawSession.ticket);
         }
-        const sessionData = applyCurrentUserToSession(rawSession, currentUsername);
+        const sessionData = applyCurrentUserToSession(
+          rawSession,
+          currentUsername,
+        );
         setSession(sessionData);
-        setSelectedLanguage(sessionData.selectedLanguage);
         setCodeByLanguage({
           javascript: sessionData.starterCode.javascript,
           python: sessionData.starterCode.python,
@@ -184,7 +184,6 @@ export default function SessionPage() {
     setSession(null);
     setQuestion(null);
     setCodeByLanguage(EMPTY_DRAFTS);
-    setSelectedLanguage("python");
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
@@ -193,14 +192,12 @@ export default function SessionPage() {
     void loadSessionPage(params.sessionId, user.username);
   }
 
-  function handleLanguageChange(language: SessionLanguage) {
-    setSelectedLanguage(language);
-  }
+  const sessionLanguage = session?.selectedLanguage ?? "python";
 
   function handleEditorChange(nextValue: string) {
     setCodeByLanguage((current) => ({
       ...current,
-      [selectedLanguage]: nextValue,
+      [sessionLanguage]: nextValue,
     }));
   }
 
@@ -291,7 +288,7 @@ export default function SessionPage() {
   } = useSessionAi({
     sessionId: params.sessionId,
     question,
-    selectedLanguage,
+    selectedLanguage: sessionLanguage,
     codeByLanguage,
   });
 
@@ -383,10 +380,8 @@ export default function SessionPage() {
                 <EditorPanel
                   sessionId={session.sessionId}
                   ticket={collabTicket}
-                  selectedLanguage={selectedLanguage}
-                  allowedLanguages={session.allowedLanguages}
-                  value={codeByLanguage[selectedLanguage]}
-                  onLanguageChange={handleLanguageChange}
+                  selectedLanguage={sessionLanguage}
+                  value={codeByLanguage[sessionLanguage]}
                   onChange={handleEditorChange}
                   onExplainCode={handleExplainCode}
                   walkthroughShowExplainDemo={
