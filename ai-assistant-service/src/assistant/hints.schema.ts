@@ -18,7 +18,7 @@ export const hintsRequestSchema = z
     questionExamples: z.array(questionExampleSchema).max(8),
     questionConstraints: z.array(z.string().trim().min(1).max(500)).max(20),
     language: z.enum(SUPPORTED_LANGUAGES),
-    fullCode: z.string().trim().min(1).max(assistantConfig.maxInputChars),
+    fullCode: z.string().trim().max(assistantConfig.maxInputChars),
     messages: z.array(hintMessageSchema).min(1).max(assistantConfig.maxHintMessages),
   })
   .superRefine((value, ctx) => {

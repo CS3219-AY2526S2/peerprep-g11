@@ -80,7 +80,7 @@ export function LeaveSessionDialog({
         <Button
           data-nextstep="leave-session-btn"
           variant="ghost"
-          className="gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          className="scroll-mt-8 gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive lg:scroll-mt-10"
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" className="shrink-0">
             <path
