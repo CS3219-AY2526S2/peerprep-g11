@@ -377,6 +377,28 @@ describe('AI assistant service routes', () => {
     });
   });
 
+  it('accepts hints requests when the current code is empty', async () => {
+    mockStream(['Start by deciding what information you need to keep track of.\n\n']);
+
+    const res = await request(app)
+      .post('/assistant/hints')
+      .set('Authorization', `Bearer ${createToken()}`)
+      .send(createHintsBody({ fullCode: '' }));
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+
+    const events = parseSseEvents(res.text);
+    expect(events).toContainEqual({
+      event: 'chunk',
+      data: { delta: 'Start by deciding what information you need to keep track of.\n\n' },
+    });
+    expect(events[events.length - 1]).toEqual({
+      event: 'done',
+      data: { finishReason: 'stop' },
+    });
+  });
+
   it('rejects invalid hints payloads', async () => {
     const res = await request(app)
       .post('/assistant/hints')
