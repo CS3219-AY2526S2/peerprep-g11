@@ -307,9 +307,7 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     Returns 404 if the question is not found.
     Admin access only.
     '''
-    title = question.title
-    slug = create_slug(title)
-    filter = {'slug': slug}
+    filter = {'slug': question.slug}
 
     try:
         result = await collection.delete_one(filter)
@@ -319,7 +317,7 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail=f"Question {question.slug} not found")
 
-    await cache_invalidate_question(slug)
+    await cache_invalidate_question(question.slug)
     return {'message': "Deleted", 'title': question.slug}
 
 
