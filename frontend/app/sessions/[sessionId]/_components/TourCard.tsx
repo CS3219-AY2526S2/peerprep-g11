@@ -47,7 +47,7 @@ export function TourCard({
     <div className="w-[300px] rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-xl)]">
       <div className="mb-3 flex items-center gap-2.5">
         {step.icon && (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary/60 text-accent">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-accent">
             {step.icon}
           </span>
         )}

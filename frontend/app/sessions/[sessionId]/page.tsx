@@ -11,6 +11,7 @@ import { EditorPanel } from "@/app/sessions/[sessionId]/_components/EditorPanel"
 import { SessionOnboardingTour } from "@/app/sessions/[sessionId]/_components/SessionOnboardingTour";
 import { AiSidebar } from "@/app/sessions/[sessionId]/_components/AiSidebar";
 import { AiSidebarToggle } from "@/app/sessions/[sessionId]/_components/AiSidebarToggle";
+import { ChatWidget } from "@/app/sessions/[sessionId]/_components/ChatWidget";
 import { SESSION_TOUR_STEP_INDEX } from "@/app/sessions/[sessionId]/_components/sessionTourSteps";
 import { useSessionAi } from "@/app/sessions/[sessionId]/useSessionAi";
 import type { Question } from "@/app/questions/types";
@@ -375,7 +376,7 @@ export default function SessionPage() {
                 onLeaveError={setLeaveError}
               />
 
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
+              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
                 <QuestionPanel question={question} />
                 <EditorPanel
                   sessionId={session.sessionId}
@@ -393,6 +394,7 @@ export default function SessionPage() {
           </SessionOnboardingTour>
         </div>
       </div>
+      <ChatWidget participants={session.participants} />
     </div>
   );
 }
