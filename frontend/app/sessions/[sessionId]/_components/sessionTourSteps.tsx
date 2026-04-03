@@ -3,7 +3,7 @@ import {
   Code,
   Sparkles,
   PanelLeft,
-  Users,
+  MessageCircle,
   LogOut,
 } from "lucide-react";
 import type { Tour } from "nextstepjs";
@@ -14,7 +14,7 @@ export const SESSION_TOUR_STEP_INDEX = {
   SHARED_EDITOR: 1,
   EXPLAIN_DEMO: 2,
   AI_SIDEBAR: 3,
-  PARTICIPANTS: 4,
+  CHAT_WIDGET: 4,
   LEAVE_SESSION: 5,
 } as const;
 
@@ -51,7 +51,7 @@ export const sessionTourSteps: Tour[] = [
         title: "Explain Selected Code",
         content:
           "The walkthrough highlights the starter code for you here. When you select code in the shared editor, the Explain action appears so you can ask AI to break it down.",
-        selector: '[data-nextstep="editor-panel"]',
+        selector: '[data-nextstep="editor-surface"]',
         side: "left",
         showControls: true,
         showSkip: false,
@@ -72,12 +72,12 @@ export const sessionTourSteps: Tour[] = [
         pointerRadius: 16,
       },
       {
-        icon: <Users size={15} />,
-        title: "Session Participants",
+        icon: <MessageCircle size={15} />,
+        title: "Session Chat",
         content:
-          "See who is in the session and their connection status. A green dot means they are connected and ready to collaborate.",
-        selector: '[data-nextstep="participants-card"]',
-        side: "bottom",
+          "Use the chat widget to coordinate with your peer without leaving the coding flow. Open it anytime to discuss approaches or ask quick clarifying questions.",
+        selector: '[data-nextstep="chat-widget"]',
+        side: "top-right",
         showControls: true,
         showSkip: false,
         pointerPadding: 8,

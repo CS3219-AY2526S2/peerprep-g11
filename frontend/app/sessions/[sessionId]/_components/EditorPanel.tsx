@@ -302,11 +302,11 @@ export function EditorPanel({
   return (
     <Card
       data-nextstep="editor-panel"
-      className="gap-0 overflow-hidden rounded-b-none border-border bg-card shadow-[var(--shadow-xl)]"
+      className="gap-0 overflow-hidden rounded-b-none border-border bg-card py-0 shadow-[var(--shadow-xl)]"
     >
-      <CardHeader className="gap-2 border-b border-border/80">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-2">
+      <CardHeader className="border-b border-border/80 py-7">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
             <CardTitle
               className="text-[24px] leading-tight text-foreground"
               style={{ fontFamily: "var(--font-serif)" }}
@@ -321,7 +321,7 @@ export function EditorPanel({
             </Badge>
           </div>
 
-          <div className="min-w-[170px] space-y-1.5">
+          <div className="space-y-1 text-right">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Language
             </p>
@@ -332,7 +332,10 @@ export function EditorPanel({
         </div>
       </CardHeader>
 
-      <CardContent className="relative overflow-hidden rounded-b-none bg-secondary/10 px-0 pb-0 pt-0">
+      <CardContent
+        data-nextstep="editor-surface"
+        className="relative overflow-hidden rounded-b-none bg-secondary/10 px-0 pb-0 pt-0"
+      >
         <MonacoEditor
           height="640px"
           language={selectedLanguage}
