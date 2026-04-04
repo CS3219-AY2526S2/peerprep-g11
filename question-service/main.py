@@ -1,3 +1,4 @@
+import json
 import jwt
 import os
 import re
@@ -8,6 +9,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
+from redis.asyncio import from_url as redis_from_url
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
 from typing import Annotated
 from utils import create_slug, normalize_topic
@@ -17,16 +19,54 @@ load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 PORT = int(os.getenv("PORT"))
 SECRET_KEY = os.getenv("JWT_SECRET")
+REDIS_URI = os.getenv("REDIS_URI", "redis://localhost:6379")
 ALGORITHM = "HS256"
 EXEMPT_ROUTES = ["/", "/health", "/questions", "/questions/topics"]
 VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
 DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
+CACHE_TTL = 300  # 5 minutes
 auth = HTTPBearer(auto_error=False)
 
 # Init mongodb client
 client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
+
+# Init redis client
+redis = redis_from_url(REDIS_URI, decode_responses=True)
+CACHE_PREFIX = "qs:"
+
+async def cache_get(key: str):
+    try:
+        data = await redis.get(f"{CACHE_PREFIX}{key}")
+        return json.loads(data) if data else None
+    except Exception:
+        return None
+
+async def cache_set(key: str, value, ttl: int = CACHE_TTL):
+    try:
+        await redis.set(f"{CACHE_PREFIX}{key}", json.dumps(value), ex=ttl)
+    except Exception:
+        pass
+
+async def cache_invalidate_question(slug: str):
+    try:
+        keys = [f"{CACHE_PREFIX}question:{slug}", f"{CACHE_PREFIX}topics"]
+        async for key in redis.scan_iter(f"{CACHE_PREFIX}questions:*"):
+            keys.append(key)
+        await redis.delete(*keys)
+    except Exception:
+        pass
+
+async def cache_invalidate_questions(slugs: list[str]):
+    try:
+        keys = [f"{CACHE_PREFIX}question:{slug}" for slug in slugs]
+        keys.append(f"{CACHE_PREFIX}topics")
+        async for key in redis.scan_iter(f"{CACHE_PREFIX}questions:*"):
+            keys.append(key)
+        await redis.delete(*keys)
+    except Exception:
+        pass
 
 # Make the slug column be index for faster search
 @asynccontextmanager
@@ -101,6 +141,11 @@ async def get_questions(
     Retrieves questions in the database, optionally filtered by
     exact topic and/or exact difficulty.
     '''
+    cache_key = f"questions:topic={topic}:diff={difficulty}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     normalized_topic = normalize_topic(topic) if isinstance(topic, str) else ''
     normalized_difficulty = difficulty.strip() if isinstance(difficulty, str) else ''
 
@@ -133,6 +178,7 @@ async def get_questions(
 
     for r in results:
         r['_id'] = str(r['_id'])
+    await cache_set(cache_key, results)
     return results
 
 @app.get('/questions/topics')
@@ -141,6 +187,10 @@ async def get_all_topics():
     Retrieves all distinct topics in the database, along with the
     available difficulty levels for each topic.
     '''
+    cached = await cache_get("topics")
+    if cached is not None:
+        return cached
+
     projection = {
         'topics': 1,
         'difficulty': 1,
@@ -174,10 +224,12 @@ async def get_all_topics():
         topic: sorted(topic_difficulties[topic], key=lambda difficulty: DIFFICULTY_ORDER[difficulty])
         for topic in topics
     }
-    return {
+    result = {
         'topics': topics,
         'topicDifficulties': serialized_topic_difficulties,
     }
+    await cache_set("topics", result)
+    return result
 
 @app.get('/questions/{question_slug}')
 async def get_question(question_slug: str):
@@ -185,6 +237,11 @@ async def get_question(question_slug: str):
     Retrieves a question by exact title.
     Returns 404 if the question is not found.
     '''
+    cache_key = f"question:{question_slug}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     filter = {'slug': question_slug}
     try:
         question = await collection.find_one(filter)
@@ -195,6 +252,7 @@ async def get_question(question_slug: str):
         raise HTTPException(status_code=404, detail=f"Question {question_slug} not found")
 
     question['_id'] = str(question['_id'])
+    await cache_set(cache_key, question)
     return question
 
 # ============================================
@@ -230,6 +288,7 @@ async def add_question(question: QuestionSchema, admin: dict = Depends(verify_ad
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
     is_inserted = result['created_at'] == now
+    await cache_invalidate_question(slug)
     result = {'created_at': result['created_at'],
               'updated_at': now,
               'title': title,
@@ -248,8 +307,7 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     Returns 404 if the question is not found.
     Admin access only.
     '''
-    title = question.title
-    filter = {'slug': create_slug(title)}
+    filter = {'slug': question.slug}
 
     try:
         result = await collection.delete_one(filter)
@@ -258,7 +316,8 @@ async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail=f"Question {question.slug} not found")
-    
+
+    await cache_invalidate_question(question.slug)
     return {'message': "Deleted", 'title': question.slug}
 
 
@@ -299,6 +358,7 @@ async def bulk_delete_questions(payload: BulkDeleteSchema, admin: dict = Depends
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
+    await cache_invalidate_questions(requested_slugs)
     return {'deletedCount': result.deleted_count, 'deleted': deleted}
 
 @app.get('/health', dependencies=[])
