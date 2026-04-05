@@ -32,6 +32,28 @@ ensure_python_venv() {
   return 1
 }
 
+ensure_python_dependencies() {
+  local dir="$1"
+  local requirements_file="$ROOT_DIR/$dir/requirements.txt"
+  local install_stamp="$ROOT_DIR/$dir/.venv/.codex-requirements-installed"
+
+  if [ ! -f "$requirements_file" ]; then
+    return
+  fi
+
+  if [ -f "$install_stamp" ] && [ "$install_stamp" -nt "$requirements_file" ]; then
+    return
+  fi
+
+  echo "Installing Python dependencies for $dir"
+  (
+    cd "$ROOT_DIR/$dir"
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
+    touch "$install_stamp"
+  )
+}
+
 start_service() {
   local name="$1"
   local dir="$2"
@@ -157,6 +179,7 @@ LOCAL_FRONTEND_ORIGIN="http://localhost:3000"
 LOCAL_COLLAB_WS_URL="ws://localhost:1234"
 
 ensure_python_venv "question-service"
+ensure_python_dependencies "question-service"
 ensure_node_dependencies "collaboration-service"
 ensure_node_dependencies "user-service"
 ensure_node_dependencies "ai-assistant-service"
