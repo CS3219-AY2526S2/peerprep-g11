@@ -1,0 +1,11 @@
+JWT_SECRET=ThisIsASuperSecretKeyWithAtLeast32Chars!
+
+# MongoDB Configuration
+spring.data.mongodb.uri=put_uri_here
+spring.data.mongodb.auto-index-creation=true
+
+# Question Service Configuration
+question.service.url=http://question-service:8000
+
+# Collaboration Service Configuration
+collaboration.service.url=http://localhost:1234
