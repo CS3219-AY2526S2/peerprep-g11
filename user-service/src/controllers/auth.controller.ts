@@ -60,9 +60,9 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const secret = process.env.JWT_SECRET!;
-    const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
+    const expiresIn = (process.env.JWT_EXPIRES_IN || '1d') as jwt.SignOptions['expiresIn'];
     const token = jwt.sign(
-      { id: user._id.toString(), email: user.email, role: user.role },
+      { id: user._id.toString(), email: user.email, role: user.role, name: user.username },
       secret,
       { expiresIn }
     );
