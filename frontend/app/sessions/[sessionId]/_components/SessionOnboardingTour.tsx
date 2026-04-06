@@ -7,6 +7,34 @@ import { useAuth } from '@/contexts/AuthContext';
 import { sessionTourSteps, SESSION_TOUR_ID } from './sessionTourSteps';
 import { TourCard } from './TourCard';
 
+function TourScrollSync() {
+  const { isNextStepVisible } = useNextStep();
+
+  useEffect(() => {
+    if (!isNextStepVisible) return;
+
+    let rafId = 0;
+
+    const recalc = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+
+    window.addEventListener('scroll', recalc, { passive: true });
+    document.addEventListener('scroll', recalc, { passive: true, capture: true });
+
+    return () => {
+      window.removeEventListener('scroll', recalc);
+      document.removeEventListener('scroll', recalc, { capture: true } as EventListenerOptions);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isNextStepVisible]);
+
+  return null;
+}
+
 const skippedUserIds = new Set<string>();
 
 function hasSkippedOnboardingInMemory(userId: string | undefined): boolean {
@@ -165,6 +193,7 @@ export function SessionOnboardingTour({
         onSkip={handleTourSkip}
       >
         <TourAutoStarter isSkipped={isSkipped} isAuthLoading={isLoading} />
+        <TourScrollSync />
         {children}
       </NextStep>
     </NextStepProvider>
