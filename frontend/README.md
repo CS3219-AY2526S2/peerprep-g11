@@ -2,6 +2,37 @@
 
 The PeerPrep frontend is built with [Next.js](https://nextjs.org) (App Router), [TailwindCSS](https://tailwindcss.com), and [shadcn/ui](https://ui.shadcn.com).
 
+## Architecture
+
+```mermaid
+graph LR
+    Browser["Web Browser"]
+
+    subgraph Next.js["Next.js (Frontend + BFF)"]
+        UI["React UI\n(App Router)"]
+        BFF["API Routes\n(/api/*)"]
+    end
+
+    Browser  --> UI
+    UI -- "fetch(/api/...)\ncredentials: include" --> BFF
+
+    Auth["User Service\n(Auth & Profiles)"]
+    QS["Question Service\n(Questions & History)"]
+    MS["Matching Service"]
+    CS["Collaboration Service\n(Sessions)"]
+    AI["AI Assistant Service\n(Hints & Explain)"]
+
+    BFF -- "/api/users/*" --> Auth
+    BFF -- "/api/questions/*\n/api/admin/questions/*\n/api/history/*" --> QS
+    BFF -- "/api/matching/*\n/api/matches/*" --> MS
+    BFF -- "/api/sessions/*/leave\n/api/sessions/*" --> CS
+    BFF -- "/api/sessions/*/hints\n/api/sessions/*/explain" --> AI
+```
+
+**Auth flow:** The User Service issues a JWT inside an httpOnly cookie on login. The browser automatically includes this cookie on every request. Each API route in the BFF layer forwards the cookie and authorization headers to the upstream microservice using `forwardAuthHeaders()`, so individual services can verify the user's identity without the browser ever touching the raw token.
+
+---
+
 ## Getting Started
 
 ```bash
@@ -9,6 +40,44 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+## Testing
+
+Install browser binaries for Playwright once after pulling the repo:
+
+```bash
+npm run test:e2e:install
+```
+
+Run the unit and component tests with Jest:
+
+```bash
+npm test
+```
+
+Watch Jest tests during development:
+
+```bash
+npm run test:watch
+```
+
+Generate a Jest coverage report:
+
+```bash
+npm run test:coverage
+```
+
+Run the Playwright smoke tests:
+
+```bash
+npm run test:e2e
+```
+
+Open the Playwright UI runner:
+
+```bash
+npm run test:e2e:ui
+```
 
 ---
 
@@ -129,13 +198,6 @@ export async function GET(request: NextRequest) {
   }
 }
 ```
-
-### Rules of Thumb
-
-1. **Always call `/api/*`** from the browser — never hardcode microservice URLs in client code.
-2. **Keep service URLs in env vars** — API routes read `process.env.XXXX_SERVICE_URL`.
-3. **Forward auth headers** — the BFF passes along `Authorization` (or cookies) to downstream services.
-4. **Handle errors consistently** — catch failures in the API route and return a clean JSON error with a proper status code.
 
 ---
 

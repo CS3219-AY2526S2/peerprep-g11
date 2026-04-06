@@ -53,7 +53,7 @@ export function TimedOutCard({ preferences, onRetry, onBack }: TimedOutCardProps
                 <Button
                     variant="ghost"
                     onClick={onBack}
-                    className="w-full text-[12.5px] text-accent font-semibold hover:bg-secondary"
+                    className="w-full text-[12.5px] text-accent font-semibold hover:bg-secondary hover:text-accent"
                 >
                     Change Preferences
                 </Button>
