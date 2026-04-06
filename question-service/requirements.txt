@@ -3,3 +3,4 @@ fastapi[standard]
 pyjwt[crypto]
 pymongo[srv]
 redis
+black

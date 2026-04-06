@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { editor } from "monaco-editor";
-import { SparklesIcon } from "lucide-react";
+import { Info, SparklesIcon, WandSparklesIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { SessionLanguage } from "@/app/sessions/[sessionId]/types";
 import { PROGRAMMING_LANGUAGE_LABELS } from "@/lib/programming-languages";
 import * as Y from "yjs";
@@ -47,6 +54,8 @@ function handleEditorWillMount(monaco: typeof import("monaco-editor")) {
       { token: "keyword", foreground: "2E4E66" },
       { token: "string", foreground: "3A7664" },
       { token: "number", foreground: "A1621A" },
+      { token: "delimiter", foreground: "8B5CF6" },
+      { token: "operator", foreground: "8B5CF6" },
     ],
     colors: {
       "editor.background": "#FBF8F4",
@@ -88,6 +97,55 @@ export function EditorPanel({
   });
 
   const [isEditorReady, setEditorReady] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
+
+  async function handleFormatCode() {
+    const ed = editorRef.current;
+    if (!ed || isFormatting) return;
+
+    const model = ed.getModel();
+    if (!model) return;
+
+    const code = model.getValue();
+    if (!code.trim()) return;
+
+    setIsFormatting(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/format`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language: selectedLanguage }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const errorMessage = err.error || err.detail || "Formatting failed";
+        console.error("[Format] Failed:", err);
+        toast.error("Format Failed", {
+          description: errorMessage,
+        });
+        return;
+      }
+
+      const { formatted } = await res.json();
+      if (typeof formatted === "string") {
+        const fullRange = model.getFullModelRange();
+        ed.executeEdits("format-code", [{ range: fullRange, text: formatted }]);
+        toast.success("Code Formatted", {
+          description: "Your Python code is now following the PEP 8 standards.",
+          descriptionClassName: "!text-black font-medium opacity-100",
+        });
+      }
+    } catch (err) {
+      console.error("[Format] Error:", err);
+      toast.error("Format Error", {
+        description: "An unexpected error occurred while formatting.",
+      });
+    } finally {
+      setIsFormatting(false);
+    }
+  }
 
   // refs to hold Yjs objects so we can destroy them on unmount
   const yjsProviderRef = useRef<import("y-websocket").WebsocketProvider | null>(
@@ -321,20 +379,22 @@ export function EditorPanel({
             </Badge>
           </div>
 
-          <div className="space-y-1 text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Language
-            </p>
-            <p className="text-base font-semibold text-foreground">
-              {PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]}
-            </p>
+          <div className="flex flex-col items-end gap-2 text-right">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Language
+              </p>
+              <p className="text-base font-semibold text-foreground">
+                {PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]}
+              </p>
+            </div>
           </div>
         </div>
       </CardHeader>
 
       <CardContent
         data-nextstep="editor-surface"
-        className="relative overflow-hidden rounded-b-none bg-secondary/10 px-0 pb-0 pt-0"
+        className="relative overflow-hidden bg-secondary/10 px-0 pb-0 pt-0"
       >
         <MonacoEditor
           height="640px"
@@ -407,6 +467,43 @@ export function EditorPanel({
           </button>
         )}
       </CardContent>
+
+      {selectedLanguage === "python" && (
+        <div className="flex items-center justify-end gap-2 border-t border-border/80 bg-card px-4 py-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isFormatting || !isEditorReady}
+            onClick={handleFormatCode}
+            className="h-8 gap-1.5 px-3 text-[12px] font-semibold"
+          >
+            <WandSparklesIcon className="h-3.5 w-3.5 text-accent" />
+            {isFormatting ? "Formatting\u2026" : "Format Code"}
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end" className="p-3">
+              <p className="mb-2 font-semibold text-gray">
+                How we format code:
+              </p>
+              <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                <li>Consistent indentation (4 spaces)</li>
+                <li>Line length (defaults to 88 characters)</li>
+                <li>Trailing commas, whitespace, blank lines</li>
+                <li>Consistent string quoting</li>
+                <li>Proper spacing around operators and keywords</li>
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
     </Card>
   );
 }

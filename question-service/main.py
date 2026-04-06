@@ -13,6 +13,9 @@ from redis.asyncio import from_url as redis_from_url
 from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
 from typing import Annotated
 from utils import create_slug, normalize_topic
+from pydantic import BaseModel
+import subprocess
+import tempfile
 
 # Load constants from environment values
 load_dotenv()
@@ -21,7 +24,7 @@ PORT = int(os.getenv("PORT"))
 SECRET_KEY = os.getenv("JWT_SECRET")
 REDIS_URI = os.getenv("REDIS_URI", "redis://localhost:6379")
 ALGORITHM = "HS256"
-EXEMPT_ROUTES = ["/", "/health", "/questions", "/questions/topics"]
+EXEMPT_ROUTES = ["/", "/health", "/questions", "/questions/topics", "/format"]
 VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
 DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
 CACHE_TTL = 300  # 5 minutes
@@ -367,8 +370,51 @@ async def health_check():
         await client.admin.command("ping")
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
-    
     return {'status': "ok"}
+
+class FormatRequest(BaseModel):
+    code: str
+    language: str = "python"
+
+@app.post('/format', dependencies=[])
+async def format_code(payload: FormatRequest):
+    if payload.language != "python":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formatting not supported for language: {payload.language}",
+        )
+
+    fd, path = tempfile.mkstemp(suffix=".py")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(payload.code)
+
+        result = subprocess.run(
+            ["python", "-m", "black", "--quiet", "--fast", path],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=422,
+                detail=result.stderr.strip() or "Could not format: syntax error in code",
+            )
+
+        with open(path, "r") as f:
+            formatted = f.read()
+
+        return {"formatted": formatted}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="Formatting timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
 
 
 if __name__ == "__main__":
