@@ -1,7 +1,9 @@
+import base64
 import json
 import jwt
 import os
 import re
+from bson import ObjectId
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -10,31 +12,32 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from redis.asyncio import from_url as redis_from_url
-from schema import QuestionSchema, RetrieveDeleteSchema, BulkDeleteSchema
+from schema import AttemptSchema, BulkDeleteSchema, QuestionSchema, RetrieveDeleteSchema, RetrieveHistoryListSchema
 from typing import Annotated
-from utils import create_slug, normalize_topic
+from utils import create_slug, create_timestamp, normalize_topic
 
 # Load constants from environment values
 load_dotenv()
-MONGODB_URI = os.getenv("MONGODB_URI")
-PORT = int(os.getenv("PORT"))
-SECRET_KEY = os.getenv("JWT_SECRET")
-REDIS_URI = os.getenv("REDIS_URI", "redis://localhost:6379")
 ALGORITHM = "HS256"
-EXEMPT_ROUTES = ["/", "/health", "/questions", "/questions/topics"]
+CACHE_TTL = 300  # 5 minutes
+CACHE_PREFIX = "qs:"
 VALID_DIFFICULTIES = ('Easy', 'Medium', 'Hard')
 DIFFICULTY_ORDER = {difficulty: index for index, difficulty in enumerate(VALID_DIFFICULTIES)}
-CACHE_TTL = 300  # 5 minutes
+EXEMPT_ROUTES = {"/", "/health", "/questions", "/questions/topics", "/history/insert"}
+MONGODB_URI = os.getenv("MONGODB_URI")
+PORT = int(os.getenv("PORT"))
+REDIS_URI = os.getenv("REDIS_URI", "redis://localhost:6379")
+SECRET_KEY = os.getenv("JWT_SECRET")
 auth = HTTPBearer(auto_error=False)
 
 # Init mongodb client
 client = AsyncMongoClient(MONGODB_URI)
 db = client['question-service']
 collection = db['questions']
+attempts = db['attempts']
 
 # Init redis client
 redis = redis_from_url(REDIS_URI, decode_responses=True)
-CACHE_PREFIX = "qs:"
 
 async def cache_get(key: str):
     try:
@@ -272,7 +275,7 @@ async def add_question(question: QuestionSchema, admin: dict = Depends(verify_ad
     data = question.model_dump()
     title = data['title']
     slug = create_slug(title)
-    now = datetime.now(timezone.utc).isoformat()
+    now = create_timestamp()
 
     filter = {'title': title, 'slug': slug}
     set_fields = {key: value for key, value in data.items() if key != 'title'}
@@ -361,8 +364,93 @@ async def bulk_delete_questions(payload: BulkDeleteSchema, admin: dict = Depends
     await cache_invalidate_questions(requested_slugs)
     return {'deletedCount': result.deleted_count, 'deleted': deleted}
 
+# ============================================
+#             History access APIs
+# ============================================
+@app.post('/history/insert', status_code=201)
+async def upload_history(attempt: AttemptSchema):
+    '''
+    Inserts an attempt into attempt history
+    '''
+    data = attempt.model_dump()
+    data['timestamp'] = create_timestamp()
+    data['code'] = base64.b64encode(data['code'].encode()).decode() # Encode in base64 for storage
+
+    try:
+        db_result = await attempts.insert_one(data)
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    result = {
+        'message': "Attempt added",
+        'id': str(db_result.inserted_id)
+    }
+    
+    return result
+
+
+@app.get('/history/list')
+async def get_history_list(user: RetrieveHistoryListSchema):
+    user_id = user.user_id
+    filter = {
+        'user_ids': {'$in': user_id}
+    }
+    projection = {
+        'language': 0,
+        'code': 0
+    }
+
+    try:
+        results = await attempts.find(filter, projection).to_list()
+        for result in results:
+            for id in result['user_ids']:
+                if id != user_id:
+                    result['partner_id'] = id
+                    break
+
+            qns_filter = {
+                'slug': result['slug']
+            }
+            result['question'] = await collection.find_one(qns_filter)
+            result['question']['_id'] = str(result['question']['_id'])
+
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    
+    return results
+
+
+@app.get('/history/{id}')
+async def get_history(id: str):
+    filter = {
+        '_id': ObjectId(id)
+    }
+
+    try:
+        result = await attempts.find_one(filter)
+        if not result:
+            raise ValueError("Result not found")
+
+        result['partner_id'] = result['user_ids'][0]
+        qns_filter = {
+            'slug': result['slug']
+        }
+        result['question'] = await collection.find_one(qns_filter)
+        result['question']['_id'] = str(result['question']['_id'])
+
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="History entry not found") from e
+    
+    return result
+
+
 @app.get('/health', dependencies=[])
 async def health_check():
+    '''
+    Check repository status
+    '''
     try:
         await client.admin.command("ping")
     except PyMongoError as e:
