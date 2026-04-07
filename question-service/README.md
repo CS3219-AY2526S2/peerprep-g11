@@ -216,7 +216,7 @@ Adds an attempt to the database.
 
 ```json
 {
-    "session_id": "69be848b4e2576f0b59c492d",
+    "session_id": "81420ad8-9559-497b-8695-2585137a29d5",
     "user_ids": ["69be848b4e2576f0b59c492d", "69be848b4e2576f0b59c492d"],
     "slug": "two-sum-variations",
     "language": "Python",
@@ -230,7 +230,7 @@ Adds an attempt to the database.
 
 | Variable         | Description                            | Constraint                                                                           |
 |------------------|----------------------------------------|--------------------------------------------------------------------------------------|
-| `session_id`     | The completed session id               | Must be 24 characters and in hexadcimal characters (based on BSON)                   |
+| `session_id`     | The completed session id               | Auto-managed by collaboration service                                                |
 | `user_ids`       | The  users' id                         | Must be exactly 2 ids, each in 24 hexadecimal characters (based on BSON)             |
 | `slug`           | The slug of the attempting question    | Required                                                                             |
 | `language`       | The coding language used               | Must be a language available in PeerPrep                                             |
@@ -336,6 +336,7 @@ Below demonstrates the data structures stored in question service.
 ```json
 {
     "_id": "69be848b4e2576f0b59c492d",
+    "session_id": "81420ad8-9559-497b-8695-2585137a29d5",
     "user_ids": ["69be848b4e2576f0b59c492d", "69be848b4e2576f0b59c492d"],
     "slug": "two-sum-variations",
     "language": "Python",
@@ -347,6 +348,7 @@ Below demonstrates the data structures stored in question service.
 | Field         | Type       | Constraints                                               |
 |---------------|------------|-----------------------------------------------------------|
 | `_id`         | ObjectId   | Auto-managed by MongoDB                                   |
+| `session_id`  | uuid       | Auto-managed by collaboration service                     |
 | `user_ids`    | List[str]  | Required, exactly two users must be present               |
 | `slug`        | str        | Auto-generated from title                                 |
 | `language`    | str        | Required, must be an language available on PeerPrep       |
