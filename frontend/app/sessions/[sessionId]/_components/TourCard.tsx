@@ -10,8 +10,6 @@ import { Button } from '@/components/ui/button';
  * - "Don't show this again" only appears on the final step.
  */
 interface TourCardProps extends CardComponentProps {
-  isNextDisabled?: boolean;
-  nextDisabledMessage?: string | null;
   onDontShowAgain?: (closeTour: () => void) => void | Promise<void>;
   showDontShowAgain?: boolean;
 }
@@ -24,8 +22,6 @@ export function TourCard({
   prevStep,
   skipTour,
   arrow,
-  isNextDisabled = false,
-  nextDisabledMessage = null,
   onDontShowAgain,
   showDontShowAgain = true,
 }: TourCardProps) {
@@ -91,7 +87,6 @@ export function TourCard({
             <Button
               size="sm"
               onClick={nextStep}
-              disabled={isNextDisabled}
               className="rounded-full px-4 text-[11.5px] shadow-[var(--shadow)]"
             >
               {isLast ? 'Got it' : 'Next'}
@@ -99,12 +94,6 @@ export function TourCard({
           )}
         </div>
       </div>
-
-      {isNextDisabled && nextDisabledMessage ? (
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-          {nextDisabledMessage}
-        </p>
-      ) : null}
 
       {skipTour && isLast && showDontShowAgain && (
         <button

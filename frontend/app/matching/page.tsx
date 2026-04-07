@@ -74,7 +74,6 @@ export default function MatchingPage() {
         };
     }, [fetchTopics]);
 
-    // Clear both intervals whenever matching ends or the page unmounts.
     const stopTimers = useCallback(() => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -152,12 +151,10 @@ export default function MatchingPage() {
             setElapsedSeconds(0);
             setState('searching');
 
-            // Start elapsed timer
             timerRef.current = setInterval(() => {
                 setElapsedSeconds((prev) => prev + 1);
             }, 1000);
 
-            // Start polling for match status
             pollingRef.current = setInterval(async () => {
                 try {
                     const statusRes = await fetch(`/api/matching/requests/${data.requestId}`);
@@ -169,7 +166,6 @@ export default function MatchingPage() {
                         setMatchRequest(statusData);
                         if (statusData.matchId) {
                             setState('matched');
-                            router.push(`/sessions/${statusData.matchId}`);
                         }
                     } else if (statusData.status === 'timed_out') {
                         stopTimers();
@@ -229,13 +225,12 @@ export default function MatchingPage() {
         return (
             <div className="min-h-screen bg-background text-foreground">
                 <NavBar activePage="matching" />
-                <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
-                    <Skeleton className="h-6 w-52 mb-2" />
-                    <Skeleton className="h-4 w-[420px] mb-1" />
-                    <Skeleton className="h-4 w-[360px] mb-6" />
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                        <Skeleton className="h-[340px] w-full max-w-[520px] rounded-xl" />
-                        <Skeleton className="h-[180px] w-full max-w-[360px] rounded-xl" />
+                <div className="px-10 pt-20 pb-16 max-w-[1080px] mx-auto">
+                    <Skeleton className="h-5 w-40 mb-2" />
+                    <Skeleton className="h-3.5 w-[320px] mb-7" />
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10 items-start">
+                        <Skeleton className="h-[240px] w-full rounded-2xl" />
+                        <Skeleton className="h-[240px] w-full rounded-2xl hidden lg:block" />
                     </div>
                 </div>
             </div>
@@ -247,28 +242,27 @@ export default function MatchingPage() {
             <NavBar activePage="matching" />
 
             {state === 'preferences' && (
-                <div className="px-10 pt-20 py-8 pb-16 max-w-[1100px] mx-auto">
-                    <div className="mb-6">
+                <div className="px-10 pt-20 pb-16 max-w-[1080px] mx-auto">
+                    <div className="mb-7">
                         <h1
-                            className="text-[20px] font-bold text-foreground mb-2"
+                            className="text-[22px] font-bold text-foreground tracking-tight"
                             style={{ fontFamily: 'var(--font-serif)' }}
                         >
-                            Matching Preferences
+                            Find a Peer
                         </h1>
-                        <p className="text-[12.5px] text-muted-foreground max-w-[520px] leading-relaxed">
-                            Choose the topic, difficulty, and language you want to practice. We&apos;ll look for a
-                            peer with the same preferences and start a collaborative session as soon as a match is
-                            found.
+                        <p className="text-[12.5px] text-muted-foreground mt-1.5 leading-relaxed max-w-[440px]">
+                            Set your preferences below and we&apos;ll match you with someone ready to practice.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10 items-start">
                         <div>
                             {matchingError && (
-                                <Alert variant="destructive" className="mb-4">
+                                <Alert variant="destructive" className="mb-5 rounded-xl">
                                     <AlertDescription className="text-[12px]">{matchingError}</AlertDescription>
                                 </Alert>
                             )}
+
                             <MatchingPreferencesForm
                                 topics={topics}
                                 topicDifficulties={topicDifficulties}
@@ -276,20 +270,26 @@ export default function MatchingPage() {
                                 isSubmitting={isSubmitting}
                             />
                         </div>
+
                         <HowMatchingWorks />
                     </div>
                 </div>
             )}
 
-            {state === 'searching' && preferences && (
-                <div className="min-h-[calc(100vh-56px)] grid place-items-center">
-                    <WaitingCard
-                        preferences={preferences}
-                        elapsedSeconds={elapsedSeconds}
-                        onCancel={handleCancel}
-                        isCancelling={isCancelling}
-                    />
-                </div>
+            {(state === 'searching' || state === 'matched') && preferences && (
+                <WaitingCard
+                    preferences={preferences}
+                    elapsedSeconds={elapsedSeconds}
+                    onCancel={handleCancel}
+                    isCancelling={isCancelling}
+                    matched={state === 'matched'}
+                    matchPartnerName={matchRequest?.partnerName}
+                    onMatchAnimationDone={() => {
+                        if (matchRequest?.matchId) {
+                            router.push(`/sessions/${matchRequest.matchId}`);
+                        }
+                    }}
+                />
             )}
 
             {state === 'timed_out' && preferences && (

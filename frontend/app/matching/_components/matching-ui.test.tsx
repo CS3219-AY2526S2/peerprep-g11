@@ -24,10 +24,9 @@ describe("matching display components", () => {
   it("renders the matching explainer points", () => {
     render(<HowMatchingWorks />);
 
-    expect(screen.getByText("How matching works")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Your topic and difficulty must align/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText("How it works")).toBeInTheDocument();
+    expect(screen.getByText("Set preferences")).toBeInTheDocument();
+    expect(screen.getByText("Get matched")).toBeInTheDocument();
   });
 
   it("renders the waiting state and cancel action", () => {
@@ -41,11 +40,11 @@ describe("matching display components", () => {
       />
     );
 
-    expect(screen.getByText("Searching for a peer…")).toBeInTheDocument();
+    expect(screen.getByText("Searching for a peer")).toBeInTheDocument();
     expect(screen.getByText("Python")).toBeInTheDocument();
     expect(screen.getByText("01:05")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /cancel matching/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -87,7 +86,7 @@ describe("matching display components", () => {
     expect(screen.getByText("Taylor")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /enter session/i }));
-    fireEvent.click(screen.getByRole("button", { name: /cancel matching/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(onEnterSession).toHaveBeenCalled();
     expect(onCancel).toHaveBeenCalled();

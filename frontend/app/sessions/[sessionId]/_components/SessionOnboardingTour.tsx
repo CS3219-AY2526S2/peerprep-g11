@@ -93,15 +93,11 @@ function TourAutoStarter({
 interface SessionOnboardingTourProps {
   children: React.ReactNode;
   onStepChange?: (stepIndex: number | null) => void;
-  isNextDisabled?: boolean;
-  nextDisabledMessage?: string | null;
 }
 
 export function SessionOnboardingTour({
   children,
   onStepChange,
-  isNextDisabled = false,
-  nextDisabledMessage = null,
 }: SessionOnboardingTourProps) {
   const { user, isLoading } = useAuth();
   const userId = user?.id;
@@ -147,13 +143,11 @@ export function SessionOnboardingTour({
     (props: CardComponentProps) => (
       <TourCard
         {...props}
-        isNextDisabled={isNextDisabled}
-        nextDisabledMessage={nextDisabledMessage}
         onDontShowAgain={handleDontShowAgain}
         showDontShowAgain={!skippedRef.current}
       />
     ),
-    [handleDontShowAgain, isNextDisabled, nextDisabledMessage]
+    [handleDontShowAgain]
   );
   const handleTourStart = useCallback(
     (tourName: string | null) => {
