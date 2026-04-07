@@ -196,12 +196,92 @@ The operation is all-or-nothing for missing questions:
 |---------------|------------------------------------|---------------------------------|
 | `slugs`       | Slugs of the target questions      | Must contain at least one slug  |
 
-#### Responses
+**Responses:**
 
 | Status | Description                                         |
 |--------|-----------------------------------------------------|
 | 200    | Questions deleted                                   |
 | 404    | One or more questions not found                     |
+| 503    | Database down, check health status of your database |
+
+### History routes
+
+These routes are used for storing and retrieving user attempt history.
+
+#### POST /history/insert
+
+Adds an attempt to the database.
+
+**Request body:**
+
+```json
+{
+    "session_id": "69be848b4e2576f0b59c492d",
+    "user_ids": ["69be848b4e2576f0b59c492d", "69be848b4e2576f0b59c492d"],
+    "slug": "two-sum-variations",
+    "language": "Python",
+    "code": "
+        def main():
+            print('Hello World')
+            
+    "
+}
+```
+
+| Variable         | Description                            | Constraint                                                                           |
+|------------------|----------------------------------------|--------------------------------------------------------------------------------------|
+| `session_id`     | The completed session id               | Must be 24 characters and in hexadcimal characters (based on BSON)                   |
+| `user_ids`       | The  users' id                         | Must be exactly 2 ids, each in 24 hexadecimal characters (based on BSON)             |
+| `slug`           | The slug of the attempting question    | Required                                                                             |
+| `language`       | The coding language used               | Must be a language available in PeerPrep                                             |
+| `code`           | The full code                          | None                                                                                 |
+
+**Responses:**
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 201    | History created                                     |
+| 503    | Database down, check health status of your database |
+
+#### GET /history/list
+
+Retrieves the full history of users.
+
+**Request body:**
+
+```json
+{
+    "user_id": "69be848b4e2576f0b59c492d"
+}
+```
+
+| Variable      | Description                    | Constraint                                                          |
+|---------------|--------------------------------|---------------------------------------------------------------------|
+| `user_id`     | The target user's id           | Must be 24 characters and in hexadcimal characters (based on BSON)  |
+
+**Responses:**
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 200    | History retrieved                                   |
+| 503    | Database down, check health status of your database |
+
+#### GET /history/`{id}`
+
+Retrieves the full history of users
+
+**Request query:**
+
+| Variable   | Description                | Constraint                                                          |
+|------------|----------------------------|---------------------------------------------------------------------|
+| `id`       | The attempt's id           | Must be 24 characters and in hexadcimal characters (based on BSON)  |
+
+**Responses:**
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 200    | History retrieved                                   |
+| 404    | History not found                                   |
 | 503    | Database down, check health status of your database |
 
 ## Data Model
@@ -250,3 +330,25 @@ Below demonstrates the data structures stored in question service.
 | `constraints` | List[str]  | Required, at least one                        |
 | `created_at`  | Date       | Auto-managed by service                       |
 | `updated_at`  | Date       | Auto-managed by service                       |
+
+### Attempt
+
+```json
+{
+    "_id": "69be848b4e2576f0b59c492d",
+    "user_ids": ["69be848b4e2576f0b59c492d", "69be848b4e2576f0b59c492d"],
+    "slug": "two-sum-variations",
+    "language": "Python",
+    "code": "ZGVmIG1haW4oKToKICAgIHByaW50KCJIZWxsbyBXb3JsZCIp",
+    "timestamp": "2026-04-02T14:02:50.215983+00:00"
+}
+```
+
+| Field         | Type       | Constraints                                               |
+|---------------|------------|-----------------------------------------------------------|
+| `_id`         | ObjectId   | Auto-managed by MongoDB                                   |
+| `user_ids`    | List[str]  | Required, exactly two users must be present               |
+| `slug`        | str        | Auto-generated from title                                 |
+| `language`    | str        | Required, must be an language available on PeerPrep       |
+| `code`        | str        | Endoded in base64                                         |
+| `timestamp`   | Date       | Auto-managed by service                                   |

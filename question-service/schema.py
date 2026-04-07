@@ -89,7 +89,7 @@ class AttemptSchema(BaseModel):
     language: str
     code: str
 
-    @field_validator('user_ids', mode='before'):
+    @field_validator('user_ids', mode='before')
     @classmethod
     def validate_user_ids(cls, user_ids):
         if len(user_ids) != 2:
