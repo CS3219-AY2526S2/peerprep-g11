@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(MOCK_HISTORY_LIST);
+    // return NextResponse.json(MOCK_HISTORY_LIST);
 
     const authHeaders = forwardAuthHeaders(request);
     const res = await fetch(
