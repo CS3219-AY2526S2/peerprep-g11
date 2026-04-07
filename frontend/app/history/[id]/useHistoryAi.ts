@@ -12,7 +12,6 @@ import type {
   AiTab,
   ExplainEntry,
   HintMessage,
-  SessionLanguage,
   TranslateEntry,
 } from '@/app/sessions/[sessionId]/types';
 
@@ -24,11 +23,11 @@ const HINT_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.'
 const EXPLAIN_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.';
 const TRANSLATE_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.';
 
-interface SessionAiCodeContext {
-  sessionId?: string;
+interface HistoryAiCodeContext {
+  historyId?: string;
   question: Question | null;
-  selectedLanguage: SessionLanguage;
-  codeByLanguage: Record<SessionLanguage, string>;
+  language: string;
+  code: string;
 }
 
 interface HintRequestMessage {
@@ -119,12 +118,12 @@ async function streamAssistantResponse(
   return { finishReason, streamErrorMessage };
 }
 
-export function useSessionAi({
-  sessionId,
+export function useHistoryAi({
+  historyId,
   question,
-  selectedLanguage,
-  codeByLanguage,
-}: SessionAiCodeContext) {
+  language,
+  code,
+}: HistoryAiCodeContext) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeAiTab, setActiveAiTab] = useState<AiTab>('hints');
   const [explanations, setExplanations] = useState<ExplainEntry[]>([]);
@@ -137,7 +136,7 @@ export function useSessionAi({
 
   const handleExplainCode = useCallback(
     async (selectedCode: string) => {
-      if (!sessionId) {
+      if (!historyId) {
         return;
       }
 
@@ -146,7 +145,7 @@ export function useSessionAi({
       const newEntry: ExplainEntry = {
         id: entryId,
         selectedCode,
-        language: selectedLanguage,
+        language,
         response: null,
         createdAt: new Date().toISOString(),
       };
@@ -158,13 +157,13 @@ export function useSessionAi({
 
       try {
         const { finishReason, streamErrorMessage } = await streamAssistantResponse(
-          `/api/sessions/${sessionId}/explain`,
+          `/api/history/${historyId}/explain`,
           {
             questionDescription: question?.description ?? '',
             questionExamples: question?.examples ?? [],
             questionConstraints: question?.constraints ?? [],
-            language: selectedLanguage,
-            fullCode: codeByLanguage[selectedLanguage],
+            language,
+            fullCode: code,
             selectedCode,
           },
           (event) => {
@@ -215,13 +214,13 @@ export function useSessionAi({
         );
       }
     },
-    [codeByLanguage, explanations.length, question, selectedLanguage, sessionId]
+    [code, explanations.length, question, language, historyId]
   );
 
   const handleSendHint = useCallback(
     async (input: string) => {
       const text = input.trim();
-      if (!text || !sessionId || !question || isHintStreaming) {
+      if (!text || !historyId || !question || isHintStreaming) {
         return;
       }
 
@@ -252,13 +251,13 @@ export function useSessionAi({
       try {
         const requestMessages = buildHintRequestMessages(nextVisibleMessages);
         const { finishReason, streamErrorMessage } = await streamAssistantResponse(
-          `/api/sessions/${sessionId}/hints`,
+          `/api/history/${historyId}/hints`,
           {
             questionDescription: question.description,
             questionExamples: question.examples,
             questionConstraints: question.constraints,
-            language: selectedLanguage,
-            fullCode: codeByLanguage[selectedLanguage],
+            language,
+            fullCode: code,
             messages: requestMessages,
           },
           (event) => {
@@ -350,21 +349,20 @@ export function useSessionAi({
         setIsHintStreaming(false);
       }
     },
-    [codeByLanguage, hintMessages, isHintStreaming, question, selectedLanguage, sessionId]
+    [code, hintMessages, isHintStreaming, question, language, historyId]
   );
 
   const handleTranslateCode = useCallback(
     async (targetLanguage: string) => {
-      const currentCode = codeByLanguage[selectedLanguage];
-      if (!sessionId || !currentCode || isTranslateStreaming) {
+      if (!historyId || !code || isTranslateStreaming) {
         return;
       }
 
       const cachedIndex = translations.findIndex(
         (t) =>
           t.targetLanguage === targetLanguage &&
-          t.sourceLanguage === selectedLanguage &&
-          t.originalCode === currentCode &&
+          t.sourceLanguage === language &&
+          t.originalCode === code &&
           t.translatedCode !== null
       );
 
@@ -379,9 +377,9 @@ export function useSessionAi({
       const nextTranslateIndex = translations.length;
       const newEntry: TranslateEntry = {
         id: entryId,
-        sourceLanguage: selectedLanguage,
+        sourceLanguage: language,
         targetLanguage,
-        originalCode: currentCode,
+        originalCode: code,
         translatedCode: null,
         createdAt: new Date().toISOString(),
       };
@@ -394,14 +392,14 @@ export function useSessionAi({
 
       try {
         const { finishReason, streamErrorMessage } = await streamAssistantResponse(
-          `/api/sessions/${sessionId}/translate`,
+          `/api/history/${historyId}/translate`,
           {
             questionDescription: question?.description ?? '',
             questionExamples: question?.examples ?? [],
             questionConstraints: question?.constraints ?? [],
-            language: selectedLanguage,
+            language,
             targetLanguage,
-            fullCode: currentCode,
+            fullCode: code,
           },
           (event) => {
             if (event.event === 'chunk') {
@@ -453,7 +451,7 @@ export function useSessionAi({
         setIsTranslateStreaming(false);
       }
     },
-    [codeByLanguage, translations, question, selectedLanguage, sessionId, isTranslateStreaming]
+    [code, translations, question, language, historyId, isTranslateStreaming]
   );
 
   const handleClearHints = useCallback(() => {

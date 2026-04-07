@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 
-export type AssistantFeature = 'explain' | 'hints';
+export type AssistantFeature = 'explain' | 'hints' | 'translate';
 export type AssistantFinishReason = 'stop' | 'length' | 'refusal';
 
 export class SseWriter {

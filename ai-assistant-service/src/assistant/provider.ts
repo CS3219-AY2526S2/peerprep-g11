@@ -12,3 +12,7 @@ export function getExplainModel() {
 export function getHintsModel() {
   return gateway(assistantConfig.hintsModel);
 }
+
+export function getTranslateModel() {
+  return gateway(assistantConfig.translateModel);
+}

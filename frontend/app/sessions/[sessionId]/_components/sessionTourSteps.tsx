@@ -63,7 +63,7 @@ export const sessionTourSteps: Tour[] = [
         icon: <PanelLeft size={15} />,
         title: "AI Assistant Sidebar",
         content:
-          "The AI sidebar opens on Hints first. Click the Explain tab yourself to see where code explanations appear and unlock the next step.",
+          "This is your AI assistant. Use the Hints tab to get guidance, or switch to Explain to break down selected code. Both are here whenever you need them.",
         selector: '[data-nextstep="ai-sidebar-tabs"]',
         side: "bottom-right",
         showControls: true,

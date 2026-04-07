@@ -14,13 +14,11 @@ describe("PermissionDeniedPage", () => {
     resetNextNavigationMocks();
   });
 
-  it("routes both call-to-action buttons correctly", () => {
+  it("routes the Return Home button correctly", () => {
     render(<PermissionDeniedPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Return Home" }));
-    fireEvent.click(screen.getByRole("button", { name: "Browse Questions" }));
 
-    expect(mockPush).toHaveBeenNthCalledWith(1, "/dashboard");
-    expect(mockPush).toHaveBeenNthCalledWith(2, "/questions");
+    expect(mockPush).toHaveBeenCalledWith("/dashboard");
   });
 });

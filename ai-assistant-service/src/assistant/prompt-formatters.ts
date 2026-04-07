@@ -1,8 +1,9 @@
 import type { ExplainRequest } from './explain.schema';
 import type { HintsRequest } from './hints.schema';
+import type { TranslateRequest } from './translate.schema';
 
 type QuestionContextRequest = Pick<
-  ExplainRequest | HintsRequest,
+  ExplainRequest | HintsRequest | TranslateRequest,
   'questionExamples' | 'questionConstraints'
 >;
 
