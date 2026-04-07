@@ -33,8 +33,6 @@ interface SessionWalkthroughState {
   isEditorExplainDemoActive: boolean;
   isAiSidebarForcedOpen: boolean;
   forcedAiTab: AiTab | null;
-  stepFiveVisitedTabs: AiTab[];
-  canAdvanceFromStepFive: boolean;
 }
 
 function createInitialWalkthroughState(): SessionWalkthroughState {
@@ -43,8 +41,6 @@ function createInitialWalkthroughState(): SessionWalkthroughState {
     isEditorExplainDemoActive: false,
     isAiSidebarForcedOpen: false,
     forcedAiTab: null,
-    stepFiveVisitedTabs: [],
-    canAdvanceFromStepFive: false,
   };
 }
 
@@ -220,26 +216,18 @@ export default function SessionPage() {
           isEditorExplainDemoActive: true,
           isAiSidebarForcedOpen: false,
           forcedAiTab: null,
-          stepFiveVisitedTabs: [],
-          canAdvanceFromStepFive: false,
         };
       }
 
       if (stepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
-        const stayingOnSidebarStep =
-          current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
-
         return {
           activeStepIndex: stepIndex,
           isEditorExplainDemoActive: false,
           isAiSidebarForcedOpen: true,
-          forcedAiTab: stayingOnSidebarStep ? current.forcedAiTab : "hints",
-          stepFiveVisitedTabs: stayingOnSidebarStep
-            ? current.stepFiveVisitedTabs
-            : [],
-          canAdvanceFromStepFive: stayingOnSidebarStep
-            ? current.canAdvanceFromStepFive
-            : false,
+          forcedAiTab:
+            current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR
+              ? current.forcedAiTab
+              : "hints",
         };
       }
 
@@ -248,28 +236,17 @@ export default function SessionPage() {
         isEditorExplainDemoActive: false,
         isAiSidebarForcedOpen: false,
         forcedAiTab: null,
-        stepFiveVisitedTabs: [],
-        canAdvanceFromStepFive: false,
       };
     });
   }, []);
 
-  const handleWalkthroughTabClick = useCallback((tab: AiTab) => {
+  const handleWalkthroughTabClick = useCallback(() => {
     setWalkthroughState((current) => {
       if (current.activeStepIndex !== SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
         return current;
       }
 
-      const nextVisitedTabs = current.stepFiveVisitedTabs.includes(tab)
-        ? current.stepFiveVisitedTabs
-        : [...current.stepFiveVisitedTabs, tab];
-
-      return {
-        ...current,
-        forcedAiTab: null,
-        stepFiveVisitedTabs: nextVisitedTabs,
-        canAdvanceFromStepFive: tab === "explain",
-      };
+      return { ...current, forcedAiTab: null };
     });
   }, []);
 
@@ -286,6 +263,11 @@ export default function SessionPage() {
     isHintStreaming,
     handleSendHint,
     handleClearHints,
+    translations,
+    activeTranslateIndex,
+    setActiveTranslateIndex,
+    isTranslateStreaming,
+    handleTranslateCode,
   } = useSessionAi({
     sessionId: params.sessionId,
     question,
@@ -295,11 +277,6 @@ export default function SessionPage() {
 
   const isAiSidebarVisible =
     sidebarOpen || walkthroughState.isAiSidebarForcedOpen;
-  const isStepFiveActive =
-    walkthroughState.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
-  const nextDisabledMessage = isStepFiveActive
-    ? "Click the Explain tab in the AI sidebar to continue the walkthrough."
-    : null;
 
   if (authLoading || !user) {
     return <SessionPageSkeleton />;
@@ -352,6 +329,14 @@ export default function SessionPage() {
           isHintStreaming={isHintStreaming}
           onSendHint={handleSendHint}
           onClearHints={handleClearHints}
+          translations={translations}
+          activeTranslateIndex={activeTranslateIndex}
+          onActiveTranslateIndexChange={setActiveTranslateIndex}
+          isTranslateStreaming={isTranslateStreaming}
+          onTranslateCode={handleTranslateCode}
+          currentLanguage={sessionLanguage}
+          hasCode={Boolean(codeByLanguage[sessionLanguage]?.trim())}
+          translateEmptyLabel="Start writing your solution in the editor. Once you have code, you can translate it here."
           walkthroughForceOpen={walkthroughState.isAiSidebarForcedOpen}
           walkthroughForcedTab={walkthroughState.forcedAiTab}
           onWalkthroughTabClick={handleWalkthroughTabClick}
@@ -362,10 +347,6 @@ export default function SessionPage() {
         <div className="min-w-0 flex-1">
           <SessionOnboardingTour
             onStepChange={handleTourStepChange}
-            isNextDisabled={
-              isStepFiveActive && !walkthroughState.canAdvanceFromStepFive
-            }
-            nextDisabledMessage={nextDisabledMessage}
           >
             <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
               <SessionHeader

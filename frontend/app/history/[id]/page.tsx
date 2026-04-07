@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import type { editor } from 'monaco-editor';
+import { SparklesIcon } from 'lucide-react';
 import { NavBar } from '@/components/ui/navBar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,8 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { PROGRAMMING_LANGUAGE_LABELS, type ProgrammingLanguage } from '@/lib/programming-languages';
+import { AiSidebar } from '@/app/sessions/[sessionId]/_components/AiSidebar';
+import { AiSidebarToggle } from '@/app/sessions/[sessionId]/_components/AiSidebarToggle';
+import { useHistoryAi } from '@/app/history/[id]/useHistoryAi';
 import type { HistoryDetail } from '@/app/history/types';
 import type { Difficulty } from '@/lib/types';
+
+type MonacoInstance = typeof import('monaco-editor');
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -77,6 +84,12 @@ function monacoLanguage(lang: string): string {
   return map[lang.toLowerCase()] ?? lang.toLowerCase();
 }
 
+interface ExplainWidgetPosition {
+  visible: boolean;
+  top: number;
+  left: number;
+}
+
 export default function HistoryDetailPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const params = useParams<{ id: string }>();
@@ -86,6 +99,100 @@ export default function HistoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<MonacoInstance | null>(null);
+  const [widgetPos, setWidgetPos] = useState<ExplainWidgetPosition>({
+    visible: false,
+    top: 0,
+    left: 0,
+  });
+
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    activeAiTab,
+    setActiveAiTab,
+    explanations,
+    activeExplainIndex,
+    setActiveExplainIndex,
+    handleExplainCode,
+    hintMessages,
+    isHintStreaming,
+    handleSendHint,
+    handleClearHints,
+    translations,
+    activeTranslateIndex,
+    setActiveTranslateIndex,
+    isTranslateStreaming,
+    handleTranslateCode,
+  } = useHistoryAi({
+    historyId: params.id,
+    question: entry?.question ?? null,
+    language: entry?.language ?? 'python',
+    code: entry?.code ?? '',
+  });
+
+  const onExplainCodeRef = useRef(handleExplainCode);
+  useEffect(() => {
+    onExplainCodeRef.current = handleExplainCode;
+  }, [handleExplainCode]);
+
+  const getSelectedText = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) return '';
+    const selection = ed.getSelection();
+    if (!selection) return '';
+    const model = ed.getModel();
+    if (!model) return '';
+    return model.getValueInRange(selection).trim();
+  }, []);
+
+  const updateWidgetPosition = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const selection = ed.getSelection();
+    if (!selection || selection.isEmpty()) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const model = ed.getModel();
+    if (!model) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const selected = model.getValueInRange(selection).trim();
+    if (!selected) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    const endPos = selection.getEndPosition();
+    const coords = ed.getScrolledVisiblePosition(endPos);
+    if (!coords) {
+      setWidgetPos({ visible: false, top: 0, left: 0 });
+      return;
+    }
+
+    setWidgetPos({
+      visible: true,
+      top: coords.top - 32,
+      left: coords.left + 16,
+    });
+  }, []);
+
+  function handleExplainClick() {
+    const selected = getSelectedText();
+    if (selected) {
+      onExplainCodeRef.current(selected);
+    }
+  }
 
   useEffect(() => {
     if (!params.id) return;
@@ -194,239 +301,321 @@ export default function HistoryDetailPage() {
     PROGRAMMING_LANGUAGE_LABELS[entry.language as ProgrammingLanguage] ?? entry.language;
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <NavBar activePage="dashboard" />
+    <div className="h-screen overflow-hidden bg-background text-foreground">
+      <AiSidebarToggle
+        onClick={() => setSidebarOpen(true)}
+        visible={!sidebarOpen}
+      />
 
-      <div className="px-8 pt-26 pb-16 max-w-[1200px] mx-auto">
-        <div className="mb-6 animate-fade-in-up">
-          <h1
-            className="text-[22px] font-bold text-foreground mb-1"
-            style={{ fontFamily: 'var(--font-serif)' }}
-          >
-            Session {entry.session_id}
-          </h1>
+      <div className="flex h-full">
+        <AiSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          activeTab={activeAiTab}
+          onTabChange={setActiveAiTab}
+          explanations={explanations}
+          activeExplainIndex={activeExplainIndex}
+          onActiveExplainIndexChange={setActiveExplainIndex}
+          hintMessages={hintMessages}
+          isHintStreaming={isHintStreaming}
+          onSendHint={handleSendHint}
+          onClearHints={handleClearHints}
+          translations={translations}
+          activeTranslateIndex={activeTranslateIndex}
+          onActiveTranslateIndexChange={setActiveTranslateIndex}
+          isTranslateStreaming={isTranslateStreaming}
+          onTranslateCode={handleTranslateCode}
+          currentLanguage={entry?.language ?? ''}
+          hasCode={Boolean(entry?.code?.trim())}
+          translateEmptyLabel="This session has no saved code to translate."
+        />
 
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Badge
-              variant="outline"
-              className={`rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${difficultyConfig[question.difficulty]}`}
-            >
-              {question.difficulty}
-            </Badge>
-            {question.topics.map((topic) => (
-              <Badge
-                key={topic}
-                variant="outline"
-                className="rounded-full text-[11px] font-semibold px-2.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200"
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <NavBar activePage="dashboard" sidebarOffset={sidebarOpen ? 440 : 0} />
+
+          <div className="px-8 pt-26 pb-16 max-w-[1200px] mx-auto">
+            <div className="mb-6 animate-fade-in-up">
+              <h1
+                className="text-[22px] font-bold text-foreground mb-1"
+                style={{ fontFamily: 'var(--font-serif)' }}
               >
-                {topic}
-              </Badge>
-            ))}
-            <Separator orientation="vertical" className="h-4 mx-1" />
-            <span className="text-[11.5px] text-muted-foreground flex items-center gap-1.5">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-accent shrink-0">
-                <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-                <circle cx="11" cy="7" r="2" stroke="currentColor" strokeWidth="1.4" />
-                <path d="M2.5 13c.4-2 2-3 4-3s3.5 1 3.9 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-              with <span className="font-medium text-foreground">{entry.partner_username ?? entry.partner_id}</span>
-            </span>
-            <Separator orientation="vertical" className="h-4 mx-1" />
-            <span className="text-[11.5px] text-muted-foreground flex items-center gap-1.5">
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" className="text-muted-foreground shrink-0">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
-                <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {formatTimestamp(entry.timestamp)}
-            </span>
-            <Separator orientation="vertical" className="h-4 mx-1" />
-          </div>
-        </div>
+                Session {entry.session_id}
+              </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div
-            className="animate-fade-in-up"
-            style={{ animationDelay: '80ms' }}
-          >
-            <Card className="border-border shadow-sm transition-shadow duration-300 hover:shadow-md h-full py-0 gap-0">
-              <CardContent className="p-6">
-                <h2
-                  className="text-[16px] font-bold text-foreground mb-4"
-                  style={{ fontFamily: 'var(--font-serif)' }}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <Badge
+                  variant="outline"
+                  className={`rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${difficultyConfig[question.difficulty]}`}
                 >
-                  {question.title}
-                </h2>
-                {descriptionParagraphs.length > 0 ? (
-                  <div className="text-[13px] leading-relaxed text-foreground space-y-3">
-                    {descriptionParagraphs.map((paragraph, index) => (
-                      <p
-                        key={index}
-                        className="animate-fade-in-up"
-                        style={{ animationDelay: `${index * 40}ms` }}
-                      >
-                        {paragraph}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[13px] text-muted-foreground italic">
-                    No description available.
-                  </p>
-                )}
-
-                {question.constraints.length > 0 && (
-                  <div className="mt-5">
-                    <h3 className="text-[12px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
-                      Constraints
-                    </h3>
-                    <ul className="list-disc list-inside text-[13px] text-muted-foreground space-y-1.5">
-                      {question.constraints.map((c, i) => (
-                        <li
-                          key={i}
-                          className="animate-fade-in-up"
-                          style={{ animationDelay: `${i * 40}ms` }}
-                        >
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {question.examples.map((example, i) => (
-                  <div
-                    key={i}
-                    className="mt-5 bg-secondary border border-border rounded-xl p-4
-                      transition-all duration-200 hover:border-accent/20
-                      animate-fade-in-up"
-                    style={{ animationDelay: `${i * 60}ms` }}
+                  {question.difficulty}
+                </Badge>
+                {question.topics.map((topic) => (
+                  <Badge
+                    key={topic}
+                    variant="outline"
+                    className="rounded-full text-[11px] font-semibold px-2.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200"
                   >
-                    <h4 className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
-                      Example {question.examples.length > 1 ? i + 1 : 'Input / Output'}
-                    </h4>
-                    <pre
-                      className="text-[12px] leading-relaxed text-foreground whitespace-pre-wrap"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      {`Input: ${example.input}\nOutput: ${example.output}`}
-                      {example.explanation ? `\nExplanation: ${example.explanation}` : ''}
-                    </pre>
-                  </div>
+                    {topic}
+                  </Badge>
                 ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div
-            className="animate-fade-in-up"
-            style={{ animationDelay: '160ms' }}
-          >
-            <Card className="border-border shadow-sm transition-shadow duration-300 hover:shadow-md overflow-hidden h-full flex flex-col bg-[#FBF8F4] py-2 gap-0">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
-                <div className="flex items-center gap-2">
-                  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-accent">
-                    <path d="M5 12l-3-4 3-4M11 4l3 4-3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <Separator orientation="vertical" className="h-4 mx-1" />
+                <span className="text-[11.5px] text-muted-foreground flex items-center gap-1.5">
+                  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-accent shrink-0">
+                    <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+                    <circle cx="11" cy="7" r="2" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M2.5 13c.4-2 2-3 4-3s3.5 1 3.9 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
-                  <span className="text-[12px] font-semibold text-foreground">
-                    Your Solution
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
-                    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" className="shrink-0">
-                      <path d="M5 12l-3-4 3-4M11 4l3 4-3 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {langLabel}
-                  </span>
-                  {entry.code && (
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(entry.code);
-                              setCopied(true);
-                              setTimeout(() => setCopied(false), 2000);
-                            }}
-                            className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
-                          >
-                            {copied ? (
-                              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-emerald-600">
-                                <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            ) : (
-                              <svg viewBox="0 0 16 16" width="13" height="13" fill="none">
-                                <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-                                <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3" />
-                              </svg>
-                            )}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {copied ? 'Copied!' : 'Copy code'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
+                  with <span className="font-medium text-foreground">{entry.partner_username ?? entry.partner_id}</span>
+                </span>
+                <Separator orientation="vertical" className="h-4 mx-1" />
+                <span className="text-[11.5px] text-muted-foreground flex items-center gap-1.5">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" className="text-muted-foreground shrink-0">
+                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {formatTimestamp(entry.timestamp)}
+                </span>
+                <Separator orientation="vertical" className="h-4 mx-1" />
               </div>
-              <CardContent className="p-0 flex-1 min-h-0">
-                {entry.code ? (
-                  <MonacoEditor
-                    height="480px"
-                    language={monacoLanguage(entry.language)}
-                    value={entry.code}
-                    theme="peerprep-light"
-                    beforeMount={handleEditorWillMount}
-                    options={{
-                      readOnly: true,
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      fontSize: 13,
-                      fontFamily: 'var(--font-mono)',
-                      lineNumbers: 'on',
-                      renderLineHighlight: 'none',
-                      folding: true,
-                      wordWrap: 'on',
-                      padding: { top: 12, bottom: 12 },
-                      scrollbar: {
-                        verticalScrollbarSize: 6,
-                        horizontalScrollbarSize: 6,
-                      },
-                      domReadOnly: true,
-                    }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[480px] text-center px-6">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" className="text-muted-foreground/30 mb-2">
-                      <path d="M8 17l-5-5 5-5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <p className="text-[12.5px] text-muted-foreground">No code was saved for this session.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+            </div>
 
-        <div className="mt-8 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
-          <Link
-            href="/dashboard"
-            className="group/back inline-flex items-center gap-1.5 text-[12.5px] font-medium
-              text-muted-foreground no-underline
-              transition-colors duration-200 hover:text-foreground cursor-pointer"
-          >
-            <svg
-              viewBox="0 0 16 16"
-              width="12"
-              height="12"
-              fill="none"
-              className="transition-transform duration-200 group-hover/back:-translate-x-0.5"
-            >
-              <path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Back to Dashboard
-          </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div
+                className="animate-fade-in-up"
+                style={{ animationDelay: '80ms' }}
+              >
+                <Card className="border-border shadow-sm transition-shadow duration-300 hover:shadow-md h-full py-0 gap-0">
+                  <CardContent className="p-6">
+                    <h2
+                      className="text-[16px] font-bold text-foreground mb-4"
+                      style={{ fontFamily: 'var(--font-serif)' }}
+                    >
+                      {question.title}
+                    </h2>
+                    {descriptionParagraphs.length > 0 ? (
+                      <div className="text-[13px] leading-relaxed text-foreground space-y-3">
+                        {descriptionParagraphs.map((paragraph, index) => (
+                          <p
+                            key={index}
+                            className="animate-fade-in-up"
+                            style={{ animationDelay: `${index * 40}ms` }}
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-muted-foreground italic">
+                        No description available.
+                      </p>
+                    )}
+
+                    {question.constraints.length > 0 && (
+                      <div className="mt-5">
+                        <h3 className="text-[12px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
+                          Constraints
+                        </h3>
+                        <ul className="list-disc list-inside text-[13px] text-muted-foreground space-y-1.5">
+                          {question.constraints.map((c, i) => (
+                            <li
+                              key={i}
+                              className="animate-fade-in-up"
+                              style={{ animationDelay: `${i * 40}ms` }}
+                            >
+                              {c}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {question.examples.map((example, i) => (
+                      <div
+                        key={i}
+                        className="mt-5 bg-secondary border border-border rounded-xl p-4
+                          transition-all duration-200 hover:border-accent/20
+                          animate-fade-in-up"
+                        style={{ animationDelay: `${i * 60}ms` }}
+                      >
+                        <h4 className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
+                          Example {question.examples.length > 1 ? i + 1 : 'Input / Output'}
+                        </h4>
+                        <pre
+                          className="text-[12px] leading-relaxed text-foreground whitespace-pre-wrap"
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                        >
+                          {`Input: ${example.input}\nOutput: ${example.output}`}
+                          {example.explanation ? `\nExplanation: ${example.explanation}` : ''}
+                        </pre>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div
+                className="animate-fade-in-up"
+                style={{ animationDelay: '160ms' }}
+              >
+                <Card className="border-border shadow-sm transition-shadow duration-300 hover:shadow-md overflow-hidden h-full flex flex-col bg-[#FBF8F4] py-2 gap-0">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
+                    <div className="flex items-center gap-2">
+                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-accent">
+                        <path d="M5 12l-3-4 3-4M11 4l3 4-3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[12px] font-semibold text-foreground">
+                        Your Solution
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" className="shrink-0">
+                          <path d="M5 12l-3-4 3-4M11 4l3 4-3 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {langLabel}
+                      </span>
+                      {entry.code && (
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(entry.code);
+                                  setCopied(true);
+                                  setTimeout(() => setCopied(false), 2000);
+                                }}
+                                className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+                              >
+                                {copied ? (
+                                  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" className="text-emerald-600">
+                                    <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                ) : (
+                                  <svg viewBox="0 0 16 16" width="13" height="13" fill="none">
+                                    <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                                    <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3" />
+                                  </svg>
+                                )}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {copied ? 'Copied!' : 'Copy code'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </div>
+                  <CardContent className="relative p-0 flex-1 min-h-0">
+                    {entry.code ? (
+                      <>
+                        <MonacoEditor
+                          height="480px"
+                          language={monacoLanguage(entry.language)}
+                          value={entry.code}
+                          theme="peerprep-light"
+                          beforeMount={handleEditorWillMount}
+                          onMount={(monacoEditor, monaco) => {
+                            editorRef.current = monacoEditor;
+                            monacoRef.current = monaco;
+
+                            monacoEditor.addAction({
+                              id: 'peerprep.explainCode',
+                              label: 'PeerPrep AI: Explain Code',
+                              contextMenuGroupId: 'navigation',
+                              contextMenuOrder: 0,
+                              precondition: 'editorHasSelection',
+                              run: () => {
+                                const selection = monacoEditor.getSelection();
+                                if (!selection) return;
+                                const model = monacoEditor.getModel();
+                                if (!model) return;
+                                const selected = model.getValueInRange(selection).trim();
+                                if (selected) {
+                                  onExplainCodeRef.current(selected);
+                                }
+                              },
+                            });
+
+                            monacoEditor.onDidChangeCursorSelection(() => {
+                              updateWidgetPosition();
+                            });
+
+                            monacoEditor.onDidScrollChange(() => {
+                              updateWidgetPosition();
+                            });
+                          }}
+                          options={{
+                            readOnly: true,
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            fontSize: 13,
+                            fontFamily: 'var(--font-mono)',
+                            lineNumbers: 'on',
+                            renderLineHighlight: 'none',
+                            folding: true,
+                            wordWrap: 'on',
+                            padding: { top: 12, bottom: 12 },
+                            scrollbar: {
+                              verticalScrollbarSize: 6,
+                              horizontalScrollbarSize: 6,
+                            },
+                            domReadOnly: false,
+                          }}
+                        />
+                        {widgetPos.visible && (
+                          <button
+                            type="button"
+                            className="peerprep-explain-widget"
+                            style={{
+                              position: 'absolute',
+                              top: widgetPos.top,
+                              left: widgetPos.left,
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleExplainClick();
+                            }}
+                          >
+                            <SparklesIcon className="h-3.5 w-3.5" />
+                            <span>Explain</span>
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[480px] text-center px-6">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" className="text-muted-foreground/30 mb-2">
+                          <path d="M8 17l-5-5 5-5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <p className="text-[12.5px] text-muted-foreground">No code was saved for this session.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <div className="mt-8 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
+              <Link
+                href="/dashboard"
+                className="group/back inline-flex items-center gap-1.5 text-[12.5px] font-medium
+                  text-muted-foreground no-underline
+                  transition-colors duration-200 hover:text-foreground cursor-pointer"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  className="transition-transform duration-200 group-hover/back:-translate-x-0.5"
+                >
+                  <path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back to Dashboard
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

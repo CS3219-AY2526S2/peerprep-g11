@@ -5,14 +5,17 @@ import {
   PanelLeftCloseIcon,
   SparklesIcon,
   LightbulbIcon,
+  LanguagesIcon,
   SendIcon,
   Trash2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   LoaderCircleIcon,
+  CopyIcon,
+  CheckIcon,
 } from 'lucide-react';
 import { RichMarkdown } from './RichMarkdown';
-import type { AiTab, ExplainEntry, HintMessage } from '@/app/sessions/[sessionId]/types';
+import type { AiTab, ExplainEntry, HintMessage, TranslateEntry } from '@/app/sessions/[sessionId]/types';
 
 function BouncingDots() {
   return (
@@ -63,15 +66,30 @@ interface AiSidebarProps {
   isHintStreaming: boolean;
   onSendHint: (message: string) => void;
   onClearHints: () => void;
+  translations?: TranslateEntry[];
+  activeTranslateIndex?: number;
+  onActiveTranslateIndexChange?: (index: number) => void;
+  isTranslateStreaming?: boolean;
+  onTranslateCode?: (targetLanguage: string) => void;
+  currentLanguage?: string;
+  hasCode?: boolean;
+  translateEmptyLabel?: string;
   walkthroughForceOpen?: boolean;
   walkthroughForcedTab?: AiTab | null;
-  onWalkthroughTabClick?: (tab: AiTab) => void;
+  onWalkthroughTabClick?: () => void;
   walkthroughDisableTransition?: boolean;
 }
 
 const TABS: { id: AiTab; label: string; icon: typeof SparklesIcon }[] = [
   { id: 'hints', label: 'Hints', icon: LightbulbIcon },
   { id: 'explain', label: 'Explain', icon: SparklesIcon },
+  { id: 'translate', label: 'Translate', icon: LanguagesIcon },
+];
+
+const TRANSLATE_LANGUAGES = [
+  { id: 'python', label: 'Python' },
+  { id: 'java', label: 'Java' },
+  { id: 'javascript', label: 'JavaScript' },
 ];
 
 export function AiSidebar({
@@ -86,15 +104,25 @@ export function AiSidebar({
   isHintStreaming,
   onSendHint,
   onClearHints,
+  translations = [],
+  activeTranslateIndex = 0,
+  onActiveTranslateIndexChange,
+  isTranslateStreaming = false,
+  onTranslateCode,
+  currentLanguage = '',
+  hasCode = true,
+  translateEmptyLabel = 'No code available to translate.',
   walkthroughForceOpen = false,
   walkthroughForcedTab = null,
   onWalkthroughTabClick,
   walkthroughDisableTransition = false,
 }: AiSidebarProps) {
   const [chatInput, setChatInput] = useState('');
+  const [translateCopied, setTranslateCopied] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const explainScrollRef = useRef<HTMLDivElement>(null);
+  const translateScrollRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const effectiveIsOpen = isOpen || walkthroughForceOpen;
   const effectiveActiveTab = walkthroughForcedTab ?? activeTab;
@@ -105,10 +133,19 @@ export function AiSidebar({
       ? 0
       : Math.min(Math.max(activeExplainIndex, 0), totalExplanations - 1);
 
-  // Scroll to top of explain panel when viewIndex changes
+  const totalTranslations = translations.length;
+  const translateViewIndex =
+    totalTranslations === 0
+      ? 0
+      : Math.min(Math.max(activeTranslateIndex, 0), totalTranslations - 1);
+
   useEffect(() => {
     explainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [viewIndex]);
+
+  useEffect(() => {
+    translateScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [translateViewIndex]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -179,6 +216,20 @@ export function AiSidebar({
 
   const hasMessages = hintMessages.length > 0;
   const currentExplanation = explanations[viewIndex] ?? null;
+  const currentTranslation = translations[translateViewIndex] ?? null;
+
+  function extractCodeFromMarkdown(text: string): string {
+    const fenceMatch = text.match(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
+    return fenceMatch ? fenceMatch[1].trimEnd() : text;
+  }
+
+  function handleCopyTranslation() {
+    if (!currentTranslation?.translatedCode) return;
+    const code = extractCodeFromMarkdown(currentTranslation.translatedCode);
+    navigator.clipboard.writeText(code);
+    setTranslateCopied(true);
+    setTimeout(() => setTranslateCopied(false), 2000);
+  }
 
   return (
     <aside
@@ -238,7 +289,7 @@ export function AiSidebar({
                 type="button"
                 data-nextstep={`ai-tab-${tab.id}`}
                 onClick={() => {
-                  onWalkthroughTabClick?.(tab.id);
+                  onWalkthroughTabClick?.();
                   onTabChange(tab.id);
                 }}
                 className={`relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] font-medium transition-all duration-150 ease-out active:scale-[0.98] ${isActive
@@ -506,6 +557,192 @@ export function AiSidebar({
                 </button>
               </div>
             </div>
+          </div>
+
+          <div
+            className="flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{
+              gridArea: '1 / 1',
+              opacity: effectiveActiveTab === 'translate' ? 1 : 0,
+              transform:
+                effectiveActiveTab === 'translate' ? 'translateX(0)' : 'translateX(40%)',
+              pointerEvents: effectiveActiveTab === 'translate' ? 'auto' : 'none',
+            }}
+          >
+            {totalTranslations === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+                <div className="space-y-4">
+                  <div className="relative mx-auto flex h-12 w-12 items-center justify-center">
+                    <div className="absolute inset-0 rounded-xl bg-accent/8" />
+                    <div className="absolute inset-1 rounded-[10px] bg-accent/5" />
+                    <LanguagesIcon className="relative h-5 w-5 text-accent" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[13px] font-medium text-foreground">Translate Code</p>
+                    <p className="mx-auto max-w-[260px] text-[11.5px] leading-relaxed text-muted-foreground">
+                      {hasCode
+                        ? 'Translate your solution into another language. Pick a target below to get started.'
+                        : translateEmptyLabel}
+                    </p>
+                  </div>
+                  {hasCode && (
+                    <div className="flex flex-wrap justify-center gap-1.5 pt-2">
+                      {TRANSLATE_LANGUAGES.map((lang) => {
+                        const isCurrent = lang.id === currentLanguage.toLowerCase();
+                        return (
+                          <button
+                            key={lang.id}
+                            type="button"
+                            onClick={() => !isCurrent && onTranslateCode?.(lang.id)}
+                            disabled={isCurrent || isTranslateStreaming}
+                            className={`cursor-pointer rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-all duration-150 ease-out active:scale-[0.97] ${
+                              isCurrent
+                                ? 'cursor-not-allowed border-border/40 bg-secondary/20 text-muted-foreground/40'
+                                : 'border-border bg-secondary/40 text-muted-foreground hover:border-accent/20 hover:bg-accent/8 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-secondary/40 disabled:hover:text-muted-foreground disabled:active:scale-100'
+                            }`}
+                          >
+                            {lang.label}
+                            {isCurrent && (
+                              <span className="ml-1 text-[9px] opacity-60">(current)</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    {totalTranslations > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onActiveTranslateIndexChange?.(Math.max(0, translateViewIndex - 1))}
+                          disabled={translateViewIndex === 0}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-all duration-150 ease-out hover:bg-muted/60 hover:text-foreground active:scale-95 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground disabled:active:scale-100"
+                          aria-label="Previous translation"
+                        >
+                          <ChevronLeftIcon className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          {translateViewIndex + 1} / {totalTranslations}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onActiveTranslateIndexChange?.(
+                              Math.min(totalTranslations - 1, translateViewIndex + 1)
+                            )
+                          }
+                          disabled={translateViewIndex === totalTranslations - 1}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-all duration-150 ease-out hover:bg-muted/60 hover:text-foreground active:scale-95 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground disabled:active:scale-100"
+                          aria-label="Next translation"
+                        >
+                          <ChevronRightIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRANSLATE_LANGUAGES.map((lang) => {
+                      const isCurrent = lang.id === currentLanguage.toLowerCase();
+                      return (
+                        <button
+                          key={lang.id}
+                          type="button"
+                          onClick={() => !isCurrent && onTranslateCode?.(lang.id)}
+                          disabled={isCurrent || isTranslateStreaming}
+                          className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-all duration-150 ease-out active:scale-[0.97] ${
+                            isCurrent
+                              ? 'cursor-not-allowed border-border/40 bg-secondary/20 text-muted-foreground/40'
+                              : 'cursor-pointer border-border bg-secondary/40 text-muted-foreground hover:border-accent/20 hover:bg-accent/8 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-secondary/40 disabled:hover:text-muted-foreground disabled:active:scale-100'
+                          }`}
+                        >
+                          {lang.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div ref={translateScrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+                  {currentTranslation && (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Original Code
+                        </p>
+                        <div className="overflow-hidden rounded-lg border border-border">
+                          <div className="flex items-center border-b border-border bg-secondary/40 px-3 py-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              {currentTranslation.sourceLanguage}
+                            </span>
+                          </div>
+                          <pre className="max-h-[200px] overflow-auto bg-secondary/15 px-4 py-3 text-[12px] leading-5">
+                            <code style={{ fontFamily: 'var(--font-mono)' }}>
+                              {currentTranslation.originalCode}
+                            </code>
+                          </pre>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-border/60" />
+
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Translated Code
+                          </p>
+                          {currentTranslation.translatedCode && (
+                            <button
+                              type="button"
+                              onClick={handleCopyTranslation}
+                              className="flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground transition-all duration-150 ease-out hover:bg-accent/8 hover:text-accent active:scale-95"
+                            >
+                              {translateCopied ? (
+                                <>
+                                  <CheckIcon className="h-3 w-3 text-emerald-600" />
+                                  <span className="text-emerald-600">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CopyIcon className="h-3 w-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="overflow-hidden rounded-lg border border-border">
+                          <div className="flex items-center border-b border-border bg-secondary/40 px-3 py-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              {currentTranslation.targetLanguage}
+                            </span>
+                          </div>
+                          {currentTranslation.translatedCode === null ? (
+                            <div className="flex flex-col items-center gap-3 bg-secondary/15 py-8">
+                              <LoaderCircleIcon className="h-5 w-5 animate-spin text-accent" />
+                              <p className="text-[11.5px] text-muted-foreground">
+                                Translating your code…
+                              </p>
+                            </div>
+                          ) : (
+                            <pre className="overflow-x-auto bg-secondary/15 px-4 py-3 text-[12px] leading-5">
+                              <code style={{ fontFamily: 'var(--font-mono)' }}>
+                                {extractCodeFromMarkdown(currentTranslation.translatedCode)}
+                              </code>
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
 

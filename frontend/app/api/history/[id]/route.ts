@@ -144,6 +144,15 @@ export async function GET(
   try {
     const { id } = await context.params;
 
+    const mock = MOCK_DETAILS[id];
+      if (!mock) {
+        return NextResponse.json(
+          { error: 'History entry not found' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(mock);
+
     const authHeaders = forwardAuthHeaders(request);
     const res = await fetch(`${QUESTION_SERVICE_URL}/history/${id}`, {
       headers: { ...authHeaders, 'Content-Type': 'application/json' },
