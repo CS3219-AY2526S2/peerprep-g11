@@ -375,7 +375,11 @@ export default function SessionPage() {
           </SessionOnboardingTour>
         </div>
       </div>
-      <ChatWidget participants={session.participants} />
+      <ChatWidget 
+        participants={session.participants}
+        sessionId={session.sessionId}
+        ticket={collabTicket}
+      />
     </div>
   );
 }
