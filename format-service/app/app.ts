@@ -56,10 +56,6 @@ app.post("/format", async (req: Request, res: Response) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Python — black (subprocess)
-// ---------------------------------------------------------------------------
-
 async function formatPython(code: string): Promise<string> {
   const tmpPath = join(tmpdir(), `fmt-${randomUUID()}.py`);
   try {
@@ -78,10 +74,6 @@ async function formatPython(code: string): Promise<string> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// JavaScript — prettier (in-process)
-// ---------------------------------------------------------------------------
-
 async function formatJavaScript(code: string): Promise<string> {
   const prettier = await import("prettier");
   return prettier.format(code, {
@@ -93,10 +85,6 @@ async function formatJavaScript(code: string): Promise<string> {
     printWidth: 80,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Java — google-java-format (JAR subprocess)
-// ---------------------------------------------------------------------------
 
 const GJF_JAR =
   process.env.GJF_JAR_PATH || "/opt/google-java-format.jar";
