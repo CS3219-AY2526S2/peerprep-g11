@@ -59,6 +59,8 @@ services:
         condition: service_started
       ai-assistant-service:
         condition: service_started
+      format-service:
+        condition: service_started
     restart: unless-stopped
     env_file:
       - ./frontend/.env
@@ -71,6 +73,7 @@ services:
       MATCHING_SERVICE_URL: http://matching-service:8080
       AI_ASSISTANT_SERVICE_URL: http://ai-assistant-service:4002
       COLLAB_SERVICE_URL: http://collaboration-service:1234
+      FORMAT_SERVICE_URL: http://format-service:4003
       NEXT_PUBLIC_COLLAB_SERVICE_WS_URL: ${NEXT_PUBLIC_COLLAB_SERVICE_WS_URL:-ws://localhost:1234}
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
@@ -83,3 +86,11 @@ services:
       - ./collaboration-service/.env
     ports:
       - "${COLLAB_PORT:-1234}:1234"
+
+  format-service:
+    build:
+      context: ./format-service
+    restart: unless-stopped
+    environment:
+      PORT: 4003
+      GJF_JAR_PATH: /opt/google-java-format.jar
