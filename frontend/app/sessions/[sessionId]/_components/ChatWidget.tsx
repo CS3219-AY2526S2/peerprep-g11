@@ -28,6 +28,8 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isOpenRef = useRef(isOpen);
+  const hasCompletedInitialSyncRef = useRef(false);
+  const lastReadMessageIdRef = useRef<string | null>(null);
 
   const yProviderRef = useRef<import('y-websocket').WebsocketProvider | null>(null);
   const yDocRef = useRef<Y.Doc | null>(null);
@@ -35,10 +37,64 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
   const yMessagesRef = useRef<({ yMessages: Y.Array<ChatMessage>; syncMessages: () => void }) | null>(null);
 
   const currentUserId = participants.find((p) => p.isCurrentUser)?.id ?? '';
+  const otherParticipantName = participants.find((p) => !p.isCurrentUser)?.username;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  const getLastReadStorageKey = useCallback(() => {
+    if (!currentUserId) return null;
+    return `peerprep:chat:last-read:${sessionId}:${currentUserId}`;
+  }, [currentUserId, sessionId]);
+
+  const getLatestMessageId = useCallback((chatMessages: ChatMessage[]) => {
+    return chatMessages.at(-1)?.id ?? '';
+  }, []);
+
+  const persistLastReadMessageId = useCallback(
+    (messageId: string) => {
+      const storageKey = getLastReadStorageKey();
+      if (!storageKey) return;
+
+      lastReadMessageIdRef.current = messageId;
+
+      try {
+        localStorage.setItem(storageKey, messageId);
+      } catch (error) {
+        console.error('[ChatYjs] Failed to persist last read message id:', error);
+      }
+    },
+    [getLastReadStorageKey],
+  );
+
+  const getUnreadCountFromMessages = useCallback(
+    (chatMessages: ChatMessage[], lastReadMessageId: string | null) => {
+      if (lastReadMessageId === null) {
+        return 0;
+      }
+
+      if (lastReadMessageId === '') {
+        return chatMessages.filter((msg) => msg.sender !== currentUserId).length;
+      }
+
+      const lastReadIndex = chatMessages.findIndex((msg) => msg.id === lastReadMessageId);
+      if (lastReadIndex === -1) {
+        return 0;
+      }
+
+      return chatMessages.slice(lastReadIndex + 1).filter((msg) => msg.sender !== currentUserId).length;
+    },
+    [currentUserId],
+  );
+
+  const markAllAsRead = useCallback(
+    (chatMessages: ChatMessage[]) => {
+      persistLastReadMessageId(getLatestMessageId(chatMessages));
+      setUnreadCount(0);
+    },
+    [getLatestMessageId, persistLastReadMessageId],
+  );
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -56,7 +112,12 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, scrollToBottom]);
+
+  useEffect(() => {
+    if (!isOpen || !hasCompletedInitialSyncRef.current) return;
+    markAllAsRead(messages);
+  }, [isOpen, markAllAsRead, messages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,22 +152,52 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
 
         const syncMessages = () => {
           const newMessages = yMessages.toArray();
+          setMessages(newMessages);
 
-          setMessages((prevMessages) => {
-            // track unread messages count
-            const newIncoming = newMessages.slice(prevMessages.length);
-            if (!isOpenRef.current) {
-              const unread = newIncoming.filter(
-                (msg) => msg.sender !== currentUserId
-              ).length;
-              if (unread > 0) {
-                setUnreadCount((c) => c + unread);
-              }
-            }
+          if (!hasCompletedInitialSyncRef.current) {
+            return;
+          }
 
-            return newMessages;
-          });
+          if (isOpenRef.current) {
+            markAllAsRead(newMessages);
+            return;
+          }
+
+          setUnreadCount(getUnreadCountFromMessages(newMessages, lastReadMessageIdRef.current));
         };
+
+        provider.on('sync', (isSynced: boolean) => {
+          if (!isSynced || hasCompletedInitialSyncRef.current) return;
+
+          const syncedMessages = yMessages.toArray();
+          const storageKey = getLastReadStorageKey();
+          let storedLastReadMessageId: string | null = null;
+
+          if (storageKey) {
+            try {
+              storedLastReadMessageId = localStorage.getItem(storageKey);
+            } catch (error) {
+              console.error('[ChatYjs] Failed to read last read message id:', error);
+            }
+          }
+
+          hasCompletedInitialSyncRef.current = true;
+          setMessages(syncedMessages);
+
+          if (storedLastReadMessageId === null) {
+            markAllAsRead(syncedMessages);
+            return;
+          }
+
+          lastReadMessageIdRef.current = storedLastReadMessageId;
+
+          if (isOpenRef.current) {
+            markAllAsRead(syncedMessages);
+            return;
+          }
+
+          setUnreadCount(getUnreadCountFromMessages(syncedMessages, storedLastReadMessageId));
+        });
 
         yMessages.observe(syncMessages);
         syncMessages();
@@ -128,8 +219,17 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
       yDocRef.current?.destroy();
       yProviderRef.current = null;
       yDocRef.current = null;
+      hasCompletedInitialSyncRef.current = false;
+      lastReadMessageIdRef.current = null;
     };
-  }, [sessionId, ticket]);
+  }, [
+    currentUserId,
+    getLastReadStorageKey,
+    getUnreadCountFromMessages,
+    markAllAsRead,
+    sessionId,
+    ticket,
+  ]);
 
   function handleSend() {
     const text = inputValue.trim();
@@ -174,7 +274,13 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
               <div className="flex items-center gap-2">
                 <MessageCircleIcon className="h-4 w-4 text-accent" />
                 <span className="text-[13px] font-semibold text-foreground">
-                  Session Chat
+                  {otherParticipantName ? (
+                    <>
+                      Chat with <span className="text-accent">{otherParticipantName}</span>
+                    </>
+                  ) : (
+                    'Chat'
+                  )}
                 </span>
               </div>
               <motion.button
@@ -273,7 +379,6 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
             type="button"
             data-nextstep="chat-widget"
             onClick={() => {
-              setUnreadCount(0);
               setIsOpen(true);
             }}
             initial={{ opacity: 0, scale: 0.6 }}
