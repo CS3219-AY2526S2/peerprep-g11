@@ -1,13 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import PermissionDeniedPage from "@/app/permission-denied/page";
-import * as mockNextNavigationModule from "@/test-utils/next-navigation";
 import {
   mockPush,
   resetNextNavigationMocks,
 } from "@/test-utils/next-navigation";
 
-jest.mock("next/navigation", () => mockNextNavigationModule);
+jest.mock("next/navigation", () => require("@/test-utils/next-navigation"));
 
 describe("PermissionDeniedPage", () => {
   beforeEach(() => {

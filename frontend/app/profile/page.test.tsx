@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 
 import ProfilePage from "@/app/profile/page";
 import { Role } from "@/lib/auth";
-import * as mockAuthModule from "@/test-utils/mock-auth";
 import {
   mockRefresh,
   resetMockAuth,
@@ -14,7 +13,7 @@ import {
   resetFetchMock,
 } from "@/test-utils/fetch";
 
-jest.mock("@/contexts/AuthContext", () => mockAuthModule);
+jest.mock("@/contexts/AuthContext", () => require("@/test-utils/mock-auth"));
 jest.mock("@/components/ui/navBar", () => ({
   NavBar: () => <div data-testid="navbar" />,
 }));

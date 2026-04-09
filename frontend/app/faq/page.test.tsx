@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import FAQPage from "@/app/faq/page";
 import { Role } from "@/lib/auth";
-import * as mockRequireAuthModule from "@/test-utils/mock-require-auth";
 import {
   resetMockRequireAuth,
   setMockRequireAuthState,
@@ -12,7 +11,9 @@ import {
   resetFetchMock,
 } from "@/test-utils/fetch";
 
-jest.mock("@/hooks/useRequireAuth", () => mockRequireAuthModule);
+jest.mock("@/hooks/useRequireAuth", () =>
+  require("@/test-utils/mock-require-auth")
+);
 jest.mock("@/components/ui/navBar", () => ({
   NavBar: () => <div data-testid="navbar" />,
 }));
