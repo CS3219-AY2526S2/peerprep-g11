@@ -1,8 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import LoginPage from "@/app/login/page";
-import * as mockAuthModule from "@/test-utils/mock-auth";
-import * as mockNextNavigationModule from "@/test-utils/next-navigation";
 import {
   mockPush,
   resetNextNavigationMocks,
@@ -18,8 +16,8 @@ import {
   resetFetchMock,
 } from "@/test-utils/fetch";
 
-jest.mock("next/navigation", () => mockNextNavigationModule);
-jest.mock("@/contexts/AuthContext", () => mockAuthModule);
+jest.mock("next/navigation", () => require("@/test-utils/next-navigation"));
+jest.mock("@/contexts/AuthContext", () => require("@/test-utils/mock-auth"));
 
 describe("LoginPage", () => {
   beforeEach(() => {
