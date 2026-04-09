@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi_pagination import Page, add_pagination
+from fastapi_pagination.ext.pymongo import paginate
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from redis.asyncio import from_url as redis_from_url
@@ -123,6 +125,7 @@ async def verify_admin_access(payload: dict = Depends(verify_jwt)):
 
 # Initialize the application
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(verify_jwt)])
+add_pagination(app)
 
 @app.get('/', dependencies=[])
 async def home():
