@@ -11,8 +11,12 @@ import {
   setMockAuthState,
 } from "@/test-utils/mock-auth";
 
-jest.mock("next/navigation", () => require("@/test-utils/next-navigation"));
-jest.mock("@/contexts/AuthContext", () => require("@/test-utils/mock-auth"));
+jest.mock("next/navigation", () =>
+  jest.requireActual("@/test-utils/next-navigation")
+);
+jest.mock("@/contexts/AuthContext", () =>
+  jest.requireActual("@/test-utils/mock-auth")
+);
 
 describe("useRequireAuth", () => {
   beforeEach(() => {
