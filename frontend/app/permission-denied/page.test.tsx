@@ -6,7 +6,9 @@ import {
   resetNextNavigationMocks,
 } from "@/test-utils/next-navigation";
 
-jest.mock("next/navigation", () => require("@/test-utils/next-navigation"));
+jest.mock("next/navigation", () =>
+  jest.requireActual("@/test-utils/next-navigation")
+);
 
 describe("PermissionDeniedPage", () => {
   beforeEach(() => {

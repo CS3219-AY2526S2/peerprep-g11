@@ -299,9 +299,13 @@ export function WaitingCard({
     // When matched becomes true, start the match animation sequence
     useEffect(() => {
         if (!matched || matchTriggered.current) return;
-        matchTriggered.current = true;
-        setPhase('match_enter');
-        setMatchSeqIdx(0);
+        const timer = window.setTimeout(() => {
+            matchTriggered.current = true;
+            setPhase('match_enter');
+            setMatchSeqIdx(0);
+        }, 0);
+
+        return () => window.clearTimeout(timer);
     }, [matched]);
 
     // Step through match animation phases

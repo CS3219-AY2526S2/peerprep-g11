@@ -464,7 +464,7 @@ export default function HistoryDetailPage() {
                         <path d="M5 12l-3-4 3-4M11 4l3 4-3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       <span className="text-[12px] font-semibold text-foreground">
-                        Your Solution
+                        Saved Code
                       </span>
                     </div>
                     <div className="flex items-center gap-3">

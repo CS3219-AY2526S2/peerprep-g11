@@ -11,7 +11,9 @@ import {
   resetFetchMock,
 } from "@/test-utils/fetch";
 
-jest.mock("next/navigation", () => require("@/test-utils/next-navigation"));
+jest.mock("next/navigation", () =>
+  jest.requireActual("@/test-utils/next-navigation")
+);
 
 describe("CreateAccountPage", () => {
   beforeEach(() => {
