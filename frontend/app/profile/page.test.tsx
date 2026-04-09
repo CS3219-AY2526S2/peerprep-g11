@@ -13,7 +13,9 @@ import {
   resetFetchMock,
 } from "@/test-utils/fetch";
 
-jest.mock("@/contexts/AuthContext", () => require("@/test-utils/mock-auth"));
+jest.mock("@/contexts/AuthContext", () =>
+  jest.requireActual("@/test-utils/mock-auth")
+);
 jest.mock("@/components/ui/navBar", () => ({
   NavBar: () => <div data-testid="navbar" />,
 }));

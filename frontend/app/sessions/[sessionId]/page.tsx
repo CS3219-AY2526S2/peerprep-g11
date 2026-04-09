@@ -58,12 +58,28 @@ function applyCurrentUserToSession(session: SessionDetails, username: string) {
   };
 }
 
+function markPeerAsDisconnected(session: SessionDetails) {
+  return {
+    ...session,
+    participants: session.participants.map((participant) =>
+      participant.isCurrentUser
+        ? participant
+        : {
+            ...participant,
+            presence: "disconnected",
+          },
+    ),
+  };
+}
+
 export default function SessionPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const currentUsernameRef = useRef("You");
+  const hasLoadedSessionSuccessfullyRef = useRef(false);
+  const isSessionStatusCheckInFlightRef = useRef(false);
 
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [collabTicket, setCollabTicket] = useState<string | null>(null);
@@ -71,18 +87,29 @@ export default function SessionPage() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [peerLeft, setPeerLeft] = useState(false);
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [walkthroughState, setWalkthroughState] =
     useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
+  const handlePeerLeft = useCallback(() => {
+    setPeerLeft(true);
+    setLeaveError(null);
+    setSession((currentSession) =>
+      currentSession ? markPeerAsDisconnected(currentSession) : currentSession,
+    );
+  }, []);
+
   const loadSessionPage = useCallback(
     async (sessionId: string, currentUsername: string) => {
       setLoadingSession(true);
       setLoadingQuestion(true);
       setError(null);
+      setPeerLeft(false);
       setLeaveError(null);
+      hasLoadedSessionSuccessfullyRef.current = false;
 
       try {
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`);
@@ -110,6 +137,7 @@ export default function SessionPage() {
           currentUsername,
         );
         setSession(sessionData);
+        hasLoadedSessionSuccessfullyRef.current = true;
         setCodeByLanguage({
           javascript: sessionData.starterCode.javascript,
           python: sessionData.starterCode.python,
@@ -136,6 +164,7 @@ export default function SessionPage() {
 
         setQuestion(questionBody as Question);
       } catch {
+        hasLoadedSessionSuccessfullyRef.current = false;
         setError("Unable to load this collaboration session right now");
         setSession(null);
         setQuestion(null);
@@ -184,7 +213,9 @@ export default function SessionPage() {
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
+    setPeerLeft(false);
     setLeaveError(null);
+    hasLoadedSessionSuccessfullyRef.current = false;
 
     void loadSessionPage(params.sessionId, user.username);
   }
@@ -203,6 +234,54 @@ export default function SessionPage() {
       router.push(response.redirectTo);
     });
   }
+
+  const checkSessionStillExists = useCallback(async () => {
+    if (
+      !params.sessionId ||
+      !hasLoadedSessionSuccessfullyRef.current ||
+      peerLeft ||
+      isSessionStatusCheckInFlightRef.current
+    ) {
+      return;
+    }
+
+    isSessionStatusCheckInFlightRef.current = true;
+
+    try {
+      const response = await fetch(`/api/sessions/${params.sessionId}`);
+
+      if (response.status === 404 && hasLoadedSessionSuccessfullyRef.current) {
+        handlePeerLeft();
+      }
+    } catch {
+      // Ignore transient polling failures and keep the current session view active.
+    } finally {
+      isSessionStatusCheckInFlightRef.current = false;
+    }
+  }, [handlePeerLeft, params.sessionId, peerLeft]);
+
+  useEffect(() => {
+    if (!session || !params.sessionId || peerLeft) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void checkSessionStillExists();
+    }, 3000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void checkSessionStillExists();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkSessionStillExists, params.sessionId, peerLeft, session]);
 
   const handleTourStepChange = useCallback((stepIndex: number | null) => {
     setWalkthroughState((current) => {
@@ -299,7 +378,7 @@ export default function SessionPage() {
             title={notFound ? "Session unavailable" : "Unable to open session"}
             message={
               notFound
-                ? "This mocked session could not be found. Try returning to the dashboard and starting again."
+                ? "This session could not be found. Try returning to the dashboard and starting again."
                 : (error ??
                   "Something went wrong while loading the collaboration session.")
             }
@@ -309,6 +388,13 @@ export default function SessionPage() {
       </div>
     );
   }
+
+  const otherParticipantName =
+    session.participants.find((participant) => !participant.isCurrentUser)
+      ?.username ?? "Your peer";
+  const peerLeftMessage = peerLeft
+    ? `${otherParticipantName} has left the session. Any further edits will not be saved.`
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -353,6 +439,7 @@ export default function SessionPage() {
                 sessionId={session.sessionId}
                 participants={session.participants}
                 leaveError={leaveError}
+                peerLeftMessage={peerLeftMessage}
                 onLeaveSuccess={handleLeaveSuccess}
                 onLeaveError={setLeaveError}
               />

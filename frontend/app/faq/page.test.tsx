@@ -12,7 +12,7 @@ import {
 } from "@/test-utils/fetch";
 
 jest.mock("@/hooks/useRequireAuth", () =>
-  require("@/test-utils/mock-require-auth")
+  jest.requireActual("@/test-utils/mock-require-auth")
 );
 jest.mock("@/components/ui/navBar", () => ({
   NavBar: () => <div data-testid="navbar" />,
