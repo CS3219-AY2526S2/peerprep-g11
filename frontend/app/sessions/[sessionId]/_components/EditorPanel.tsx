@@ -56,7 +56,7 @@ function handleEditorWillMount(monaco: typeof import("monaco-editor")) {
       "editorLineNumber.activeForeground": "#4B4A48",
       "editor.selectionBackground": "#D9ECE6",
       "editor.inactiveSelectionBackground": "#E7F3EF",
-      "editorCursor.foreground": "#2F6F53",
+      "editorCursor.foreground": "#C26B2D",
       "editorIndentGuide.background1": "#E8E0D6",
       "editorIndentGuide.activeBackground1": "#CCC0B3",
       "editorWidget.background": "#FFFFFF",

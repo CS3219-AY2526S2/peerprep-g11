@@ -239,6 +239,42 @@
   }
 }
 
+/* ── Yjs remote cursor / selection styles ──────────── */
+
+.yRemoteSelection {
+  background-color: oklch(0.75 0.12 200 / 0.35);
+}
+
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid oklch(0.55 0.14 200);
+  height: 22px; /* match Monaco lineHeight in EditorPanel editorOptions */
+  box-sizing: border-box;
+}
+
+.yRemoteSelectionHead:not([data-client-name])::after,
+.yRemoteSelectionHead[data-client-name=""]::after {
+  display: none;
+}
+
+.yRemoteSelectionHead::after {
+  content: attr(data-client-name);
+  position: absolute;
+  top: -1.4em;
+  left: -2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: oklch(0.55 0.14 200);
+  color: #fff;
+  font-size: 10px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Monaco context menu customizations ────────────── */
 
 /* Hide Command Palette and Change All Occurrences */

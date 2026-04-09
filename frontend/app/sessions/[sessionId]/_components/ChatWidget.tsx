@@ -4,22 +4,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MessageCircleIcon, ChevronDownIcon, SendIcon } from 'lucide-react';
 import type { SessionParticipant } from '@/app/sessions/[sessionId]/types';
+import * as Y from 'yjs';
 
 interface ChatMessage {
   id: string;
-  sender: 'me' | 'partner';
+  sender: string;
   text: string;
+  timestamp: number;
 }
-
-const SIMULATED_REPLIES = [
-  'Good idea, let me think about that.',
-];
 
 interface ChatWidgetProps {
   participants: SessionParticipant[];
+  sessionId: string;
+  ticket: string | null;
 }
 
-export function ChatWidget({ participants }: ChatWidgetProps) {
+export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -27,14 +27,74 @@ export function ChatWidget({ participants }: ChatWidgetProps) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const replyIndexRef = useRef(0);
   const isOpenRef = useRef(isOpen);
+  const hasCompletedInitialSyncRef = useRef(false);
+  const lastReadMessageIdRef = useRef<string | null>(null);
 
-  void participants;
+  const yProviderRef = useRef<import('y-websocket').WebsocketProvider | null>(null);
+  const yDocRef = useRef<Y.Doc | null>(null);
+  const yArrayRef = useRef<Y.Array<ChatMessage> | null>(null);
+  const yMessagesRef = useRef<({ yMessages: Y.Array<ChatMessage>; syncMessages: () => void }) | null>(null);
+
+  const currentUserId = participants.find((p) => p.isCurrentUser)?.id ?? '';
+  const otherParticipantName = participants.find((p) => !p.isCurrentUser)?.username;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  const getLastReadStorageKey = useCallback(() => {
+    if (!currentUserId) return null;
+    return `peerprep:chat:last-read:${sessionId}:${currentUserId}`;
+  }, [currentUserId, sessionId]);
+
+  const getLatestMessageId = useCallback((chatMessages: ChatMessage[]) => {
+    return chatMessages.at(-1)?.id ?? '';
+  }, []);
+
+  const persistLastReadMessageId = useCallback(
+    (messageId: string) => {
+      const storageKey = getLastReadStorageKey();
+      if (!storageKey) return;
+
+      lastReadMessageIdRef.current = messageId;
+
+      try {
+        localStorage.setItem(storageKey, messageId);
+      } catch (error) {
+        console.error('[ChatYjs] Failed to persist last read message id:', error);
+      }
+    },
+    [getLastReadStorageKey],
+  );
+
+  const getUnreadCountFromMessages = useCallback(
+    (chatMessages: ChatMessage[], lastReadMessageId: string | null) => {
+      if (lastReadMessageId === null) {
+        return 0;
+      }
+
+      if (lastReadMessageId === '') {
+        return chatMessages.filter((msg) => msg.sender !== currentUserId).length;
+      }
+
+      const lastReadIndex = chatMessages.findIndex((msg) => msg.id === lastReadMessageId);
+      if (lastReadIndex === -1) {
+        return 0;
+      }
+
+      return chatMessages.slice(lastReadIndex + 1).filter((msg) => msg.sender !== currentUserId).length;
+    },
+    [currentUserId],
+  );
+
+  const markAllAsRead = useCallback(
+    (chatMessages: ChatMessage[]) => {
+      persistLastReadMessageId(getLatestMessageId(chatMessages));
+      setUnreadCount(0);
+    },
+    [getLatestMessageId, persistLastReadMessageId],
+  );
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -46,42 +106,145 @@ export function ChatWidget({ participants }: ChatWidgetProps) {
 
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+        scrollToBottom();
+      }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, scrollToBottom]);
 
-  function addPartnerMessage(text: string) {
-    const msg: ChatMessage = {
-      id: `partner-${Date.now()}-${Math.random()}`,
-      sender: 'partner',
-      text,
-    };
-    setMessages((prev) => [...prev, msg]);
-    if (!isOpenRef.current) {
-      setUnreadCount((c) => c + 1);
+  useEffect(() => {
+    if (!isOpen || !hasCompletedInitialSyncRef.current) return;
+    markAllAsRead(messages);
+  }, [isOpen, markAllAsRead, messages]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initYjs(): Promise<void> {
+      try {
+        const { WebsocketProvider } = await import('y-websocket');
+
+        if (cancelled) return;
+
+        const COLLAB_SERVICE_URL =
+          process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL ??
+          `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`;
+
+        const yDocument = new Y.Doc();
+        yDocRef.current = yDocument;
+
+        const provider = new WebsocketProvider(
+          COLLAB_SERVICE_URL,
+          `${sessionId}-chat`,
+          yDocument,
+          { params: { ticket: ticket! } },
+        );
+        yProviderRef.current = provider;
+
+        provider.on('status', (event: { status: string }) => {
+          console.log(`[ChatYjs] WebSocket status: ${event.status}`);
+        });
+
+        const yMessages = yDocument.getArray<ChatMessage>('messages');
+        yArrayRef.current = yMessages;
+
+        const syncMessages = () => {
+          const newMessages = yMessages.toArray();
+          setMessages(newMessages);
+
+          if (!hasCompletedInitialSyncRef.current) {
+            return;
+          }
+
+          if (isOpenRef.current) {
+            markAllAsRead(newMessages);
+            return;
+          }
+
+          setUnreadCount(getUnreadCountFromMessages(newMessages, lastReadMessageIdRef.current));
+        };
+
+        provider.on('sync', (isSynced: boolean) => {
+          if (!isSynced || hasCompletedInitialSyncRef.current) return;
+
+          const syncedMessages = yMessages.toArray();
+          const storageKey = getLastReadStorageKey();
+          let storedLastReadMessageId: string | null = null;
+
+          if (storageKey) {
+            try {
+              storedLastReadMessageId = localStorage.getItem(storageKey);
+            } catch (error) {
+              console.error('[ChatYjs] Failed to read last read message id:', error);
+            }
+          }
+
+          hasCompletedInitialSyncRef.current = true;
+          setMessages(syncedMessages);
+
+          if (storedLastReadMessageId === null) {
+            markAllAsRead(syncedMessages);
+            return;
+          }
+
+          lastReadMessageIdRef.current = storedLastReadMessageId;
+
+          if (isOpenRef.current) {
+            markAllAsRead(syncedMessages);
+            return;
+          }
+
+          setUnreadCount(getUnreadCountFromMessages(syncedMessages, storedLastReadMessageId));
+        });
+
+        yMessages.observe(syncMessages);
+        syncMessages();
+        yMessagesRef.current = { yMessages, syncMessages };
+      } catch (error) {
+        console.error('[ChatYjs] Error during initialisation:', error);
+      }
     }
-  }
+
+    initYjs();
+
+    return () => {
+      cancelled = true;
+      if (yMessagesRef.current) {
+        const { yMessages, syncMessages } = yMessagesRef.current;
+        yMessages.unobserve(syncMessages);
+      }
+      yProviderRef.current?.destroy();
+      yDocRef.current?.destroy();
+      yProviderRef.current = null;
+      yDocRef.current = null;
+      hasCompletedInitialSyncRef.current = false;
+      lastReadMessageIdRef.current = null;
+    };
+  }, [
+    currentUserId,
+    getLastReadStorageKey,
+    getUnreadCountFromMessages,
+    markAllAsRead,
+    sessionId,
+    ticket,
+  ]);
 
   function handleSend() {
     const text = inputValue.trim();
-    if (!text) return;
-
+    if (!text || !yArrayRef.current || !currentUserId) return;
     const msg: ChatMessage = {
-      id: `me-${Date.now()}-${Math.random()}`,
-      sender: 'me',
+      id: crypto.randomUUID(),
+      sender: currentUserId,
       text,
+      timestamp: Date.now(),
     };
-    setMessages((prev) => [...prev, msg]);
+    yArrayRef.current.push([msg]);
     setInputValue('');
-
     if (inputRef.current) {
       inputRef.current.style.height = '20px';
     }
-
-    const replyText = SIMULATED_REPLIES[replyIndexRef.current % SIMULATED_REPLIES.length];
-    replyIndexRef.current += 1;
-    setTimeout(() => addPartnerMessage(replyText), 1200 + Math.random() * 800);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -111,7 +274,13 @@ export function ChatWidget({ participants }: ChatWidgetProps) {
               <div className="flex items-center gap-2">
                 <MessageCircleIcon className="h-4 w-4 text-accent" />
                 <span className="text-[13px] font-semibold text-foreground">
-                  Session Chat
+                  {otherParticipantName ? (
+                    <>
+                      Chat with <span className="text-accent">{otherParticipantName}</span>
+                    </>
+                  ) : (
+                    'Chat'
+                  )}
                 </span>
               </div>
               <motion.button
@@ -135,30 +304,33 @@ export function ChatWidget({ participants }: ChatWidgetProps) {
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {messages.map((msg) => (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                      className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] px-3 py-2 text-[12.5px] leading-relaxed ${
-                          msg.sender === 'me'
-                            ? 'rounded-2xl rounded-br-sm bg-accent-soft text-foreground'
-                            : 'rounded-2xl rounded-bl-sm border border-border/60 bg-card text-foreground'
-                        }`}
+                  {messages.map((msg) => {
+                    const isMe = msg.sender === currentUserId;
+                    return (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                        className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                       >
-                        {msg.text.split('\n').map((line, i) => (
-                          <span key={i}>
-                            {i > 0 && <br />}
-                            {line}
-                          </span>
-                        ))}
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div
+                          className={`max-w-[80%] px-3 py-2 text-[12.5px] leading-relaxed ${
+                            isMe
+                              ? 'rounded-2xl rounded-br-sm bg-accent-soft text-foreground'
+                              : 'rounded-2xl rounded-bl-sm border border-border/60 bg-card text-foreground'
+                          }`}
+                        >
+                          {msg.text.split('\n').map((line, i) => (
+                            <span key={i}>
+                              {i > 0 && <br />}
+                              {line}
+                            </span>
+                          ))}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               )}
@@ -207,7 +379,6 @@ export function ChatWidget({ participants }: ChatWidgetProps) {
             type="button"
             data-nextstep="chat-widget"
             onClick={() => {
-              setUnreadCount(0);
               setIsOpen(true);
             }}
             initial={{ opacity: 0, scale: 0.6 }}
