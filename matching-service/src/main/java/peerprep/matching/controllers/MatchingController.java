@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import peerprep.matching.models.MatchRequest;
 import peerprep.matching.service.InvalidMatchPreferenceException;
+import peerprep.matching.service.MatchRequestConflictException;
 import peerprep.matching.service.MatchService;
 import peerprep.matching.documents.UserStateDoc;
 
@@ -37,6 +38,11 @@ public class MatchingController {
             requestId = matchService.addUser(req);
         } catch (InvalidMatchPreferenceException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        } catch (MatchRequestConflictException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(),
+                    "reason", e.getReason()
+            ));
         }
 
         return ResponseEntity.status(201).body(Map.of(
