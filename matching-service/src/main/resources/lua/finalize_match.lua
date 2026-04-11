@@ -1,0 +1,10 @@
+redis.call('HSET', 'userState:' .. KEYS[1], 'state', 'MATCHED')
+redis.call('HSET', 'userState:' .. KEYS[2], 'state', 'MATCHED')
+redis.call('SREM', 'pendingFinalizations', KEYS[1] .. ':' .. KEYS[2])
+redis.call('SREM', 'matchFoundUsers', KEYS[1])
+redis.call('SREM', 'matchFoundUsers', KEYS[2])
+redis.call('DEL', 'matchFoundAt:' .. KEYS[1])
+redis.call('DEL', 'matchFoundAt:' .. KEYS[2])
+redis.call('DEL', 'userMatch:' .. KEYS[1])
+redis.call('DEL', 'userMatch:' .. KEYS[2])
+return 1
