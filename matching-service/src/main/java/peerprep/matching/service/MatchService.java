@@ -5,23 +5,19 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import peerprep.matching.client.CollaborationServiceClient;
 import peerprep.matching.client.QuestionServiceClient;
-import peerprep.matching.documents.MatchDoc;
-import peerprep.matching.documents.UserStateDoc;
-import peerprep.matching.documents.WaitingQueueDoc;
-import peerprep.matching.models.MatchNotificationRequest;
+import peerprep.matching.infrastructure.mongo.document.MatchDoc;
+import peerprep.matching.infrastructure.mongo.repository.MatchRepository;
+import peerprep.matching.infrastructure.redis.RedisMatchRepository;
+import peerprep.matching.infrastructure.redis.RedisQueueRepository;
+import peerprep.matching.infrastructure.redis.RedisUserRepository;
 import peerprep.matching.models.MatchNotificationRequestDto;
 import peerprep.matching.models.MatchRequest;
 import peerprep.matching.models.Participant;
 import peerprep.matching.models.UserState;
-import peerprep.matching.repositories.MatchRepository;
-import peerprep.matching.repositories.UserStateRepository;
-import peerprep.matching.repositories.WaitingQueueRepository;
 
 @Service
 public class MatchService {
@@ -30,39 +26,40 @@ public class MatchService {
 
     private final Logger logger = LoggerFactory.getLogger(MatchService.class);
 
-    private final WaitingQueueRepository waitingQueueRepository;
-    private final UserStateRepository userStateRepository;
+    private final RedisUserRepository redisUserRepository;
+    private final RedisQueueRepository redisQueueRepository;
+    private final RedisMatchRepository redisMatchRepository;
     private final MatchRepository matchRepository;
-    private final TransactionTemplate transactionTemplate;
     private final QuestionServiceClient questionServiceClient;
     private final CollaborationServiceClient collaborationServiceClient;
 
     @Autowired
     public MatchService(
-            WaitingQueueRepository waitingQueueRepository,
-            UserStateRepository userStateRepository,
+            RedisUserRepository redisUserRepository,
+            RedisQueueRepository redisQueueRepository,
+            RedisMatchRepository redisMatchRepository,
             MatchRepository matchRepository,
-            MongoTransactionManager transactionManager,
             QuestionServiceClient questionServiceClient,
             CollaborationServiceClient collaborationServiceClient) {
-        this.waitingQueueRepository = waitingQueueRepository;
-        this.userStateRepository = userStateRepository;
+        this.redisUserRepository = redisUserRepository;
+        this.redisQueueRepository = redisQueueRepository;
+        this.redisMatchRepository = redisMatchRepository;
         this.matchRepository = matchRepository;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.questionServiceClient = questionServiceClient;
         this.collaborationServiceClient = collaborationServiceClient;
     }
 
     /**
-     * Adds user to the waiting pool under the selected category
-     * and attempt to match users within the selected category.
-     * Notify collaboration-service of the created matches, and roll back if notification fails.
-     * Fully transactional to prevent race conditions with cancelMatch.
-     * If user is already in the waiting pool or matched, an exception is thrown.
+     * Adds user to the matching queue for the specified category.
+     * 
+     * The user is marked as {@code PENDING} and added to both the matching 
+     * queue and the timeout management structure. The scope of the match is 
+     * also marked as dirty to trigger matching attempts.
      *
      * @param req A MatchRequest object containing user id and category.
      * @return The request ID of the match request of user.
-     * @throws RuntimeException If user is already in waiting pool or in an active match.
+     * @throws InvalidMatchPreferenceException If there are no questions for the specified category.
+     * @throws MatchRequestConflictException If user is already in waiting pool or in an active match.
      */
     public String addUser(MatchRequest req) {
         if (!questionServiceClient.hasQuestionsByTopicAndDifficulty(req.getTopic(), req.getDifficulty())) {
@@ -70,57 +67,43 @@ public class MatchService {
                     "No questions are available for the selected topic and difficulty.");
         }
 
-        MatchRequestConflictException existingConflict =
-                getConflictExceptionForUserState(userStateRepository.findByUserId(req.getUserId()));
-        if (existingConflict != null) {
-            throw existingConflict;
-        }
+        String userId = req.getUserId();
+        String existingState = redisUserRepository.getUserState(userId);
 
-        List<MatchNotificationRequest> createdMatches = transactionTemplate.execute(status -> {
-            String userId = req.getUserId();
-            String requestId = UUID.randomUUID().toString();
-            req.setRequestId(requestId);
-            String userName = req.getUserName();
-            String category = req.getCategory();
-
-            boolean success = userStateRepository.upsertIfNotActive(
-                    userId, requestId, userName, category);
-            if (!success) {
-                throw new MatchRequestConflictException(
-                        "MATCH_REQUEST_CONFLICT",
-                        "Unable to start a new match request right now.");
+        if (existingState != null) {
+            MatchRequestConflictException conflict = getConflictExceptionForState(existingState);
+            if (conflict != null) {
+                throw conflict;
             }
-
-            waitingQueueRepository.createIfNotExists(category);
-            waitingQueueRepository.enqueueUser(category, userId);
-
-            return tryMatchTransactional(category);
-        });
-
-        if (createdMatches != null) {
-            notifyCollaborationService(createdMatches);
         }
 
-        return transactionTemplate.execute(status -> {
-            return req.getRequestId();
-        });
+        String requestId = UUID.randomUUID().toString();
+        String topic = req.getTopic();
+        String language = req.getLanguage();
+        String difficulty = req.getDifficulty();
+        String userName = req.getUserName();
+
+        redisUserRepository.saveUserState(userId, requestId, userName, topic, language, difficulty);
+
+        redisQueueRepository.addUserToQueue(topic, language, difficulty, userId);
+
+        long expiryTime = System.currentTimeMillis() + TWO_MIN_IN_MS;
+        redisQueueRepository.addUserToTimeoutQueue(userId, expiryTime);
+
+        redisQueueRepository.addToDirtyScopes(topic, language);
+
+        return requestId;
     }
 
-    private MatchRequestConflictException getConflictExceptionForUserState(UserStateDoc stateDoc) {
-        if (stateDoc == null) {
-            return null;
-        }
-
-        String existingState = stateDoc.getState();
-
-        if (UserState.PENDING.name().equals(existingState)) {
+    private MatchRequestConflictException getConflictExceptionForState(String state) {
+        if (UserState.PENDING.name().equals(state)) {
             return new MatchRequestConflictException(
                     "ALREADY_IN_QUEUE",
                     "You are already in the matching queue.");
         }
 
-        if (UserState.MATCH_FOUND.name().equals(existingState)
-                || UserState.MATCHED.name().equals(existingState)) {
+        if (UserState.MATCH_FOUND.name().equals(state)
+                || UserState.MATCHED.name().equals(state)) {
             return new MatchRequestConflictException(
                     "ALREADY_IN_SESSION",
                     "You are already in a session.");
@@ -130,248 +113,331 @@ public class MatchService {
     }
 
     /**
-     * Try to match users in a category inside a transaction. 
-     * If match is found, assign a question and save the match document. 
+     * Try to create a match between two users. 
      * 
-     * @param category The category to match users in.
-     * @return List of created match info for notification to collaboration-service.
+     * Get a question for the match from question service, notify 
+     * collaboration service about the new match, and save the match details. 
+     * If any of these steps fail, rollback the match and put users back to 
+     * the queue. Both users are marked as matched only after all steps are 
+     * successful.
+     * 
+     * @param user1 The first user to match.
+     * @param user2 The second user to match.
+     * @param difficulty The difficulty level of the match.
+     * @param topic The topic of the match.
+     * @param language The programming language of the match.
+     * @param matchId The ID of the match.
      */
-    private List<MatchNotificationRequest> tryMatchTransactional(String category) {
-        List<MatchNotificationRequest> createdMatches = new ArrayList<>();
+    public void createMatchFromPair(String user1, String user2, String difficulty,
+                                     String topic, String language, String matchId) {
+        String questionSlug = questionServiceClient.getQuestionByTopicAndDifficulty(topic, difficulty);
+        if (questionSlug == null || questionSlug.isBlank()) {
+            throw new IllegalStateException("Unable to assign a question for category " + topic + "|" + difficulty + "|" + language);
+        }
 
-        while (true) {
-            String userId1 = waitingQueueRepository.dequeueUserAndReturn(category);
-            String userId2 = waitingQueueRepository.dequeueUserAndReturn(category);
+        MatchDoc matchDoc = new MatchDoc(matchId, user1, user2);
+        matchDoc.setQuestionSlug(questionSlug);
 
-            if (userId1 == null) break;
-            if (userId2 == null) {
-                waitingQueueRepository.enqueueFront(category, userId1);
-                break;
+        boolean mongoSaved = saveMatchWithRetry(matchDoc);
+        if (!mongoSaved) {
+            rollbackMatch(user1, user2, topic, language, difficulty, matchId);
+            return;
+        }
+
+        boolean collabNotified = notifyCollaborationServiceWithRetry(matchId, user1, user2, questionSlug, language);
+        if (!collabNotified) {
+            rollbackMatch(user1, user2, topic, language, difficulty, matchId);
+            return;
+        }
+
+        redisUserRepository.setCollabNotified(matchId, true);
+        redisUserRepository.setUserMatchId(user1, matchId);
+        redisUserRepository.setUserMatchId(user2, matchId);
+
+        try {
+            redisMatchRepository.finalizeMatch(user1, user2);
+        } catch (Exception e) {
+            logger.warn("Failed to finalize match {} via Lua, scheduling background retry: {}", matchId, e.getMessage());
+            redisMatchRepository.addToPendingFinalization(user1, user2);
+        }
+    }
+
+    private boolean saveMatchWithRetry(MatchDoc matchDoc) {
+        for (int i = 0; i < 50; i++) {
+            try {
+                matchRepository.save(matchDoc);
+                return true;
+            } catch (Exception e) {
+                logger.warn("Failed to save match doc, retry {}/50: {}", i + 1, e.getMessage());
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
             }
+        }
+        logger.error("Failed to save match doc after 50 retries");
+        return false;
+    }
 
-            UserStateDoc stateDoc1 = userStateRepository.findByUserId(userId1);
-            UserStateDoc stateDoc2 = userStateRepository.findByUserId(userId2);
+    private boolean notifyCollaborationServiceWithRetry(String matchId, String user1, String user2,
+                                                        String questionSlug, String language) {
 
-            boolean valid1 = stateDoc1 != null && stateDoc1.getState().equals(UserState.PENDING.name());
-            boolean valid2 = stateDoc2 != null && stateDoc2.getState().equals(UserState.PENDING.name());
+        String userName1 = redisUserRepository.getUserName(user1);
+        String userName2 = redisUserRepository.getUserName(user2);
+        List<Participant> participants = List.of(
+                new Participant(user1, userName1),
+                new Participant(user2, userName2)
+        );
 
-            if (!valid1 || !valid2) {
-                if (valid1) waitingQueueRepository.enqueueFront(category, userId1);
-                if (valid2) waitingQueueRepository.enqueueFront(category, userId2);
+        MatchNotificationRequestDto dto = new MatchNotificationRequestDto();
+        dto.setSessionId(matchId);
+        dto.setQuestionId(questionSlug);
+        dto.setSelectedLanguage(language);
+        dto.setParticipants(participants);
+
+        for (int i = 0; i < 50; i++) {
+            try {
+                collaborationServiceClient.notifyMatchCreated(dto);
+                return true;
+            } catch (Exception e) {
+                logger.warn("Failed to notify collab service for match {}, retry {}/50: {}", matchId, i + 1, e.getMessage());
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        logger.error("Failed to notify collab service after 50 retries for match {}", matchId);
+        return false;
+    }
+
+    private void rollbackMatch(String user1, String user2, String topic, String language,
+                              String difficulty, String matchId) {
+        try {
+            MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+            if (matchDoc != null) {
+                matchRepository.delete(matchDoc);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
+        }
+
+        redisUserRepository.setUserState(user1, UserState.PENDING.name());
+        redisUserRepository.setUserState(user2, UserState.PENDING.name());
+
+        Long joinTime1 = redisUserRepository.getJoinTime(user1);
+        if (joinTime1 == null) {
+            joinTime1 = System.currentTimeMillis();
+        }
+        Long joinTime2 = redisUserRepository.getJoinTime(user2);
+        if (joinTime2 == null) {
+            joinTime2 = System.currentTimeMillis();
+        }
+
+        redisQueueRepository.requeueUser(user1, topic, language, difficulty, joinTime1);
+        redisQueueRepository.requeueUser(user2, topic, language, difficulty, joinTime2);
+    }
+
+    /**
+     * Rollback a match by matchId. This is used when finalizing a match 
+     * fails. 
+     * 
+     * Mark the involved users as @code {PENDING}, put users back to the 
+     * queue, and delete the match doc.
+     * 
+     * @param matchId The ID of the match.
+     */
+    public void rollbackMatchByMatchId(String matchId) {
+        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+        if (matchDoc == null) {
+            logger.warn("No match doc found for matchId {} during rollback", matchId);
+            return;
+        }
+
+        String user1 = matchDoc.getUser1();
+        String user2 = matchDoc.getUser2();
+
+        redisUserRepository.setUserState(user1, UserState.PENDING.name());
+        redisUserRepository.setUserState(user2, UserState.PENDING.name());
+
+        String category = redisUserRepository.getUserCategory(user1);
+        if (category == null) {
+            category = redisUserRepository.getUserCategory(user2);
+        }
+
+        if (category != null) {
+            String[] parts = category.split("\\|");
+            if (parts.length == 3) {
+                String topic = parts[0];
+                String language = parts[2];
+                String difficulty = parts[1];
+
+                try {
+                    matchRepository.delete(matchDoc);
+                } catch (Exception e) {
+                    logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
+                }
+
+                Long joinTime1 = redisUserRepository.getJoinTime(user1);
+                if (joinTime1 == null) {
+                    joinTime1 = System.currentTimeMillis();
+                }
+                Long joinTime2 = redisUserRepository.getJoinTime(user2);
+                if (joinTime2 == null) {
+                    joinTime2 = System.currentTimeMillis();
+                }
+
+                redisQueueRepository.requeueUser(user1, topic, language, difficulty, joinTime1);
+                redisQueueRepository.requeueUser(user2, topic, language, difficulty, joinTime2);
+                return;
+            }
+        }
+
+        try {
+            matchRepository.delete(matchDoc);
+        } catch (Exception e) {
+            logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Cancel a match request.
+     * 
+     * The user is removed from the matching queue and timeout management 
+     * structure, and user information is deleted.
+     * 
+     * @param requestId Request ID of the match request of user.
+     * @return true if user removed successfully, false if user was not found or user state is not @code {PENDING}.
+     */
+    public boolean cancelMatch(String requestId) {
+        String userId = redisUserRepository.getUserIdForRequest(requestId);
+        if (userId == null) {
+            return false;
+        }
+
+        String state = redisUserRepository.getUserState(userId);
+        if (state == null || !state.equals(UserState.PENDING.name())) {
+            return false;
+        }
+
+        String category = redisUserRepository.getUserCategory(userId);
+        if (category != null) {
+            String[] parts = category.split("\\|");
+            if (parts.length == 3) {
+                redisQueueRepository.removeUserFromAllQueues(parts[0], parts[2], parts[1], userId);
+            }
+        }
+
+        redisUserRepository.removeUserState(userId);
+        return true;
+    }
+
+    /**
+     * Ends an active match session.
+     *  
+     * The match is marked as ended and involved users are removed from the 
+     * system. 
+     *
+     * @param matchId Match ID of the match session.
+     * @return true if session ended successfully, false otherwise.
+     */
+    public boolean endSession(String matchId) {
+        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+        if (matchDoc == null || !matchDoc.getStatus().equals("active")) {
+            return false;
+        }
+
+        matchDoc.setStatus("ended");
+        matchDoc.setEndedAt(new Date());
+        matchRepository.save(matchDoc);
+
+        redisUserRepository.removeUserState(matchDoc.getUser1());
+        redisUserRepository.removeUserState(matchDoc.getUser2());
+
+        return true;
+    }
+
+    /**
+     * Ends matching attempt for users that have been waiting for more than 
+     * two minutes.
+     * 
+     * Remove users from the matching queue and timeout management structure, 
+     * and mark them as timed out. This is triggered by a scheduled task that 
+     * runs every 5 seconds.
+     */
+    public void removeTimeoutUsers() {
+        Set<String> expiredUserIds = redisQueueRepository.getExpiredTimeoutUsers();
+
+        for (String userId : expiredUserIds) {
+            redisQueueRepository.removeFromTimeoutQueue(userId);
+
+            String state = redisUserRepository.getUserState(userId);
+            if (!UserState.PENDING.name().equals(state)) {
                 continue;
             }
 
-            stateDoc1.setState(UserState.MATCH_FOUND.name());
-            stateDoc2.setState(UserState.MATCH_FOUND.name());
-            userStateRepository.save(stateDoc1);
-            userStateRepository.save(stateDoc2);
-
-            String matchId = UUID.randomUUID().toString();
-            MatchDoc matchDoc = new MatchDoc(matchId, userId1, userId2);
-            
-            String[] categoryParts = category.split("\\|");
-            String topic = categoryParts[0];
-            String difficulty = categoryParts[1];
-            String language = categoryParts[2];
-            String questionSlug = questionServiceClient.getQuestionByTopicAndDifficulty(topic, difficulty);
-            if (questionSlug == null || questionSlug.isBlank()) {
-                throw new IllegalStateException("Unable to assign a question for category " + category);
+            String category = redisUserRepository.getUserCategory(userId);
+            if (category == null) {
+                continue;
             }
-            matchDoc.setQuestionSlug(questionSlug);
-            
-            matchRepository.save(matchDoc);
 
-            createdMatches.add(new MatchNotificationRequest(matchId, userId1, userId2, questionSlug, language, category));
-        }
-
-        return createdMatches;
-    }
-
-    private void notifyCollaborationService(List<MatchNotificationRequest> createdMatches) {
-        for (MatchNotificationRequest request : createdMatches) {
-            try {
-                MatchNotificationRequestDto dto = toDto(request);
-                collaborationServiceClient.notifyMatchCreated(dto);
-                userStateRepository.updateState(request.getUserId1(), UserState.MATCHED);
-                userStateRepository.updateState(request.getUserId2(), UserState.MATCHED);
-            } catch (Exception e) {
-                logger.error("Failed to notify collaboration-service for match {}: {}",
-                        request.getMatchId(), e.getMessage());
-                rollbackMatch(request);
+            String[] parts = category.split("\\|");
+            if (parts.length != 3) {
+                continue;
             }
+
+            String topic = parts[0];
+            String language = parts[2];
+            String difficulty = parts[1];
+
+            redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
+            redisUserRepository.setUserState(userId, UserState.TIMED_OUT.name());
         }
     }
 
-    private void rollbackMatch(MatchNotificationRequest request) {
-        transactionTemplate.execute(status -> {
-            try {
-                MatchDoc matchDoc = matchRepository.findByMatchId(request.getMatchId());
-                if (matchDoc != null) {
-                    matchRepository.delete(matchDoc);
-                }
+    public MatchDoc getMatchDocByMatchId(String matchId) {
+        return matchRepository.findByMatchId(matchId);
+    }
 
-                UserStateDoc stateDoc1 = userStateRepository.findByUserId(request.getUserId1());
-                UserStateDoc stateDoc2 = userStateRepository.findByUserId(request.getUserId2());
-
-                if (stateDoc1 != null) {
-                    stateDoc1.setState(UserState.PENDING.name());
-                    userStateRepository.save(stateDoc1);
-                    waitingQueueRepository.createIfNotExists(request.getCategory());
-                    waitingQueueRepository.enqueueUser(request.getCategory(), request.getUserId1());
-                }
-
-                if (stateDoc2 != null) {
-                    stateDoc2.setState(UserState.PENDING.name());
-                    userStateRepository.save(stateDoc2);
-                    waitingQueueRepository.createIfNotExists(request.getCategory());
-                    waitingQueueRepository.enqueueUser(request.getCategory(), request.getUserId2());
-                }
-
-                logger.info("Rolled back match {} and re-queued users {} and {}",
-                        request.getMatchId(), request.getUserId1(), request.getUserId2());
-            } catch (Exception e) {
-                logger.error("Failed to rollback match {}: {}", request.getMatchId(), e.getMessage());
-                status.setRollbackOnly();
-            }
-
+    public Map<String, String> getUserStateMapByRequestId(String requestId) {
+        String userId = redisUserRepository.getUserIdForRequest(requestId);
+        if (userId == null) {
             return null;
-        });
+        }
+        return redisUserRepository.getUserStateMap(userId);
     }
 
     /**
-     * Cancel a match request safely within a transaction.
-     * 
-     * @param requestId Request ID of the match request of user.
-     * @return true if user removed successfully, false if user was not found.
-     */
-    public boolean cancelMatch(String requestId) {
-        return transactionTemplate.execute(status -> {
-            UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
-            if (stateDoc == null) return false;
-
-            String userId = stateDoc.getUserId();
-
-            if (!stateDoc.getState().equals(UserState.PENDING.name())) {
-                return false;
-            }
-
-            String category = stateDoc.getCategory();
-            waitingQueueRepository.removeUser(category, userId);
-            userStateRepository.deleteByUserId(userId);
-            return true;
-        });
-    }
-
-    /**
-     * Returns the state of the user (idle / pending / matched / timed out).
+     * Returns the state of the user (idle / pending / match found / matched / timed out).
+     * If user is marked as @code {MATCHED}, also returns the match ID, 
+     * partner's user ID and name, and question slug.
      *
      * @param requestId Request ID of the match request of user.
      * @return Current state of the user.
      */
-    public String getStatus(String requestId) {
-        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
-        if (stateDoc == null) return null;
-        System.out.println(stateDoc.getState());
-        return stateDoc.getState().toLowerCase();
-    }
-
-    /**
-     * Ends the active match session of the user and the matched peer, 
-     * and removes them from the system. 
-     * If user is not in an active match, returns false.
-     *
-     * @param requestId Request ID of the match request of user.
-     * @return true if session ended successfully, false otherwise.
-     */
-    public boolean endSession(String matchId) {
-        return transactionTemplate.execute(status -> {
-            MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
-            if (matchDoc == null || !matchDoc.getStatus().equals("active")) return false;
-
-            matchDoc.setStatus("ended");
-            matchDoc.setEndedAt(new Date());
-            matchRepository.save(matchDoc);
-
-            userStateRepository.deleteByUserId(matchDoc.getUser1());
-            userStateRepository.deleteByUserId(matchDoc.getUser2());
-
-            return true;
-        });
-    }
-
-    /**
-     * Removes all users that have been in the waiting pool for more than two minutes.
-     * Fully transactional to avoid race conditions with matching or cancelling.
-     */
-    public void removeTimeoutUsers() {
-        List<WaitingQueueDoc> queues = waitingQueueRepository.findAll();
-        long now = System.currentTimeMillis();
-
-        for (WaitingQueueDoc queueDoc : queues) {
-            String category = queueDoc.getCategory();
-
-            transactionTemplate.execute(status -> {
-                List<String> userIds = new ArrayList<>(queueDoc.getUserIds());
-
-                for (String userId : userIds) {
-                    UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
-                    if (stateDoc == null) continue;
-                    if (!stateDoc.getState().equals(UserState.PENDING.name())) continue;
-
-                    long joinedAt = stateDoc.getCreatedAt().getTime();
-                    if ((now - joinedAt) < TWO_MIN_IN_MS) continue;
-
-                    waitingQueueRepository.removeUser(category, userId);
-                    stateDoc.setState(UserState.TIMED_OUT.name());
-                    userStateRepository.save(stateDoc);
-                }
-
-                return null;
-            });
+    public Map<String, Object> getStatus(String requestId) {
+        String userId = redisUserRepository.getUserIdForRequest(requestId);
+        if (userId == null) {
+            return null;
         }
-    }
 
-    /**
-     * Finds and returns the match document using the match ID
-     *
-     * @param matchId Match ID of the match.
-     * @return The match document corresponding to the match ID, or null if not found.
-     */
-    public MatchDoc getMatchDocByMatchId(String matchId) {
-        return matchRepository.findByMatchId(matchId);
-    }    
-
-    /**
-     * Finds and returns the user using the request ID
-     *
-     * @param requestId Request ID of the match request of user.
-     * @return The User object corresponding to the request ID, or null if not found.
-     */
-    public UserStateDoc getStateDocByRequestId(String requestId) {
-        return userStateRepository.findByRequestId(requestId);
-    }
-
-    /**
-     * Gets the status and matchId (if matched) for a user by request ID.
-     *
-     * @param requestId Request ID of the match request of user.
-     * @return A map containing status and optionally matchId.
-     */
-    public Map<String, Object> getStatusWithMatchId(String requestId) {
-        UserStateDoc stateDoc = userStateRepository.findByRequestId(requestId);
-        if (stateDoc == null) return null;
-
-        String status = stateDoc.getState().toLowerCase();
-        String userId = stateDoc.getUserId();
+        String state = redisUserRepository.getUserState(userId);
+        if (state == null) {
+            return null;
+        }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("status", status);
+        result.put("status", state.toLowerCase());
 
-        if (status.equals("matched")) {
-            MatchDoc matchDoc = matchRepository.findActiveMatch(stateDoc.getUserId());
+        if (UserState.MATCHED.name().equals(state)) {
+            MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
             if (matchDoc != null) {
                 result.put("matchId", matchDoc.getMatchId());
-                
+
                 String peerUserId;
                 if (matchDoc.getUser1().equals(userId)) {
                     peerUserId = matchDoc.getUser2();
@@ -379,37 +445,15 @@ public class MatchService {
                     peerUserId = matchDoc.getUser1();
                 }
                 result.put("partnerId", peerUserId);
-                
-                String peerUserName = userStateRepository.findByUserId(peerUserId).getUserName();
-                result.put("partnerName", peerUserName);
-                
+
+                Map<String, String> peerState = redisUserRepository.getUserStateMap(peerUserId);
+                String peerUserName = peerState != null ? peerState.get("userName") : null;
+                result.put("partnerName", peerUserName != null && !peerUserName.isBlank() ? peerUserName : peerUserId);
+
                 result.put("questionSlug", matchDoc.getQuestionSlug());
             }
         }
 
         return result;
-    }
-
-    private MatchNotificationRequestDto toDto(MatchNotificationRequest request) {
-        List<Participant> participants = List.of(
-            toParticipant(request.getUserId1()),
-            toParticipant(request.getUserId2())
-        );
-
-        MatchNotificationRequestDto dto = new MatchNotificationRequestDto();
-        dto.setSessionId(request.getMatchId());
-        dto.setQuestionId(request.getQuestionSlug());
-        dto.setSelectedLanguage(request.getLanguage());
-        dto.setParticipants(participants);
-
-        return dto;
-    }
-
-    private Participant toParticipant(String userId) {
-        Participant participant = new Participant(userId);
-        UserStateDoc stateDoc = userStateRepository.findByUserId(userId);
-        String userName = stateDoc != null ? stateDoc.getUserName() : null;
-        participant.setUsername(userName != null && !userName.isBlank() ? userName : userId);
-        return participant;
     }
 }
