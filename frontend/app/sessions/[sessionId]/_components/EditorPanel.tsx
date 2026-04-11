@@ -13,6 +13,8 @@ import * as Y from "yjs";
 
 type MonacoInstance = typeof import("monaco-editor");
 
+type WebsocketProvider = import("y-websocket").WebsocketProvider;
+
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
@@ -24,12 +26,13 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 interface EditorPanelProps {
   sessionId: string;
-  ticket: string | null; // short-lived JWT from BFF — passed as WS query param
   selectedLanguage: SessionLanguage;
   value: string;
   onChange: (value: string) => void;
   onExplainCode: (selectedCode: string) => void;
   walkthroughShowExplainDemo?: boolean;
+  yDocument: Y.Doc | null;
+  provider: WebsocketProvider | null;
 }
 
 interface WidgetPosition {
@@ -67,12 +70,13 @@ function handleEditorWillMount(monaco: typeof import("monaco-editor")) {
 
 export function EditorPanel({
   sessionId,
-  ticket,
   selectedLanguage,
   value,
   onChange,
   onExplainCode,
   walkthroughShowExplainDemo = false,
+  yDocument,
+  provider,
 }: EditorPanelProps) {
   const onExplainCodeRef = useRef(onExplainCode);
   useEffect(() => {
@@ -89,68 +93,43 @@ export function EditorPanel({
 
   const [isEditorReady, setEditorReady] = useState(false);
 
-  // refs to hold Yjs objects so we can destroy them on unmount
-  const yjsProviderRef = useRef<import("y-websocket").WebsocketProvider | null>(
-    null,
-  );
-  const yjsDocRef = useRef<Y.Doc | null>(null);
-
-  // initialise Yjs once the monaco editor is mounted AND the ticket is available
   useEffect(() => {
-    if (!isEditorReady || !ticket) return;
+    if (!isEditorReady || !provider || !yDocument || !editorRef.current) {
+      return;
+    }
 
     let cancelled = false;
+    let binding: { destroy?: () => void } | null = null;
 
-    async function initYjs(): Promise<void> {
+    async function initYjsBinding(): Promise<void> {
       try {
-        const { WebsocketProvider } = await import("y-websocket");
         const { MonacoBinding } = await import("y-monaco");
 
-        if (cancelled) return; // component unmounted before async import finished
+        if (cancelled || !editorRef.current) {
+          return;
+        }
 
-        const COLLAB_SERVICE_URL =
-          process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL ??
-          `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`;
+        const type = yDocument!.getText("monaco");
 
-        const yDocument = new Y.Doc();
-        yjsDocRef.current = yDocument;
-
-        const provider = new WebsocketProvider(
-          COLLAB_SERVICE_URL,
-          sessionId, // used as the Yjs room name — matches sessionId on the server
-          yDocument,
-          { params: { ticket: ticket! } }, // ticket appended as ?ticket=<value> on the WS URL
-        );
-        yjsProviderRef.current = provider;
-
-        provider.on("status", (event: { status: string }) => {
-          console.log(`[Yjs] WebSocket status: ${event.status}`);
-        });
-
-        const type = yDocument.getText("monaco");
-
-        new MonacoBinding(
+        binding = new MonacoBinding(
           type,
-          editorRef.current!.getModel()!,
-          new Set([editorRef.current!]),
-          provider.awareness,
+          editorRef.current.getModel()!,
+          new Set([editorRef.current]),
+          provider!.awareness,
         );
       } catch (error) {
-        console.error("[Yjs] Error during initialisation:", error);
+        console.error("[Yjs] Error during editor binding:", error);
       }
     }
 
-    initYjs();
+    void initYjsBinding();
 
-    // cleanup: destroy provider and doc when component unmounts or ticket/sessionId changes
     return () => {
       cancelled = true;
-      yjsProviderRef.current?.destroy();
-      yjsDocRef.current?.destroy();
-      yjsProviderRef.current = null;
-      yjsDocRef.current = null;
+      binding?.destroy?.();
     };
-  }, [isEditorReady, ticket, sessionId]);
+  }, [isEditorReady, provider, yDocument]);
+
   const getSelectedText = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return "";
@@ -186,7 +165,6 @@ export function EditorPanel({
       return;
     }
 
-    // Position at the end of the selection
     const endPos = selection.getEndPosition();
     const coords = ed.getScrolledVisiblePosition(endPos);
     if (!coords) {
