@@ -1,4 +1,4 @@
-package peerprep.matching.controllers;
+package peerprep.matching.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -7,8 +7,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import peerprep.matching.infrastructure.mongo.document.MatchDoc;
 import peerprep.matching.service.MatchService;
-import peerprep.matching.documents.MatchDoc;
 
 @RestController
 @RequestMapping("/matches")
