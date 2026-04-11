@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import peerprep.matching.models.MatchRequest;
 import peerprep.matching.service.InvalidMatchPreferenceException;
+import peerprep.matching.service.MatchRequestConflictException;
 import peerprep.matching.service.MatchService;
 import peerprep.matching.documents.UserStateDoc;
 
@@ -30,8 +31,6 @@ public class MatchingController {
         String jwtUserId = userInfo[0];
         String jwtUserName = userInfo[1];
 
-        // TODO: jwtUserName not included in token yet. Consider modifying token generation, or remove if unneccessary.
-
         req.setUserId(jwtUserId);
         req.setUserName(jwtUserName);
         final String requestId;
@@ -39,6 +38,11 @@ public class MatchingController {
             requestId = matchService.addUser(req);
         } catch (InvalidMatchPreferenceException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        } catch (MatchRequestConflictException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(),
+                    "reason", e.getReason()
+            ));
         }
 
         return ResponseEntity.status(201).body(Map.of(

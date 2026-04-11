@@ -9,8 +9,9 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 
 export const assistantConfig = {
   gatewayApiKey: process.env.AI_GATEWAY_API_KEY ?? '',
-  explainModel: process.env.AI_EXPLAIN_MODEL ?? 'openai/gpt-5-mini',
-  hintsModel: process.env.AI_HINTS_MODEL ?? process.env.AI_EXPLAIN_MODEL ?? 'openai/gpt-5-mini',
+  explainModel: process.env.AI_EXPLAIN_MODEL ?? 'openai/gpt-5.4-mini',
+  hintsModel: process.env.AI_HINTS_MODEL ?? process.env.AI_EXPLAIN_MODEL ?? 'openai/gpt-5.4-mini',
+  translateModel: process.env.AI_TRANSLATE_MODEL ?? process.env.AI_EXPLAIN_MODEL ?? 'openai/gpt-5.4-mini',
   maxInputChars: parsePositiveInt(process.env.AI_MAX_INPUT_CHARS, 20000),
   maxSelectedChars: parsePositiveInt(process.env.AI_MAX_SELECTED_CHARS, 4000),
   maxHintMessages: parsePositiveInt(process.env.AI_MAX_HINT_MESSAGES, 12),

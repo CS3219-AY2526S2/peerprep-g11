@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { requireAdmin } from '../middleware/requireAdmin';
 
@@ -21,12 +22,16 @@ function makeToken(payload: object, secret = 'test_secret') {
   return jwt.sign(payload, secret, { expiresIn: '1h' });
 }
 
+function makeUserId() {
+  return new mongoose.Types.ObjectId().toString();
+}
+
 // ---------------------------------------------------------------------------
 // authenticate middleware
 // ---------------------------------------------------------------------------
 describe('authenticate middleware', () => {
-  it('calls next() and populates req.user when a valid Bearer token is provided', () => {
-    const payload = { id: 'abc123', email: 'user@example.com', role: 'user' };
+  it('calls next() and populates req.user when a valid Bearer token is provided', async () => {
+    const payload = { id: makeUserId(), email: 'user@example.com', role: 'user' };
     const token = makeToken(payload);
 
     const req = {
@@ -36,14 +41,14 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(req.user).toMatchObject(payload);
   });
 
-  it('calls next() when a valid token is provided via cookie', () => {
-    const payload = { id: 'abc123', email: 'user@example.com', role: 'user' };
+  it('calls next() when a valid token is provided via cookie', async () => {
+    const payload = { id: makeUserId(), email: 'user@example.com', role: 'user' };
     const token = makeToken(payload);
 
     const req = {
@@ -53,15 +58,23 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(req.user).toMatchObject(payload);
   });
 
-  it('prefers the Authorization header over the cookie', () => {
-    const headerPayload = { id: 'header-id', email: 'header@example.com', role: 'admin' };
-    const cookiePayload = { id: 'cookie-id', email: 'cookie@example.com', role: 'user' };
+  it('prefers the Authorization header over the cookie', async () => {
+    const headerPayload = {
+      id: makeUserId(),
+      email: 'header@example.com',
+      role: 'admin',
+    };
+    const cookiePayload = {
+      id: makeUserId(),
+      email: 'cookie@example.com',
+      role: 'user',
+    };
 
     const req = {
       headers: { authorization: `Bearer ${makeToken(headerPayload)}` },
@@ -70,25 +83,25 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    expect(req.user!.id).toBe('header-id');
+    expect(req.user!.id).toBe(headerPayload.id);
   });
 
-  it('returns 401 when no token is provided', () => {
+  it('returns 401 when no token is provided', async () => {
     const req = { headers: {}, cookies: {} } as unknown as AuthRequest;
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Unauthorized' }));
   });
 
-  it('returns 401 when the token is signed with the wrong secret', () => {
+  it('returns 401 when the token is signed with the wrong secret', async () => {
     const token = makeToken({ id: 'x', email: 'x@x.com', role: 'user' }, 'wrong_secret');
 
     const req = {
@@ -98,7 +111,7 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
@@ -107,7 +120,7 @@ describe('authenticate middleware', () => {
     );
   });
 
-  it('returns 401 when the token is expired', () => {
+  it('returns 401 when the token is expired', async () => {
     const token = jwt.sign(
       { id: 'x', email: 'x@x.com', role: 'user' },
       'test_secret',
@@ -121,13 +134,13 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
-  it('returns 401 when the token is malformed', () => {
+  it('returns 401 when the token is malformed', async () => {
     const req = {
       headers: { authorization: 'Bearer not.a.valid.jwt' },
       cookies: {},
@@ -135,7 +148,7 @@ describe('authenticate middleware', () => {
     const res = mockRes();
     const next = jest.fn() as NextFunction;
 
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);

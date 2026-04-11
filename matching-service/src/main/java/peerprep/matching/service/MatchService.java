@@ -70,6 +70,12 @@ public class MatchService {
                     "No questions are available for the selected topic and difficulty.");
         }
 
+        MatchRequestConflictException existingConflict =
+                getConflictExceptionForUserState(userStateRepository.findByUserId(req.getUserId()));
+        if (existingConflict != null) {
+            throw existingConflict;
+        }
+
         List<MatchNotificationRequest> createdMatches = transactionTemplate.execute(status -> {
             String userId = req.getUserId();
             String requestId = UUID.randomUUID().toString();
@@ -80,7 +86,9 @@ public class MatchService {
             boolean success = userStateRepository.upsertIfNotActive(
                     userId, requestId, userName, category);
             if (!success) {
-                throw new RuntimeException("User already in queue or matched");
+                throw new MatchRequestConflictException(
+                        "MATCH_REQUEST_CONFLICT",
+                        "Unable to start a new match request right now.");
             }
 
             waitingQueueRepository.createIfNotExists(category);
@@ -96,6 +104,29 @@ public class MatchService {
         return transactionTemplate.execute(status -> {
             return req.getRequestId();
         });
+    }
+
+    private MatchRequestConflictException getConflictExceptionForUserState(UserStateDoc stateDoc) {
+        if (stateDoc == null) {
+            return null;
+        }
+
+        String existingState = stateDoc.getState();
+
+        if (UserState.PENDING.name().equals(existingState)) {
+            return new MatchRequestConflictException(
+                    "ALREADY_IN_QUEUE",
+                    "You are already in the matching queue.");
+        }
+
+        if (UserState.MATCH_FOUND.name().equals(existingState)
+                || UserState.MATCHED.name().equals(existingState)) {
+            return new MatchRequestConflictException(
+                    "ALREADY_IN_SESSION",
+                    "You are already in a session.");
+        }
+
+        return null;
     }
 
     /**

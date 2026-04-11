@@ -11,6 +11,7 @@ import { EditorPanel } from "@/app/sessions/[sessionId]/_components/EditorPanel"
 import { SessionOnboardingTour } from "@/app/sessions/[sessionId]/_components/SessionOnboardingTour";
 import { AiSidebar } from "@/app/sessions/[sessionId]/_components/AiSidebar";
 import { AiSidebarToggle } from "@/app/sessions/[sessionId]/_components/AiSidebarToggle";
+import { ChatWidget } from "@/app/sessions/[sessionId]/_components/ChatWidget";
 import { SESSION_TOUR_STEP_INDEX } from "@/app/sessions/[sessionId]/_components/sessionTourSteps";
 import { useSessionAi } from "@/app/sessions/[sessionId]/useSessionAi";
 import type { Question } from "@/app/questions/types";
@@ -32,8 +33,6 @@ interface SessionWalkthroughState {
   isEditorExplainDemoActive: boolean;
   isAiSidebarForcedOpen: boolean;
   forcedAiTab: AiTab | null;
-  stepFiveVisitedTabs: AiTab[];
-  canAdvanceFromStepFive: boolean;
 }
 
 function createInitialWalkthroughState(): SessionWalkthroughState {
@@ -42,8 +41,6 @@ function createInitialWalkthroughState(): SessionWalkthroughState {
     isEditorExplainDemoActive: false,
     isAiSidebarForcedOpen: false,
     forcedAiTab: null,
-    stepFiveVisitedTabs: [],
-    canAdvanceFromStepFive: false,
   };
 }
 
@@ -61,12 +58,28 @@ function applyCurrentUserToSession(session: SessionDetails, username: string) {
   };
 }
 
+function markPeerAsDisconnected(session: SessionDetails) {
+  return {
+    ...session,
+    participants: session.participants.map((participant) =>
+      participant.isCurrentUser
+        ? participant
+        : {
+            ...participant,
+            presence: "disconnected",
+          },
+    ),
+  };
+}
+
 export default function SessionPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const currentUsernameRef = useRef("You");
+  const hasLoadedSessionSuccessfullyRef = useRef(false);
+  const isSessionStatusCheckInFlightRef = useRef(false);
 
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [collabTicket, setCollabTicket] = useState<string | null>(null);
@@ -74,20 +87,29 @@ export default function SessionPage() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] =
-    useState<SessionLanguage>("python");
+  const [peerLeft, setPeerLeft] = useState(false);
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [walkthroughState, setWalkthroughState] =
     useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
+  const handlePeerLeft = useCallback(() => {
+    setPeerLeft(true);
+    setLeaveError(null);
+    setSession((currentSession) =>
+      currentSession ? markPeerAsDisconnected(currentSession) : currentSession,
+    );
+  }, []);
+
   const loadSessionPage = useCallback(
     async (sessionId: string, currentUsername: string) => {
       setLoadingSession(true);
       setLoadingQuestion(true);
       setError(null);
+      setPeerLeft(false);
       setLeaveError(null);
+      hasLoadedSessionSuccessfullyRef.current = false;
 
       try {
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`);
@@ -110,9 +132,12 @@ export default function SessionPage() {
         if (rawSession.ticket) {
           setCollabTicket(rawSession.ticket);
         }
-        const sessionData = applyCurrentUserToSession(rawSession, currentUsername);
+        const sessionData = applyCurrentUserToSession(
+          rawSession,
+          currentUsername,
+        );
         setSession(sessionData);
-        setSelectedLanguage(sessionData.selectedLanguage);
+        hasLoadedSessionSuccessfullyRef.current = true;
         setCodeByLanguage({
           javascript: sessionData.starterCode.javascript,
           python: sessionData.starterCode.python,
@@ -139,6 +164,7 @@ export default function SessionPage() {
 
         setQuestion(questionBody as Question);
       } catch {
+        hasLoadedSessionSuccessfullyRef.current = false;
         setError("Unable to load this collaboration session right now");
         setSession(null);
         setQuestion(null);
@@ -184,23 +210,22 @@ export default function SessionPage() {
     setSession(null);
     setQuestion(null);
     setCodeByLanguage(EMPTY_DRAFTS);
-    setSelectedLanguage("python");
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
+    setPeerLeft(false);
     setLeaveError(null);
+    hasLoadedSessionSuccessfullyRef.current = false;
 
     void loadSessionPage(params.sessionId, user.username);
   }
 
-  function handleLanguageChange(language: SessionLanguage) {
-    setSelectedLanguage(language);
-  }
+  const sessionLanguage = session?.selectedLanguage ?? "python";
 
   function handleEditorChange(nextValue: string) {
     setCodeByLanguage((current) => ({
       ...current,
-      [selectedLanguage]: nextValue,
+      [sessionLanguage]: nextValue,
     }));
   }
 
@@ -209,6 +234,54 @@ export default function SessionPage() {
       router.push(response.redirectTo);
     });
   }
+
+  const checkSessionStillExists = useCallback(async () => {
+    if (
+      !params.sessionId ||
+      !hasLoadedSessionSuccessfullyRef.current ||
+      peerLeft ||
+      isSessionStatusCheckInFlightRef.current
+    ) {
+      return;
+    }
+
+    isSessionStatusCheckInFlightRef.current = true;
+
+    try {
+      const response = await fetch(`/api/sessions/${params.sessionId}`);
+
+      if (response.status === 404 && hasLoadedSessionSuccessfullyRef.current) {
+        handlePeerLeft();
+      }
+    } catch {
+      // Ignore transient polling failures and keep the current session view active.
+    } finally {
+      isSessionStatusCheckInFlightRef.current = false;
+    }
+  }, [handlePeerLeft, params.sessionId, peerLeft]);
+
+  useEffect(() => {
+    if (!session || !params.sessionId || peerLeft) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void checkSessionStillExists();
+    }, 3000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void checkSessionStillExists();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkSessionStillExists, params.sessionId, peerLeft, session]);
 
   const handleTourStepChange = useCallback((stepIndex: number | null) => {
     setWalkthroughState((current) => {
@@ -222,26 +295,18 @@ export default function SessionPage() {
           isEditorExplainDemoActive: true,
           isAiSidebarForcedOpen: false,
           forcedAiTab: null,
-          stepFiveVisitedTabs: [],
-          canAdvanceFromStepFive: false,
         };
       }
 
       if (stepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
-        const stayingOnSidebarStep =
-          current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
-
         return {
           activeStepIndex: stepIndex,
           isEditorExplainDemoActive: false,
           isAiSidebarForcedOpen: true,
-          forcedAiTab: stayingOnSidebarStep ? current.forcedAiTab : "hints",
-          stepFiveVisitedTabs: stayingOnSidebarStep
-            ? current.stepFiveVisitedTabs
-            : [],
-          canAdvanceFromStepFive: stayingOnSidebarStep
-            ? current.canAdvanceFromStepFive
-            : false,
+          forcedAiTab:
+            current.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR
+              ? current.forcedAiTab
+              : "hints",
         };
       }
 
@@ -250,28 +315,17 @@ export default function SessionPage() {
         isEditorExplainDemoActive: false,
         isAiSidebarForcedOpen: false,
         forcedAiTab: null,
-        stepFiveVisitedTabs: [],
-        canAdvanceFromStepFive: false,
       };
     });
   }, []);
 
-  const handleWalkthroughTabClick = useCallback((tab: AiTab) => {
+  const handleWalkthroughTabClick = useCallback(() => {
     setWalkthroughState((current) => {
       if (current.activeStepIndex !== SESSION_TOUR_STEP_INDEX.AI_SIDEBAR) {
         return current;
       }
 
-      const nextVisitedTabs = current.stepFiveVisitedTabs.includes(tab)
-        ? current.stepFiveVisitedTabs
-        : [...current.stepFiveVisitedTabs, tab];
-
-      return {
-        ...current,
-        forcedAiTab: null,
-        stepFiveVisitedTabs: nextVisitedTabs,
-        canAdvanceFromStepFive: tab === "explain",
-      };
+      return { ...current, forcedAiTab: null };
     });
   }, []);
 
@@ -288,20 +342,20 @@ export default function SessionPage() {
     isHintStreaming,
     handleSendHint,
     handleClearHints,
+    translations,
+    activeTranslateIndex,
+    setActiveTranslateIndex,
+    isTranslateStreaming,
+    handleTranslateCode,
   } = useSessionAi({
     sessionId: params.sessionId,
     question,
-    selectedLanguage,
+    selectedLanguage: sessionLanguage,
     codeByLanguage,
   });
 
   const isAiSidebarVisible =
     sidebarOpen || walkthroughState.isAiSidebarForcedOpen;
-  const isStepFiveActive =
-    walkthroughState.activeStepIndex === SESSION_TOUR_STEP_INDEX.AI_SIDEBAR;
-  const nextDisabledMessage = isStepFiveActive
-    ? "Click the Explain tab in the AI sidebar to continue the walkthrough."
-    : null;
 
   if (authLoading || !user) {
     return <SessionPageSkeleton />;
@@ -324,7 +378,7 @@ export default function SessionPage() {
             title={notFound ? "Session unavailable" : "Unable to open session"}
             message={
               notFound
-                ? "This mocked session could not be found. Try returning to the dashboard and starting again."
+                ? "This session could not be found. Try returning to the dashboard and starting again."
                 : (error ??
                   "Something went wrong while loading the collaboration session.")
             }
@@ -334,6 +388,13 @@ export default function SessionPage() {
       </div>
     );
   }
+
+  const otherParticipantName =
+    session.participants.find((participant) => !participant.isCurrentUser)
+      ?.username ?? "Your peer";
+  const peerLeftMessage = peerLeft
+    ? `${otherParticipantName} has left the session. Any further edits will not be saved.`
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -354,6 +415,14 @@ export default function SessionPage() {
           isHintStreaming={isHintStreaming}
           onSendHint={handleSendHint}
           onClearHints={handleClearHints}
+          translations={translations}
+          activeTranslateIndex={activeTranslateIndex}
+          onActiveTranslateIndexChange={setActiveTranslateIndex}
+          isTranslateStreaming={isTranslateStreaming}
+          onTranslateCode={handleTranslateCode}
+          currentLanguage={sessionLanguage}
+          hasCode={Boolean(codeByLanguage[sessionLanguage]?.trim())}
+          translateEmptyLabel="Start writing your solution in the editor. Once you have code, you can translate it here."
           walkthroughForceOpen={walkthroughState.isAiSidebarForcedOpen}
           walkthroughForcedTab={walkthroughState.forcedAiTab}
           onWalkthroughTabClick={handleWalkthroughTabClick}
@@ -364,29 +433,24 @@ export default function SessionPage() {
         <div className="min-w-0 flex-1">
           <SessionOnboardingTour
             onStepChange={handleTourStepChange}
-            isNextDisabled={
-              isStepFiveActive && !walkthroughState.canAdvanceFromStepFive
-            }
-            nextDisabledMessage={nextDisabledMessage}
           >
             <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
               <SessionHeader
                 sessionId={session.sessionId}
                 participants={session.participants}
                 leaveError={leaveError}
+                peerLeftMessage={peerLeftMessage}
                 onLeaveSuccess={handleLeaveSuccess}
                 onLeaveError={setLeaveError}
               />
 
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
+              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] xl:gap-6">
                 <QuestionPanel question={question} />
                 <EditorPanel
                   sessionId={session.sessionId}
                   ticket={collabTicket}
-                  selectedLanguage={selectedLanguage}
-                  allowedLanguages={session.allowedLanguages}
-                  value={codeByLanguage[selectedLanguage]}
-                  onLanguageChange={handleLanguageChange}
+                  selectedLanguage={sessionLanguage}
+                  value={codeByLanguage[sessionLanguage]}
                   onChange={handleEditorChange}
                   onExplainCode={handleExplainCode}
                   walkthroughShowExplainDemo={
@@ -398,6 +462,11 @@ export default function SessionPage() {
           </SessionOnboardingTour>
         </div>
       </div>
+      <ChatWidget 
+        participants={session.participants}
+        sessionId={session.sessionId}
+        ticket={collabTicket}
+      />
     </div>
   );
 }

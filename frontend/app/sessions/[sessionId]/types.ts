@@ -28,7 +28,7 @@ export interface LeaveSessionResponse {
   redirectTo: '/dashboard';
 }
 
-export type AiTab = 'explain' | 'hints';
+export type AiTab = 'explain' | 'hints' | 'translate';
 export type AiFeature = AiTab;
 export type AiStreamFinishReason = 'stop' | 'length' | 'refusal';
 
@@ -37,6 +37,15 @@ export interface ExplainEntry {
   selectedCode: string;
   language: string;
   response: string | null;
+  createdAt: string;
+}
+
+export interface TranslateEntry {
+  id: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  originalCode: string;
+  translatedCode: string | null;
   createdAt: string;
 }
 

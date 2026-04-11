@@ -3,6 +3,14 @@ import type { LeaveSessionResponse } from '@/app/sessions/[sessionId]/types';
 
 const COLLAB_SERVICE_URL = process.env.COLLAB_SERVICE_URL ?? 'http://localhost:4003';
 
+function createLeaveSuccessResponse(sessionId: string) {
+  return {
+    sessionId,
+    status: 'left',
+    redirectTo: '/dashboard',
+  } satisfies LeaveSessionResponse;
+}
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -17,18 +25,14 @@ export async function POST(
     );
 
     if (deleteResponse.status === 404) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json(createLeaveSuccessResponse(sessionId));
     }
 
     if (!deleteResponse.ok) {
       return NextResponse.json({ error: 'Failed to leave session' }, { status: 502 });
     }
 
-    return NextResponse.json({
-      sessionId,
-      status: 'left',
-      redirectTo: '/dashboard',
-    } satisfies LeaveSessionResponse);
+    return NextResponse.json(createLeaveSuccessResponse(sessionId));
   } catch {
     // collab service unreachable
     return NextResponse.json({ error: 'Collaboration service unavailable' }, { status: 503 });

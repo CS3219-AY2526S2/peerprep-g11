@@ -12,12 +12,6 @@ import {
 } from '@/components/ui/table';
 import { Trash2, X } from 'lucide-react';
 import { DemotionVoteDialog, DemotionVoteItem } from './DemotionVoteDialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 interface User {
   _id: string;

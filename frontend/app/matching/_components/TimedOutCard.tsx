@@ -1,8 +1,7 @@
 'use client';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { PreferenceSummaryBadge } from './PreferenceSummaryBadge';
 import type { MatchingPreferences } from '@/app/matching/types';
 import { PROGRAMMING_LANGUAGE_LABELS } from '@/lib/programming-languages';
 
@@ -10,54 +9,67 @@ interface TimedOutCardProps {
     preferences: MatchingPreferences;
     onRetry: () => void;
     onBack: () => void;
+    errorMessage?: string;
+    isRetrying?: boolean;
 }
 
-export function TimedOutCard({ preferences, onRetry, onBack }: TimedOutCardProps) {
+export function TimedOutCard({
+    preferences,
+    onRetry,
+    onBack,
+    errorMessage,
+    isRetrying = false,
+}: TimedOutCardProps) {
+    const language = PROGRAMMING_LANGUAGE_LABELS[preferences.language];
+
     return (
-        <Card className="w-[380px] shadow-[var(--shadow)] border-border p-5 flex flex-col gap-3.5">
-            <div className="flex justify-center">
-                <div className="w-12 h-12 rounded-full bg-destructive/10 grid place-items-center">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" className="text-destructive">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-                        <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                </div>
+        <div className="flex flex-col items-center gap-6 animate-fade-in-up max-w-[360px] text-center">
+            {errorMessage && (
+                <Alert variant="destructive" className="w-full rounded-xl text-left">
+                    <AlertDescription className="text-[12px]">{errorMessage}</AlertDescription>
+                </Alert>
+            )}
+
+            <div className="w-14 h-14 rounded-full bg-destructive/8 grid place-items-center">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" className="text-destructive/60">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M12 7v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="12" cy="16" r="0.8" fill="currentColor" />
+                </svg>
             </div>
 
-            <h1
-                className="text-[20px] font-bold text-center text-foreground"
-                style={{ fontFamily: 'var(--font-serif)' }}
-            >
-                No match found
-            </h1>
-            <p className="text-[12.5px] text-muted-foreground text-center -mt-1.5">
-                We couldn&apos;t find a peer with matching preferences within the time limit. You can try again or adjust your preferences.
-            </p>
-
-            <div className="grid grid-cols-3 gap-3 mt-1">
-                <PreferenceSummaryBadge label="Topic" value={preferences.topic} />
-                <PreferenceSummaryBadge label="Difficulty" value={preferences.difficulty} />
-                <PreferenceSummaryBadge
-                    label="Language"
-                    value={PROGRAMMING_LANGUAGE_LABELS[preferences.language]}
-                />
+            <div>
+                <h1
+                    className="text-[20px] font-bold text-foreground tracking-tight"
+                    style={{ fontFamily: 'var(--font-serif)' }}
+                >
+                    No match found
+                </h1>
+                <p className="text-[12.5px] text-muted-foreground mt-2 leading-relaxed">
+                    We couldn&apos;t find a peer for{' '}
+                    <span className="font-semibold text-foreground">{preferences.topic}</span> at{' '}
+                    <span className="font-semibold text-foreground">{preferences.difficulty}</span> in{' '}
+                    <span className="font-semibold text-foreground">{language}</span>.
+                </p>
             </div>
 
-            <div className="grid gap-2 mt-1">
+            <div className="w-full space-y-2">
                 <Button
                     onClick={onRetry}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[var(--shadow)] text-[12.5px] font-semibold rounded-lg"
+                    disabled={isRetrying}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] text-[13px] font-semibold rounded-lg h-10 transition-all duration-150 cursor-pointer"
                 >
-                    Try Again
+                    {isRetrying ? 'Trying Again...' : 'Try Again'}
                 </Button>
-                <Button
-                    variant="ghost"
+                <button
                     onClick={onBack}
-                    className="w-full text-[12.5px] text-accent font-semibold hover:bg-secondary"
+                    type="button"
+                    className="w-full text-[12px] text-muted-foreground font-medium hover:text-accent transition-colors duration-150 py-1.5 cursor-pointer select-none"
+                    disabled={isRetrying}
                 >
                     Change Preferences
-                </Button>
+                </button>
             </div>
-        </Card>
+        </div>
     );
 }

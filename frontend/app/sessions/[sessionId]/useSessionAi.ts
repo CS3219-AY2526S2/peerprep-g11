@@ -13,6 +13,7 @@ import type {
   ExplainEntry,
   HintMessage,
   SessionLanguage,
+  TranslateEntry,
 } from '@/app/sessions/[sessionId]/types';
 
 const HINT_REQUEST_MAX_MESSAGES = 12;
@@ -21,6 +22,7 @@ const HINT_REFUSAL_MESSAGE =
   "I can help with hints, debugging, or a high-level approach, but I can't provide the full answer or unrelated help.";
 const HINT_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.';
 const EXPLAIN_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.';
+const TRANSLATE_FAILURE_MESSAGE = 'Failed to reach the AI service. Please try again.';
 
 interface SessionAiCodeContext {
   sessionId?: string;
@@ -129,6 +131,9 @@ export function useSessionAi({
   const [activeExplainIndex, setActiveExplainIndex] = useState(0);
   const [hintMessages, setHintMessages] = useState<HintMessage[]>([]);
   const [isHintStreaming, setIsHintStreaming] = useState(false);
+  const [translations, setTranslations] = useState<TranslateEntry[]>([]);
+  const [activeTranslateIndex, setActiveTranslateIndex] = useState(0);
+  const [isTranslateStreaming, setIsTranslateStreaming] = useState(false);
 
   const handleExplainCode = useCallback(
     async (selectedCode: string) => {
@@ -348,6 +353,109 @@ export function useSessionAi({
     [codeByLanguage, hintMessages, isHintStreaming, question, selectedLanguage, sessionId]
   );
 
+  const handleTranslateCode = useCallback(
+    async (targetLanguage: string) => {
+      const currentCode = codeByLanguage[selectedLanguage];
+      if (!sessionId || !currentCode || isTranslateStreaming) {
+        return;
+      }
+
+      const cachedIndex = translations.findIndex(
+        (t) =>
+          t.targetLanguage === targetLanguage &&
+          t.sourceLanguage === selectedLanguage &&
+          t.originalCode === currentCode &&
+          t.translatedCode !== null
+      );
+
+      if (cachedIndex !== -1) {
+        setActiveTranslateIndex(cachedIndex);
+        setSidebarOpen(true);
+        setActiveAiTab('translate');
+        return;
+      }
+
+      const entryId = createClientId('translate');
+      const nextTranslateIndex = translations.length;
+      const newEntry: TranslateEntry = {
+        id: entryId,
+        sourceLanguage: selectedLanguage,
+        targetLanguage,
+        originalCode: currentCode,
+        translatedCode: null,
+        createdAt: new Date().toISOString(),
+      };
+
+      setTranslations((prev) => [...prev, newEntry]);
+      setActiveTranslateIndex(nextTranslateIndex);
+      setSidebarOpen(true);
+      setActiveAiTab('translate');
+      setIsTranslateStreaming(true);
+
+      try {
+        const { finishReason, streamErrorMessage } = await streamAssistantResponse(
+          `/api/sessions/${sessionId}/translate`,
+          {
+            questionDescription: question?.description ?? '',
+            questionExamples: question?.examples ?? [],
+            questionConstraints: question?.constraints ?? [],
+            language: selectedLanguage,
+            targetLanguage,
+            fullCode: currentCode,
+          },
+          (event) => {
+            if (event.event === 'chunk') {
+              const data = event.data as AiStreamChunkEvent;
+              setTranslations((prev) =>
+                prev.map((entry) =>
+                  entry.id === entryId
+                    ? {
+                        ...entry,
+                        translatedCode: `${entry.translatedCode ?? ''}${data.delta}`,
+                      }
+                    : entry
+                )
+              );
+            }
+          }
+        );
+
+        if (streamErrorMessage) {
+          const fallbackMessage =
+            finishReason === 'refusal'
+              ? streamErrorMessage
+              : TRANSLATE_FAILURE_MESSAGE;
+
+          setTranslations((prev) =>
+            prev.map((entry) =>
+              entry.id === entryId
+                ? {
+                    ...entry,
+                    translatedCode:
+                      entry.translatedCode && entry.translatedCode.trim().length > 0
+                        ? entry.translatedCode
+                        : fallbackMessage,
+                  }
+                : entry
+            )
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : TRANSLATE_FAILURE_MESSAGE;
+
+        setTranslations((prev) =>
+          prev.map((entry) =>
+            entry.id === entryId ? { ...entry, translatedCode: message } : entry
+          )
+        );
+      } finally {
+        setIsTranslateStreaming(false);
+      }
+    },
+    [codeByLanguage, translations, question, selectedLanguage, sessionId, isTranslateStreaming]
+  );
+
   const handleClearHints = useCallback(() => {
     if (isHintStreaming) {
       return;
@@ -369,5 +477,10 @@ export function useSessionAi({
     isHintStreaming,
     handleSendHint,
     handleClearHints,
+    translations,
+    activeTranslateIndex,
+    setActiveTranslateIndex,
+    isTranslateStreaming,
+    handleTranslateCode,
   };
 }

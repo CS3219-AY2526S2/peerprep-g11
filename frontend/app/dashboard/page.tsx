@@ -1,17 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { NavBar } from '@/components/ui/navBar';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const activityItems = [
-  { title: 'Matched with Priya', topic: 'Graphs', duration: '38 minutes', lang: 'Python', completed: true },
-  { title: 'Matched with Ethan', topic: 'System Design', duration: '12 minutes', lang: 'Java', completed: false },
-  { title: 'Matched with Amira', topic: 'Dynamic Programming', duration: '52 minutes', lang: 'Python', completed: true },
-];
+import type { HistoryListItem } from '@/app/history/types';
 
 const actionCards = [
   {
@@ -43,8 +38,46 @@ const actionCards = [
   },
 ];
 
+function formatRelativeTime(timestamp: string): string {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export default function DashboardPage() {
   const { user, isLoading } = useRequireAuth();
+  const [history, setHistory] = useState<HistoryListItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    async function fetchHistory() {
+      try {
+        const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId)}`);
+        if (res.ok) {
+          const data: HistoryListItem[] = await res.json();
+          setHistory(data);
+        }
+      } catch {
+        // silently fail — section will show empty state
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+    fetchHistory();
+  }, [userId]);
 
   if (isLoading || !user) return <Skeleton />;
 
@@ -130,54 +163,80 @@ export default function DashboardPage() {
           className="animate-fade-in-up"
           style={{ animationDelay: '300ms' }}
         >
-          <p className="text-[13px] font-semibold text-foreground mb-2.5">Recent Activity</p>
+          <p className="text-[13px] font-semibold text-foreground mb-2.5">Question History</p>
           <Card className="border-border shadow-sm overflow-hidden">
             <CardContent className="pt-3 pb-2 grid gap-1">
-              {activityItems.map(({ title, topic, duration, lang, completed }, i) => (
-                <Link
-                  key={`${title}-${topic}`}
-                  href="#"
-                  className="group/row relative flex items-center justify-between gap-4 px-4 py-2.5 rounded-lg
-                    bg-secondary/30 border border-transparent
-                    transition-colors duration-200 ease-out
-                    hover:bg-secondary hover:border-border
-                    no-underline
-                    animate-fade-in-up"
-                  style={{ animationDelay: `${350 + i * 60}ms` }}
-                >
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 rounded-full bg-accent transition-all duration-200 group-hover/row:h-6" />
+              {historyLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-4 px-4 py-2.5 rounded-lg bg-secondary/30"
+                  >
+                    <div className="min-w-0 pl-2 space-y-1.5 flex-1">
+                      <Skeleton className="h-3.5 w-3/5" />
+                      <Skeleton className="h-3 w-2/5" />
+                    </div>
+                    <Skeleton className="h-3.5 w-14 rounded-full" />
+                  </div>
+                ))
+              ) : history.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <svg viewBox="0 0 24 24" width="32" height="32" fill="none" className="text-muted-foreground/40 mb-2">
+                    <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                  <p className="text-[12.5px] text-muted-foreground">No question history yet.</p>
+                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">Complete a session to see it here.</p>
+                </div>
+              ) : (
+                history.map((item, i) => (
+                  <Link
+                    key={item._id}
+                    href={`/history/${item._id}`}
+                    className="group/row relative flex items-center justify-between gap-4 px-4 py-2.5 rounded-lg
+                      bg-secondary/30 border border-transparent
+                      transition-all duration-200 ease-out
+                      hover:bg-secondary hover:border-border
+                      no-underline cursor-pointer
+                      animate-fade-in-up"
+                    style={{ animationDelay: `${350 + i * 60}ms` }}
+                  >
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 rounded-full bg-accent transition-all duration-200 group-hover/row:h-6" />
 
-                  <div className="min-w-0 pl-2">
-                    <p className="text-[12.5px] font-semibold text-foreground truncate">
-                      {title}
-                      <span className="text-muted-foreground font-normal"> · {topic}</span>
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${completed ? 'text-muted-foreground' : 'text-destructive font-medium'}`}>
-                      {completed ? 'Completed' : 'Not completed'} · {duration} · {lang}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge
-                      variant="outline"
-                      className={`text-[10.5px] whitespace-nowrap rounded-full px-2.5 ${completed
-                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                        : 'text-destructive bg-destructive/10 border-destructive/25'
-                        }`}
-                    >
-                      {completed ? 'Completed' : 'Not completed'}
-                    </Badge>
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="14"
-                      height="14"
-                      fill="none"
-                      className="text-muted-foreground/0 transition-all duration-200 group-hover/row:text-muted-foreground"
-                    >
-                      <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                </Link>
-              ))}
+                    <div className="min-w-0 pl-2">
+                      <p className="text-[12.5px] font-semibold text-foreground truncate">
+                        {item.question.title}
+                        <span className="text-muted-foreground font-normal">
+                          {' '}· {item.question.topics?.[0] ?? 'General'}
+                        </span>
+                      </p>
+                      <p className="text-[11px] mt-0.5 text-muted-foreground">
+                        with {item.partner_username ?? item.partner_id} · {formatRelativeTime(item.timestamp)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10.5px] font-medium whitespace-nowrap ${
+                        item.question.difficulty === 'Hard'
+                          ? 'text-red-400/80'
+                          : item.question.difficulty === 'Medium'
+                            ? 'text-amber-400/80'
+                            : 'text-emerald-400/80'
+                      }`}>
+                        {item.question.difficulty}
+                      </span>
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        className="text-muted-foreground/0 transition-all duration-200 group-hover/row:text-muted-foreground"
+                      >
+                        <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  </Link>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
