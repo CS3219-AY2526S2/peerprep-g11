@@ -38,6 +38,9 @@ dependencies {
     // Spring Security support
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    // MongoDB support
+    // Redis support
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    
+    // MongoDB support (for match records)
     implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 }
