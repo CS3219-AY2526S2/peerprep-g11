@@ -65,7 +65,7 @@ export default function DashboardPage() {
     if (!userId) return;
     async function fetchHistory() {
       try {
-        const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId)}`);
+        const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId!)}`);
         if (res.ok) {
           const data: HistoryListItem[] = await res.json();
           setHistory(data);
