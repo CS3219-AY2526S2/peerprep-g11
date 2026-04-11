@@ -128,9 +128,9 @@ function useYjs({
         createdDocument = new Y.Doc();
         createdProvider = new WebsocketProvider(
           collabServiceUrl,
-          sessionId,
+          sessionId!,
           createdDocument,
-          { params: { ticket } },
+          { params: { ticket: ticket! } },
         );
 
         createdProvider.on("status", (event: { status: string }) => {
@@ -142,16 +142,27 @@ function useYjs({
           username: currentUsername,
         });
 
+        console.log(
+          "[Yjs] local state after setLocalStateField",
+          createdProvider.awareness.getLocalState(),
+        );
+
         const syncPresence = () => {
           if (!createdProvider) {
             return;
           }
 
-          const participantIds = Array.from(
-            createdProvider.awareness.getStates().values(),
-          )
-            .map((state) => state.user?.id)
+          const awarenessEntries = Array.from(
+            createdProvider.awareness.getStates().entries(),
+          );
+
+          console.log("[Yjs] raw awareness entries", awarenessEntries);
+
+          const participantIds = awarenessEntries
+            .map(([, state]) => state.user?.id)
             .filter((id): id is string => typeof id === "string");
+
+          console.log("[Yjs] participant ids from awareness", participantIds);
 
           setConnectedParticipantIds(Array.from(new Set(participantIds)));
         };
@@ -340,6 +351,16 @@ export default function SessionPage() {
       }
 
       const connectedParticipantIdSet = new Set(connectedParticipantIds);
+
+      console.log(
+        "[Session] participants vs connected ids",
+        currentSession.participants.map((participant) => ({
+          participantId: participant.id,
+          username: participant.username,
+          isCurrentUser: participant.isCurrentUser,
+          connected: connectedParticipantIdSet.has(participant.id),
+        })),
+      );
 
       return {
         ...currentSession,
