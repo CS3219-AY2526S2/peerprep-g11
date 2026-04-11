@@ -46,7 +46,10 @@ function createInitialWalkthroughState(): SessionWalkthroughState {
   };
 }
 
-function applyCurrentUserToSession(session: SessionDetails, username: string) {
+function applyCurrentUserToSession(
+  session: SessionDetails,
+  username: string,
+): SessionDetails {
   return {
     ...session,
     participants: session.participants.map((participant) =>
@@ -60,7 +63,7 @@ function applyCurrentUserToSession(session: SessionDetails, username: string) {
   };
 }
 
-function markPeerAsDisconnected(session: SessionDetails) {
+function markPeerAsDisconnected(session: SessionDetails): SessionDetails {
   return {
     ...session,
     participants: session.participants.map((participant) =>
@@ -68,7 +71,7 @@ function markPeerAsDisconnected(session: SessionDetails) {
         ? participant
         : {
             ...participant,
-            presence: "disconnected",
+            presence: "disconnected" as const,
           },
     ),
   };
