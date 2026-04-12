@@ -1,7 +1,6 @@
 package peerprep.matching.models;
 
 import java.util.List;
-import peerprep.matching.models.MatchNotificationRequest;
 import peerprep.matching.models.Participant;
 
 public class MatchNotificationRequestDto {
