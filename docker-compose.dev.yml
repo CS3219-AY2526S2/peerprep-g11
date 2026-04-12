@@ -1,0 +1,20 @@
+services:
+  user-service:
+    ports:
+      - "4001:4001"
+
+  question-service:
+    ports:
+      - "8000:8000"
+
+  matching-service:
+    ports:
+      - "8080:8080"
+
+  ai-assistant-service:
+    ports:
+      - "4002:4002"
+
+  collaboration-service:
+    ports:
+      - "1234:1234"
