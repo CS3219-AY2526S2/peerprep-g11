@@ -86,6 +86,7 @@ public class StuckMatchFoundHandler {
             String difficulty = redisUserRepository.getUserDifficulty(userId);
             if (topic != null && language != null && difficulty != null) {
                 redisQueueRepository.requeueUser(userId, topic, language, difficulty, joinTime);
+                redisQueueRepository.addToDirtyScopes(topic, language);
             }
         }
 

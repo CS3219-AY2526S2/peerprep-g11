@@ -240,6 +240,8 @@ public class MatchService {
 
         redisQueueRepository.requeueUser(user1, topic, language, difficulty, joinTime1);
         redisQueueRepository.requeueUser(user2, topic, language, difficulty, joinTime2);
+        redisQueueRepository.addToDirtyScopes(topic, language);
+
     }
 
     /**
@@ -293,6 +295,7 @@ public class MatchService {
 
             redisQueueRepository.requeueUser(user1, topic, language, difficulty1, joinTime1);
             redisQueueRepository.requeueUser(user2, topic, language, difficulty2, joinTime2);
+            redisQueueRepository.addToDirtyScopes(topic, language);
             return;
         }
 
