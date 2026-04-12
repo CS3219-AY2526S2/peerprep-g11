@@ -64,4 +64,13 @@ public class LuaScriptConfig {
         script.setResultType(Long.class);
         return script;
     }
+
+    @Bean
+    public DefaultRedisScript<Long> cancelMatchScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/cancel_match.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

@@ -260,20 +260,7 @@ public class MatchService {
             return false;
         }
 
-        String state = redisUserRepository.getUserState(userId);
-        if (state == null || !state.equals(UserState.PENDING.name())) {
-            return false;
-        }
-
-        String topic = redisUserRepository.getUserTopic(userId);
-        String language = redisUserRepository.getUserLanguage(userId);
-        String difficulty = redisUserRepository.getUserDifficulty(userId);
-        if (topic != null && language != null && difficulty != null) {
-            redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
-        }
-
-        redisUserRepository.removeUserState(userId);
-        return true;
+        return redisUserRepository.cancelMatch(userId);
     }
 
     /**

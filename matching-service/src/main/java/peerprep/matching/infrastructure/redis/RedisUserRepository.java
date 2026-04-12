@@ -20,14 +20,17 @@ public class RedisUserRepository {
     private final RedisTemplate<String, Object> redisTemplate;
     private final DefaultRedisScript<Long> addUserScript;
     private final DefaultRedisScript<Long> rollbackMatchScript;
+    private final DefaultRedisScript<Long> cancelMatchScript;
 
     @Autowired
     public RedisUserRepository(RedisTemplate<String, Object> redisTemplate,
                              DefaultRedisScript<Long> addUserScript,
-                             DefaultRedisScript<Long> rollbackMatchScript) {
+                             DefaultRedisScript<Long> rollbackMatchScript,
+                             DefaultRedisScript<Long> cancelMatchScript) {
         this.redisTemplate = redisTemplate;
         this.addUserScript = addUserScript;
         this.rollbackMatchScript = rollbackMatchScript;
+        this.cancelMatchScript = cancelMatchScript;
     }
 
     public String getUserState(String userId) {
@@ -175,5 +178,11 @@ public class RedisUserRepository {
     public void rollbackMatch(String user1, String user2) {
         List<String> keys = Arrays.asList(user1, user2);
         redisTemplate.execute(rollbackMatchScript, keys);
+    }
+
+    public boolean cancelMatch(String userId) {
+        List<String> keys = Arrays.asList(userId);
+        Long result = redisTemplate.execute(cancelMatchScript, keys);
+        return result != null && result == 1L;
     }
 }
