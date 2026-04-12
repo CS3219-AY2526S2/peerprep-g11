@@ -37,13 +37,6 @@ public class RedisUserRepository {
         return (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "state");
     }
 
-    public Long getJoinTime(String userId) {
-        String value = (String) redisTemplate.opsForHash()
-                .get(USER_STATE_PREFIX + userId, "joinTime");
-
-        return value != null ? Long.parseLong(value) : null;
-    }
-
     public String getUserName(String userId) {
         return (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "userName");
     }
@@ -63,23 +56,6 @@ public class RedisUserRepository {
         return (String) redisTemplate.opsForValue().get(REQUEST_USER_PREFIX + requestId);
     }
 
-    public void saveUserState(String userId, String requestId, String userName,
-                              String topic, String language, String difficulty) {
-        Map<String, String> userState = new HashMap<>();
-        userState.put("userId", userId);
-        userState.put("requestId", requestId);
-        userState.put("userName", userName);
-        userState.put("state", "PENDING");
-        userState.put("topic", topic);
-        userState.put("language", language);
-        userState.put("difficulty", difficulty);
-        userState.put("joinTime", String.valueOf(System.currentTimeMillis()));
-
-        redisTemplate.opsForHash().putAll(USER_STATE_PREFIX + userId, userState);
-        redisTemplate.opsForValue().set(REQUEST_USER_PREFIX + requestId, userId);
-        redisTemplate.opsForValue().set(USER_REQUEST_PREFIX + userId, requestId);
-    }
-
     public boolean addUserAtomic(String userId, String requestId, String userName,
                                 String topic, String language, String difficulty) {
         List<String> keys = Arrays.asList(
@@ -91,10 +67,6 @@ public class RedisUserRepository {
         return result != null && result == 1L;
     }
 
-    public void setUserState(String userId, String state) {
-        redisTemplate.opsForHash().put(USER_STATE_PREFIX + userId, "state", state);
-    }
-
     public void removeUserState(String userId) {
         String requestId = getRequestIdForUser(userId);
         if (requestId != null) {
@@ -102,25 +74,6 @@ public class RedisUserRepository {
         }
         redisTemplate.delete(USER_REQUEST_PREFIX + userId);
         redisTemplate.delete(USER_STATE_PREFIX + userId);
-    }
-
-    public String getUserTopic(String userId) {
-        String topic = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "topic");
-        return topic;
-    }
-
-    public String getUserLanguage(String userId) {
-        String language = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "language");
-        return language;
-    }
-
-    public String getUserDifficulty(String userId) {
-        String difficulty = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "difficulty");
-        return difficulty;
-    }
-
-    public void setMatchFoundAt(String userId, long timestamp) {
-        redisTemplate.opsForValue().set("matchFoundAt:" + userId, String.valueOf(timestamp));
     }
 
     public Long getMatchFoundAt(String userId) {
@@ -151,14 +104,6 @@ public class RedisUserRepository {
     public Boolean wasCollabNotified(String matchId) {
         String value = (String) redisTemplate.opsForValue().get("collabNotified:" + matchId);
         return value != null && value.equals("true");
-    }
-
-    public void deleteCollabNotified(String matchId) {
-        redisTemplate.delete("collabNotified:" + matchId);
-    }
-
-    public void addToMatchFoundUsers(String userId) {
-        redisTemplate.opsForSet().add("matchFoundUsers", userId);
     }
 
     public void removeFromMatchFoundUsers(String userId) {

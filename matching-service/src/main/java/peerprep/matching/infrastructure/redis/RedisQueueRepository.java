@@ -33,16 +33,6 @@ public class RedisQueueRepository {
         this.removeTimeoutUserScript = removeTimeoutUserScript;
     }
 
-    public void addUserToQueue(String topic, String language, String difficulty, String userId) {
-        long now = System.currentTimeMillis();
-        String queueKey = QUEUE_PREFIX + topic + ":" + language + ":" + difficulty;
-        redisTemplate.opsForZSet().add(queueKey, userId, now);
-    }
-
-    public void addUserToTimeoutQueue(String userId, long expiryTime) {
-        redisTemplate.opsForZSet().add(TIMEOUT_QUEUE, userId, expiryTime);
-    }
-
     public void addToDirtyScopes(String topic, String language) {
         redisTemplate.opsForSet().add(DIRTY_SCOPES, topic + ":" + language);
     }
@@ -51,18 +41,7 @@ public class RedisQueueRepository {
         return (String) redisTemplate.opsForSet().pop(DIRTY_SCOPES);
     }
 
-    public void removeFromQueue(String topic, String language, String difficulty, String userId) {
-        String queueKey = QUEUE_PREFIX + topic + ":" + language + ":" + difficulty;
-        redisTemplate.opsForZSet().remove(queueKey, userId);
-    }
-
     public void removeFromTimeoutQueue(String userId) {
-        redisTemplate.opsForZSet().remove(TIMEOUT_QUEUE, userId);
-    }
-
-    public void removeUserFromAllQueues(String topic, String language, String difficulty, String userId) {
-        String queueKey = QUEUE_PREFIX + topic + ":" + language + ":" + difficulty;
-        redisTemplate.opsForZSet().remove(queueKey, userId);
         redisTemplate.opsForZSet().remove(TIMEOUT_QUEUE, userId);
     }
 
@@ -91,15 +70,6 @@ public class RedisQueueRepository {
             result.add(String.valueOf(o));
         }
         return result;
-    }
-
-    public void requeueUser(String userId, String topic, String language, String difficulty, long joinTime) {
-        long now = System.currentTimeMillis();
-        String queueKey = QUEUE_PREFIX + topic + ":" + language + ":" + difficulty;
-        redisTemplate.opsForZSet().add(queueKey, userId, now);
-
-        long expiry = joinTime + TWO_MIN_IN_MS;
-        redisTemplate.opsForZSet().add(TIMEOUT_QUEUE, userId, expiry);
     }
 
     public boolean removeTimeoutUser(String userId) {
