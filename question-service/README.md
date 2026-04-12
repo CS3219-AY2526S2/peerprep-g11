@@ -232,7 +232,7 @@ Adds an attempt to the database.
 | Variable         | Description                            | Constraint                                                                           |
 |------------------|----------------------------------------|--------------------------------------------------------------------------------------|
 | `session_id`     | The completed session id               | Auto-managed by collaboration service                                                |
-| `user_ids`       | The  users' id                         | Must be exactly 2 ids, each id must correspond to username in `user_names`           |
+| `user_ids`       | The users' id                          | Must be exactly 2 ids, each id must correspond to username in `user_names`           |
 | `user_names`     | The usernames                          | Must be exactly 2 names, each name must correspond to id in `user_ids`               |
 | `slug`           | The slug of the attempting question    | Required                                                                             |
 | `language`       | The coding language used               | Must be a language available in PeerPrep                                             |
