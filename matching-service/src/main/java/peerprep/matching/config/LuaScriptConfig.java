@@ -46,4 +46,13 @@ public class LuaScriptConfig {
         script.setResultType(Long.class);
         return script;
     }
+
+    @Bean
+    public DefaultRedisScript<Long> addUserScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/add_user.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

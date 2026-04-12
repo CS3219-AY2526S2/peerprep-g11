@@ -70,29 +70,18 @@ public class MatchService {
         }
 
         String userId = req.getUserId();
-        String existingState = redisUserRepository.getUserState(userId);
-
-        if (existingState != null) {
-            MatchRequestConflictException conflict = getConflictExceptionForState(existingState);
-            if (conflict != null) {
-                throw conflict;
-            }
-        }
-
         String requestId = UUID.randomUUID().toString();
         String topic = req.getTopic();
         String language = req.getLanguage();
         String difficulty = req.getDifficulty();
         String userName = req.getUserName();
 
-        redisUserRepository.saveUserState(userId, requestId, userName, topic, language, difficulty);
-
-        redisQueueRepository.addUserToQueue(topic, language, difficulty, userId);
-
-        long expiryTime = System.currentTimeMillis() + TWO_MIN_IN_MS;
-        redisQueueRepository.addUserToTimeoutQueue(userId, expiryTime);
-
-        redisQueueRepository.addToDirtyScopes(topic, language);
+        boolean success = redisUserRepository.addUserAtomic(userId, requestId, userName, topic, language, difficulty);
+        if (!success) {
+            String existingState = redisUserRepository.getUserState(userId);
+            MatchRequestConflictException conflict = getConflictExceptionForState(existingState);
+            throw conflict;
+        }
 
         return requestId;
     }
@@ -111,7 +100,9 @@ public class MatchService {
                     "You are already in a session.");
         }
 
-        return null;
+        return new MatchRequestConflictException(
+                "ADD_USER_FAILED",
+                "Please try again.");
     }
 
     /**

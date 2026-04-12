@@ -2,9 +2,12 @@ package peerprep.matching.infrastructure.redis;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Repository
@@ -15,10 +18,13 @@ public class RedisUserRepository {
     private static final String USER_REQUEST_PREFIX = "userRequest:";
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final DefaultRedisScript<Long> addUserScript;
 
     @Autowired
-    public RedisUserRepository(RedisTemplate<String, Object> redisTemplate) {
+    public RedisUserRepository(RedisTemplate<String, Object> redisTemplate,
+                             DefaultRedisScript<Long> addUserScript) {
         this.redisTemplate = redisTemplate;
+        this.addUserScript = addUserScript;
     }
 
     public String getUserState(String userId) {
@@ -66,6 +72,17 @@ public class RedisUserRepository {
         redisTemplate.opsForHash().putAll(USER_STATE_PREFIX + userId, userState);
         redisTemplate.opsForValue().set(REQUEST_USER_PREFIX + requestId, userId);
         redisTemplate.opsForValue().set(USER_REQUEST_PREFIX + userId, requestId);
+    }
+
+    public boolean addUserAtomic(String userId, String requestId, String userName,
+                                String topic, String language, String difficulty) {
+        List<String> keys = Arrays.asList(
+                userId, requestId, userName, topic, language, difficulty);
+        long now = System.currentTimeMillis();
+        long expiryTime = now + 120000;
+        Long result = redisTemplate.execute(addUserScript, keys,
+                String.valueOf(now), String.valueOf(expiryTime));
+        return result != null && result == 1L;
     }
 
     public void setUserState(String userId, String state) {
@@ -148,7 +165,7 @@ public class RedisUserRepository {
 
     @SuppressWarnings("unchecked")
     public <T> T executeScript(org.springframework.data.redis.core.script.RedisScript<T> script,
-                               java.util.List<String> keys, Object... args) {
+                               List<String> keys, Object... args) {
         return (T) redisTemplate.execute(script, keys, args);
     }
 }
