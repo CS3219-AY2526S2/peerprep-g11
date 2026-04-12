@@ -133,13 +133,13 @@ public class MatchService {
 
         boolean mongoSaved = saveMatchWithRetry(matchDoc);
         if (!mongoSaved) {
-            rollbackMatch(user1, user2, topic, language, difficulty, matchId);
+            rollbackMatch(user1, user2, matchId);
             return;
         }
 
         boolean collabNotified = notifyCollaborationServiceWithRetry(matchId, user1, user2, questionSlug, language);
         if (!collabNotified) {
-            rollbackMatch(user1, user2, topic, language, difficulty, matchId);
+            rollbackMatch(user1, user2, matchId);
             return;
         }
 
@@ -208,95 +208,41 @@ public class MatchService {
         return false;
     }
 
-    private void rollbackMatch(String user1, String user2, String topic, String language,
-                              String difficulty, String matchId) {
-        try {
-            MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
-            if (matchDoc != null) {
-                matchRepository.delete(matchDoc);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
-        }
-
-        redisUserRepository.setUserState(user1, UserState.PENDING.name());
-        redisUserRepository.setUserState(user2, UserState.PENDING.name());
-
-        Long joinTime1 = redisUserRepository.getJoinTime(user1);
-        if (joinTime1 == null) {
-            joinTime1 = System.currentTimeMillis();
-        }
-        Long joinTime2 = redisUserRepository.getJoinTime(user2);
-        if (joinTime2 == null) {
-            joinTime2 = System.currentTimeMillis();
-        }
-
-        redisQueueRepository.requeueUser(user1, topic, language, difficulty, joinTime1);
-        redisQueueRepository.requeueUser(user2, topic, language, difficulty, joinTime2);
-        redisQueueRepository.addToDirtyScopes(topic, language);
-
-    }
-
     /**
-     * Rollback a match by matchId. This is used when finalizing a match 
-     * fails. 
+     * Rollback a match. This is used when finalizing a match fails. 
      * 
      * Mark the involved users as @code {PENDING}, put users back to the 
      * queue, and delete the match doc.
      * 
      * @param matchId The ID of the match.
      */
-    public void rollbackMatchByMatchId(String matchId) {
-        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
-        if (matchDoc == null) {
-            logger.warn("No match doc found for matchId {} during rollback", matchId);
-            return;
-        }
-
-        String user1 = matchDoc.getUser1();
-        String user2 = matchDoc.getUser2();
-
-        redisUserRepository.setUserState(user1, UserState.PENDING.name());
-        redisUserRepository.setUserState(user2, UserState.PENDING.name());
-
-        String topic = redisUserRepository.getUserTopic(user1);
-        if (topic == null) {
-            topic = redisUserRepository.getUserTopic(user2);
-        }
-        String language = redisUserRepository.getUserLanguage(user1);
-        if (language == null) {
-            language = redisUserRepository.getUserLanguage(user2);
-        }
-        String difficulty1 = redisUserRepository.getUserDifficulty(user1);
-        String difficulty2 = redisUserRepository.getUserDifficulty(user2);
-
-        if (topic != null && language != null && difficulty1 != null && difficulty2 != null) {
+    public void rollbackMatch(String user1, String user2, String matchId) {
+        if (matchId != null) {
             try {
-                matchRepository.delete(matchDoc);
+                MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+                if (matchDoc != null) {
+                    matchRepository.delete(matchDoc);
+                }
             } catch (Exception e) {
                 logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
             }
-
-            Long joinTime1 = redisUserRepository.getJoinTime(user1);
-            if (joinTime1 == null) {
-                joinTime1 = System.currentTimeMillis();
-            }
-            Long joinTime2 = redisUserRepository.getJoinTime(user2);
-            if (joinTime2 == null) {
-                joinTime2 = System.currentTimeMillis();
-            }
-
-            redisQueueRepository.requeueUser(user1, topic, language, difficulty1, joinTime1);
-            redisQueueRepository.requeueUser(user2, topic, language, difficulty2, joinTime2);
-            redisQueueRepository.addToDirtyScopes(topic, language);
-            return;
         }
 
-        try {
-            matchRepository.delete(matchDoc);
-        } catch (Exception e) {
-            logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
+        redisUserRepository.rollbackMatch(user1, user2);
+    }
+
+    public String getOtherUserInMatch(String userId, String matchId) {
+        MatchDoc matchDoc = matchRepository.findByMatchId(matchId);
+        if (matchDoc == null) {
+            return null;
         }
+        if (matchDoc.getUser1().equals(userId)) {
+            return matchDoc.getUser2();
+        }
+        if (matchDoc.getUser2().equals(userId)) {
+            return matchDoc.getUser1();
+        }
+        return null;
     }
 
     /**

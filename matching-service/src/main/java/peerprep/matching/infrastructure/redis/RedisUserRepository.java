@@ -19,12 +19,15 @@ public class RedisUserRepository {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final DefaultRedisScript<Long> addUserScript;
+    private final DefaultRedisScript<Long> rollbackMatchScript;
 
     @Autowired
     public RedisUserRepository(RedisTemplate<String, Object> redisTemplate,
-                             DefaultRedisScript<Long> addUserScript) {
+                             DefaultRedisScript<Long> addUserScript,
+                             DefaultRedisScript<Long> rollbackMatchScript) {
         this.redisTemplate = redisTemplate;
         this.addUserScript = addUserScript;
+        this.rollbackMatchScript = rollbackMatchScript;
     }
 
     public String getUserState(String userId) {
@@ -167,5 +170,10 @@ public class RedisUserRepository {
     public <T> T executeScript(org.springframework.data.redis.core.script.RedisScript<T> script,
                                List<String> keys, Object... args) {
         return (T) redisTemplate.execute(script, keys, args);
+    }
+
+    public void rollbackMatch(String user1, String user2) {
+        List<String> keys = Arrays.asList(user1, user2);
+        redisTemplate.execute(rollbackMatchScript, keys);
     }
 }
