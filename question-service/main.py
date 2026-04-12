@@ -5,12 +5,9 @@ import os
 import re
 from bson import ObjectId
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from dotenv import load_dotenv
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi_pagination import Page, add_pagination
-from fastapi_pagination.ext.pymongo import paginate
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from redis.asyncio import from_url as redis_from_url
@@ -125,7 +122,6 @@ async def verify_admin_access(payload: dict = Depends(verify_jwt)):
 
 # Initialize the application
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(verify_jwt)])
-add_pagination(app)
 
 @app.get('/', dependencies=[])
 async def home():
@@ -142,6 +138,8 @@ async def home():
 async def get_questions(
     topic: str | None = Query(default=None),
     difficulty: str | None = Query(default=None),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100)
 ):
     '''
     Retrieves questions in the database, optionally filtered by
@@ -177,8 +175,9 @@ async def get_questions(
         filter['difficulty'] = normalized_difficulty
     
     try:
-        cursor = collection.find(filter, projection)
-        results = await cursor.to_list(length=10000)
+        skip_amount = (page - 1) * size
+        cursor = collection.find(filter, projection).skip(skip_amount).limit(size)
+        results = await cursor.to_list()
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
 
@@ -393,7 +392,9 @@ async def upload_history(attempt: AttemptSchema):
 
 
 @app.get('/history/list')
-async def get_history_list(user_id: str):
+async def get_history_list(user_id: str,
+                           page: int = Query(1, ge=1),
+                           size: int = Query(10, ge=1, le=100)):
     filter = {
         'user_ids': {'$in': [user_id]}
     }
@@ -403,7 +404,10 @@ async def get_history_list(user_id: str):
     }    
 
     try:
-        results = await attempts.find(filter, projection).to_list()
+        skip_size = (page - 1) * size
+        results = attempts.find(filter, projection).skip(skip_size).limit(size)
+        results = await results.to_list()
+
         for result in results:
             result['_id'] = str(result['_id'])
             if user_id != result['user_ids'][0]:
