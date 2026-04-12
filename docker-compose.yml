@@ -13,6 +13,11 @@ services:
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   question-service:
     build:
@@ -30,10 +35,15 @@ services:
     build:
       context: ./matching-service
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       SERVER_PORT: 8080
       QUESTION_SERVICE_URL: http://question-service:8000
       COLLABORATION_SERVICE_URL: http://collaboration-service:1234
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
 
   ai-assistant-service:
     build:
