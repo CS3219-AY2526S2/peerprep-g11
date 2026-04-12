@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import peerprep.matching.models.Difficulty;
+import peerprep.matching.domain.Difficulty;
 
 @Repository
 public class RedisQueueRepository {

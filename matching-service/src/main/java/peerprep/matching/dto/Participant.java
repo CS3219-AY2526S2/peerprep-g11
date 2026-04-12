@@ -1,4 +1,4 @@
-package peerprep.matching.models;
+package peerprep.matching.dto;
 
 public class Participant {
     private String id;

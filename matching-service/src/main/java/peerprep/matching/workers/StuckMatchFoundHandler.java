@@ -1,4 +1,6 @@
-package peerprep.matching.worker;
+package peerprep.matching.workers;
+
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,9 +11,7 @@ import org.springframework.stereotype.Component;
 
 import peerprep.matching.infrastructure.redis.RedisQueueRepository;
 import peerprep.matching.infrastructure.redis.RedisUserRepository;
-import peerprep.matching.service.MatchService;
-
-import java.util.Set;
+import peerprep.matching.services.MatchService;
 
 @Component
 public class StuckMatchFoundHandler {

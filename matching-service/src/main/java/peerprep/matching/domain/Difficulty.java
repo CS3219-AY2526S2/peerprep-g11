@@ -1,8 +1,7 @@
-package peerprep.matching.models;
+package peerprep.matching.domain;
 
-import java.util.List;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
 
 public enum Difficulty {
     EASY("Easy"), 

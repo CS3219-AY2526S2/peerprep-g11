@@ -1,4 +1,4 @@
-package peerprep.matching.service;
+package peerprep.matching.services;
 
 import java.util.*;
 
@@ -7,17 +7,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import peerprep.matching.client.CollaborationServiceClient;
-import peerprep.matching.client.QuestionServiceClient;
+import peerprep.matching.clients.CollaborationServiceClient;
+import peerprep.matching.clients.QuestionServiceClient;
 import peerprep.matching.infrastructure.mongo.document.MatchDoc;
 import peerprep.matching.infrastructure.mongo.repository.MatchRepository;
 import peerprep.matching.infrastructure.redis.RedisMatchRepository;
 import peerprep.matching.infrastructure.redis.RedisQueueRepository;
 import peerprep.matching.infrastructure.redis.RedisUserRepository;
-import peerprep.matching.models.MatchNotificationRequestDto;
-import peerprep.matching.models.MatchRequest;
-import peerprep.matching.models.Participant;
-import peerprep.matching.models.UserState;
+import peerprep.matching.domain.exception.InvalidMatchPreferenceException;
+import peerprep.matching.domain.exception.MatchRequestConflictException;
+import peerprep.matching.domain.UserState;
+import peerprep.matching.dto.MatchNotificationRequestDto;
+import peerprep.matching.dto.MatchRequest;
+import peerprep.matching.dto.Participant;
 
 @Service
 public class MatchService {

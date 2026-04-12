@@ -1,4 +1,6 @@
-package peerprep.matching.controller;
+package peerprep.matching.controllers;
+
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -6,11 +8,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-import peerprep.matching.models.MatchRequest;
-import peerprep.matching.service.InvalidMatchPreferenceException;
-import peerprep.matching.service.MatchRequestConflictException;
-import peerprep.matching.service.MatchService;
+import peerprep.matching.domain.exception.InvalidMatchPreferenceException;
+import peerprep.matching.domain.exception.MatchRequestConflictException;
+import peerprep.matching.dto.MatchRequest;
+import peerprep.matching.services.MatchService;
 
 @RestController
 @RequestMapping("/matching/requests")

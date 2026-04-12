@@ -1,8 +1,9 @@
-package peerprep.matching.worker;
+package peerprep.matching.workers;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import peerprep.matching.service.MatchService;
+
+import peerprep.matching.services.MatchService;
 
 @Component
 public class TimeoutScheduler {

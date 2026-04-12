@@ -1,4 +1,7 @@
-package peerprep.matching.worker;
+package peerprep.matching.workers;
+
+import java.util.List;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,14 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import peerprep.matching.domain.Difficulty;
+import peerprep.matching.domain.DifficultyPair;
 import peerprep.matching.infrastructure.redis.RedisMatchRepository;
 import peerprep.matching.infrastructure.redis.RedisQueueRepository;
-import peerprep.matching.models.Difficulty;
-import peerprep.matching.models.DifficultyPair;
-import peerprep.matching.service.MatchService;
-
-import java.util.List;
-import java.util.UUID;
+import peerprep.matching.services.MatchService;
 
 @Component
 public class MatchingWorker {

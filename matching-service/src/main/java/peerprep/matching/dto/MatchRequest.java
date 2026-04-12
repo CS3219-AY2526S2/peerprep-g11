@@ -1,4 +1,4 @@
-package peerprep.matching.models;
+package peerprep.matching.dto;
 
 public class MatchRequest {
     private String requestId = null;
