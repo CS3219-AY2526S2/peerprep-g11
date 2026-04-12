@@ -567,7 +567,7 @@ export default function SessionPage() {
     session.participants.find((participant) => !participant.isCurrentUser)
       ?.username ?? "Your peer";
   const peerLeftMessage = peerLeft
-    ? `${otherParticipantName} has left the session. Any further edits will not be saved.`
+    ? `${otherParticipantName} has closed the session. Any further edits will not be saved.`
     : null;
 
   return (

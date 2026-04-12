@@ -4,6 +4,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PIDS=()
+REDIS_CONTAINER_NAME=""
+TASK_PIDS=()
+TASK_NAMES=()
 
 ensure_node_dependencies() {
   local dir="$1"
@@ -54,6 +57,30 @@ ensure_python_dependencies() {
   )
 }
 
+start_task() {
+  local name="$1"
+  local cmd="$2"
+
+  echo "[$name] starting"
+  bash -lc "$cmd" &
+  TASK_PIDS+=("$!")
+  TASK_NAMES+=("$name")
+}
+
+wait_for_tasks() {
+  local i
+
+  for i in "${!TASK_PIDS[@]}"; do
+    if ! wait "${TASK_PIDS[$i]}"; then
+      echo "[${TASK_NAMES[$i]}] failed"
+      exit 1
+    fi
+  done
+
+  TASK_PIDS=()
+  TASK_NAMES=()
+}
+
 start_service() {
   local name="$1"
   local dir="$2"
@@ -94,6 +121,11 @@ cleanup() {
 
   trap - EXIT INT TERM
 
+  if [ -n "$REDIS_CONTAINER_NAME" ]; then
+    echo "Stopping Redis container..."
+    docker stop "$REDIS_CONTAINER_NAME" >/dev/null 2>&1 || true
+  fi
+
   if ((${#PIDS[@]} > 0)); then
     echo
     echo "Stopping all services..."
@@ -128,6 +160,28 @@ wait_for_http() {
   done
 
   echo "$name is ready"
+}
+
+start_local_redis_if_needed() {
+  local host="$1"
+  local port="$2"
+
+  if nc -z "$host" "$port" >/dev/null 2>&1; then
+    echo "Redis is already running on $host:$port"
+    return
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Redis is not running on $host:$port and Docker is not installed."
+    echo "Start Redis manually, then run ./scripts/dev-all.sh again."
+    exit 1
+  fi
+
+  REDIS_CONTAINER_NAME="peerprep-dev-redis-$$"
+  echo "Starting Redis in Docker on $host:$port"
+  docker run -d --rm --name "$REDIS_CONTAINER_NAME" -p "$port:6379" redis:7-alpine >/dev/null
+
+  wait_for_port "redis" "$host" "$port" 30
 }
 
 wait_for_port() {
@@ -177,13 +231,20 @@ LOCAL_COLLAB_SERVICE_URL="http://localhost:1234"
 LOCAL_AI_ASSISTANT_SERVICE_URL="http://localhost:4002"
 LOCAL_FRONTEND_ORIGIN="http://localhost:3000"
 LOCAL_COLLAB_WS_URL="ws://localhost:1234"
+LOCAL_REDIS_HOST="localhost"
+LOCAL_REDIS_PORT="6379"
+LOCAL_REDIS_URI="redis://$LOCAL_REDIS_HOST:$LOCAL_REDIS_PORT"
+
+start_local_redis_if_needed "$LOCAL_REDIS_HOST" "$LOCAL_REDIS_PORT"
 
 ensure_python_venv "question-service"
-ensure_python_dependencies "question-service"
-ensure_node_dependencies "collaboration-service"
-ensure_node_dependencies "user-service"
-ensure_node_dependencies "ai-assistant-service"
-ensure_node_dependencies "frontend"
+
+start_task "question-service dependencies" "cd '$ROOT_DIR/question-service' && if [ ! -f requirements.txt ]; then exit 0; fi; if [ -f .venv/.codex-requirements-installed ] && [ .venv/.codex-requirements-installed -nt requirements.txt ]; then exit 0; fi; source .venv/bin/activate && python -m pip install -r requirements.txt && touch .venv/.codex-requirements-installed"
+start_task "collaboration-service dependencies" "cd '$ROOT_DIR/collaboration-service' && [ -d node_modules ] || npm install"
+start_task "user-service dependencies" "cd '$ROOT_DIR/user-service' && [ -d node_modules ] || npm install"
+start_task "ai-assistant-service dependencies" "cd '$ROOT_DIR/ai-assistant-service' && [ -d node_modules ] || npm install"
+start_task "frontend dependencies" "cd '$ROOT_DIR/frontend' && [ -d node_modules ] || npm install"
+wait_for_tasks
 
 assert_port_free "question-service" "8000"
 assert_port_free "collaboration-service" "1234"
@@ -192,19 +253,17 @@ assert_port_free "ai-assistant-service" "4002"
 assert_port_free "matching-service" "8080"
 assert_port_free "frontend" "3000"
 
-start_service "question-service" "question-service" "source .venv/bin/activate && python main.py"
-wait_for_http "question-service" "$LOCAL_QUESTION_SERVICE_URL/health"
-
+start_service "question-service" "question-service" "source .venv/bin/activate && export REDIS_URI='$LOCAL_REDIS_URI'; python main.py"
 start_service "collaboration-service" "collaboration-service" "npm run dev"
-wait_for_http "collaboration-service" "$LOCAL_COLLAB_SERVICE_URL/health"
-
 start_service "user-service" "user-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
-wait_for_http "user-service" "$LOCAL_USER_SERVICE_URL/health"
-
 start_service "ai-assistant-service" "ai-assistant-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
+
+wait_for_http "question-service" "$LOCAL_QUESTION_SERVICE_URL/health"
+wait_for_http "collaboration-service" "$LOCAL_COLLAB_SERVICE_URL/health"
+wait_for_http "user-service" "$LOCAL_USER_SERVICE_URL/health"
 wait_for_http "ai-assistant-service" "$LOCAL_AI_ASSISTANT_SERVICE_URL/health"
 
-start_service "matching-service" "matching-service" "export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; ./gradlew bootRun"
+start_service "matching-service" "matching-service" "export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export SPRING_REDIS_HOST='$LOCAL_REDIS_HOST'; export SPRING_REDIS_PORT='$LOCAL_REDIS_PORT'; ./gradlew bootRun"
 wait_for_port "matching-service" "localhost" "8080"
 
 start_service "frontend" "frontend" "export USER_SERVICE_URL='$LOCAL_USER_SERVICE_URL'; export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export MATCHING_SERVICE_URL='$LOCAL_MATCHING_SERVICE_URL'; export COLLAB_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export NEXT_PUBLIC_COLLAB_SERVICE_WS_URL='$LOCAL_COLLAB_WS_URL'; export AI_ASSISTANT_SERVICE_URL='$LOCAL_AI_ASSISTANT_SERVICE_URL'; npm run dev"
