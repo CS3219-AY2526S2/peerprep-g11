@@ -57,8 +57,13 @@ describe("matching display components", () => {
         preferences={preferences}
         onRetry={onRetry}
         onBack={onBack}
+        errorMessage="You are already in a session."
       />
     );
+
+    expect(
+      screen.getByText("You are already in a session.")
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     fireEvent.click(

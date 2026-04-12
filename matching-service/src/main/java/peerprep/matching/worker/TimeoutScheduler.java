@@ -1,4 +1,4 @@
-package peerprep.matching.scheduler;
+package peerprep.matching.worker;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

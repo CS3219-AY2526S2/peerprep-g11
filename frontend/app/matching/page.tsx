@@ -141,7 +141,7 @@ export default function MatchingPage() {
 
             if (!res.ok) {
                 throw new Error(
-                    payload?.error ?? payload?.message ?? 'Failed to start matching'
+                    payload?.message ?? payload?.error ?? 'Failed to start matching'
                 );
             }
 
@@ -256,7 +256,7 @@ export default function MatchingPage() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10 items-start">
-                        <div>
+                        <div className="w-full max-w-[480px]">
                             {matchingError && (
                                 <Alert variant="destructive" className="mb-5 rounded-xl">
                                     <AlertDescription className="text-[12px]">{matchingError}</AlertDescription>
@@ -298,6 +298,8 @@ export default function MatchingPage() {
                         preferences={preferences}
                         onRetry={handleRetry}
                         onBack={handleBackToPreferences}
+                        errorMessage={matchingError}
+                        isRetrying={isSubmitting}
                     />
                 </div>
             )}

@@ -1,9 +1,9 @@
-package peerprep.matching.repositories;
+package peerprep.matching.infrastructure.mongo.repository;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
-import peerprep.matching.documents.MatchDoc;
+import peerprep.matching.infrastructure.mongo.document.MatchDoc;
 
 @Repository
 public interface MatchRepository extends MongoRepository<MatchDoc, String> {

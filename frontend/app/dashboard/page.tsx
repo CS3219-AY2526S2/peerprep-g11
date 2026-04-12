@@ -59,12 +59,13 @@ export default function DashboardPage() {
   const { user, isLoading } = useRequireAuth();
   const [history, setHistory] = useState<HistoryListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
     async function fetchHistory() {
       try {
-        const res = await fetch(`/api/history?user_id=${encodeURIComponent(user!.id)}`);
+        const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId!)}`);
         if (res.ok) {
           const data: HistoryListItem[] = await res.json();
           setHistory(data);
@@ -76,7 +77,7 @@ export default function DashboardPage() {
       }
     }
     fetchHistory();
-  }, [user?.id]);
+  }, [userId]);
 
   if (isLoading || !user) return <Skeleton />;
 

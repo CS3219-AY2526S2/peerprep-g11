@@ -14,6 +14,8 @@ import { AiSidebarToggle } from "@/app/sessions/[sessionId]/_components/AiSideba
 import { ChatWidget } from "@/app/sessions/[sessionId]/_components/ChatWidget";
 import { SESSION_TOUR_STEP_INDEX } from "@/app/sessions/[sessionId]/_components/sessionTourSteps";
 import { useSessionAi } from "@/app/sessions/[sessionId]/useSessionAi";
+import * as Y from "yjs";
+
 import type { Question } from "@/app/questions/types";
 import type {
   AiTab,
@@ -44,7 +46,10 @@ function createInitialWalkthroughState(): SessionWalkthroughState {
   };
 }
 
-function applyCurrentUserToSession(session: SessionDetails, username: string) {
+function applyCurrentUserToSession(
+  session: SessionDetails,
+  username: string,
+): SessionDetails {
   return {
     ...session,
     participants: session.participants.map((participant) =>
@@ -58,12 +63,158 @@ function applyCurrentUserToSession(session: SessionDetails, username: string) {
   };
 }
 
+function markPeerAsDisconnected(session: SessionDetails): SessionDetails {
+  return {
+    ...session,
+    participants: session.participants.map((participant) =>
+      participant.isCurrentUser
+        ? participant
+        : {
+            ...participant,
+            presence: "disconnected" as const,
+          },
+    ),
+  };
+}
+
+function useYjs({
+  sessionId,
+  ticket,
+  currentUserId,
+  currentUsername,
+}: {
+  sessionId?: string;
+  ticket: string | null;
+  currentUserId?: string;
+  currentUsername?: string;
+}): {
+  yDocument: Y.Doc | null;
+  provider: import("y-websocket").WebsocketProvider | null;
+  connectedParticipantIds: string[];
+} {
+  const [provider, setProvider] = useState<
+    import("y-websocket").WebsocketProvider | null
+  >(null);
+  const [yDocument, setYDocument] = useState<Y.Doc | null>(null);
+  const [connectedParticipantIds, setConnectedParticipantIds] = useState<
+    string[]
+  >([]);
+
+  useEffect(() => {
+    if (!sessionId || !ticket || !currentUserId || !currentUsername) {
+      setProvider(null);
+      setYDocument(null);
+      setConnectedParticipantIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    let createdProvider: import("y-websocket").WebsocketProvider | null = null;
+    let createdDocument: Y.Doc | null = null;
+    let removeAwarenessListener: (() => void) | null = null;
+
+    async function initYjs() {
+      try {
+        const { WebsocketProvider } = await import("y-websocket");
+
+        if (cancelled) {
+          return;
+        }
+
+        const collabServiceUrl =
+          process.env.NEXT_PUBLIC_COLLAB_SERVICE_WS_URL ??
+          `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`;
+
+        createdDocument = new Y.Doc();
+        createdProvider = new WebsocketProvider(
+          collabServiceUrl,
+          sessionId!,
+          createdDocument,
+          { params: { ticket: ticket! } },
+        );
+
+        createdProvider.on("status", (event: { status: string }) => {
+          console.log(`[Yjs] WebSocket status: ${event.status}`);
+        });
+
+        createdProvider.awareness.setLocalStateField("user", {
+          id: currentUserId,
+          username: currentUsername,
+        });
+
+        console.log(
+          "[Yjs] local state after setLocalStateField",
+          createdProvider.awareness.getLocalState(),
+        );
+
+        const syncPresence = () => {
+          if (!createdProvider) {
+            return;
+          }
+
+          const awarenessEntries = Array.from(
+            createdProvider.awareness.getStates().entries(),
+          );
+
+          console.log("[Yjs] raw awareness entries", awarenessEntries);
+
+          const participantIds = awarenessEntries
+            .map(([, state]) => state.user?.id)
+            .filter((id): id is string => typeof id === "string");
+
+          console.log("[Yjs] participant ids from awareness", participantIds);
+
+          setConnectedParticipantIds(Array.from(new Set(participantIds)));
+        };
+
+        createdProvider.awareness.on("change", syncPresence);
+        removeAwarenessListener = () => {
+          createdProvider?.awareness.off("change", syncPresence);
+        };
+
+        syncPresence();
+
+        if (cancelled) {
+          removeAwarenessListener?.();
+          createdProvider.destroy();
+          createdDocument.destroy();
+          return;
+        }
+
+        setYDocument(createdDocument);
+        setProvider(createdProvider);
+      } catch (error) {
+        console.error("[Yjs] Error during initialisation:", error);
+        setProvider(null);
+        setYDocument(null);
+        setConnectedParticipantIds([]);
+      }
+    }
+
+    void initYjs();
+
+    return () => {
+      cancelled = true;
+      removeAwarenessListener?.();
+      createdProvider?.destroy();
+      createdDocument?.destroy();
+      setProvider(null);
+      setYDocument(null);
+      setConnectedParticipantIds([]);
+    };
+  }, [currentUserId, currentUsername, sessionId, ticket]);
+
+  return { yDocument, provider, connectedParticipantIds };
+}
+
 export default function SessionPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const currentUsernameRef = useRef("You");
+  const hasLoadedSessionSuccessfullyRef = useRef(false);
+  const isSessionStatusCheckInFlightRef = useRef(false);
 
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [collabTicket, setCollabTicket] = useState<string | null>(null);
@@ -71,18 +222,36 @@ export default function SessionPage() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [peerLeft, setPeerLeft] = useState(false);
   const [codeByLanguage, setCodeByLanguage] =
     useState<Record<SessionLanguage, string>>(EMPTY_DRAFTS);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [walkthroughState, setWalkthroughState] =
     useState<SessionWalkthroughState>(createInitialWalkthroughState);
 
+  const { yDocument, provider, connectedParticipantIds } = useYjs({
+    sessionId: params.sessionId,
+    ticket: collabTicket,
+    currentUserId: user?.id,
+    currentUsername: user?.username,
+  });
+
+  const handlePeerLeft = useCallback(() => {
+    setPeerLeft(true);
+    setLeaveError(null);
+    setSession((currentSession) =>
+      currentSession ? markPeerAsDisconnected(currentSession) : currentSession,
+    );
+  }, []);
+
   const loadSessionPage = useCallback(
     async (sessionId: string, currentUsername: string) => {
       setLoadingSession(true);
       setLoadingQuestion(true);
       setError(null);
+      setPeerLeft(false);
       setLeaveError(null);
+      hasLoadedSessionSuccessfullyRef.current = false;
 
       try {
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`);
@@ -110,6 +279,7 @@ export default function SessionPage() {
           currentUsername,
         );
         setSession(sessionData);
+        hasLoadedSessionSuccessfullyRef.current = true;
         setCodeByLanguage({
           javascript: sessionData.starterCode.javascript,
           python: sessionData.starterCode.python,
@@ -136,6 +306,7 @@ export default function SessionPage() {
 
         setQuestion(questionBody as Question);
       } catch {
+        hasLoadedSessionSuccessfullyRef.current = false;
         setError("Unable to load this collaboration session right now");
         setSession(null);
         setQuestion(null);
@@ -173,6 +344,38 @@ export default function SessionPage() {
     );
   }, [user?.username]);
 
+  useEffect(() => {
+    setSession((currentSession) => {
+      if (!currentSession) {
+        return currentSession;
+      }
+
+      const connectedParticipantIdSet = new Set(connectedParticipantIds);
+
+      console.log(
+        "[Session] participants vs connected ids",
+        currentSession.participants.map((participant) => ({
+          participantId: participant.id,
+          username: participant.username,
+          isCurrentUser: participant.isCurrentUser,
+          connected: connectedParticipantIdSet.has(participant.id),
+        })),
+      );
+
+      return {
+        ...currentSession,
+        participants: currentSession.participants.map((participant) => ({
+          ...participant,
+          presence:
+            participant.isCurrentUser ||
+            connectedParticipantIdSet.has(participant.id)
+              ? "connected"
+              : "disconnected",
+        })),
+      };
+    });
+  }, [connectedParticipantIds]);
+
   function handleRetry() {
     if (!params.sessionId || authLoading || !user) {
       return;
@@ -184,7 +387,9 @@ export default function SessionPage() {
     setLoadingSession(true);
     setLoadingQuestion(true);
     setError(null);
+    setPeerLeft(false);
     setLeaveError(null);
+    hasLoadedSessionSuccessfullyRef.current = false;
 
     void loadSessionPage(params.sessionId, user.username);
   }
@@ -203,6 +408,54 @@ export default function SessionPage() {
       router.push(response.redirectTo);
     });
   }
+
+  const checkSessionStillExists = useCallback(async () => {
+    if (
+      !params.sessionId ||
+      !hasLoadedSessionSuccessfullyRef.current ||
+      peerLeft ||
+      isSessionStatusCheckInFlightRef.current
+    ) {
+      return;
+    }
+
+    isSessionStatusCheckInFlightRef.current = true;
+
+    try {
+      const response = await fetch(`/api/sessions/${params.sessionId}`);
+
+      if (response.status === 404 && hasLoadedSessionSuccessfullyRef.current) {
+        handlePeerLeft();
+      }
+    } catch {
+      // Ignore transient polling failures and keep the current session view active.
+    } finally {
+      isSessionStatusCheckInFlightRef.current = false;
+    }
+  }, [handlePeerLeft, params.sessionId, peerLeft]);
+
+  useEffect(() => {
+    if (!session || !params.sessionId || peerLeft) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void checkSessionStillExists();
+    }, 3000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void checkSessionStillExists();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkSessionStillExists, params.sessionId, peerLeft, session]);
 
   const handleTourStepChange = useCallback((stepIndex: number | null) => {
     setWalkthroughState((current) => {
@@ -299,7 +552,7 @@ export default function SessionPage() {
             title={notFound ? "Session unavailable" : "Unable to open session"}
             message={
               notFound
-                ? "This mocked session could not be found. Try returning to the dashboard and starting again."
+                ? "This session could not be found. Try returning to the dashboard and starting again."
                 : (error ??
                   "Something went wrong while loading the collaboration session.")
             }
@@ -309,6 +562,13 @@ export default function SessionPage() {
       </div>
     );
   }
+
+  const otherParticipantName =
+    session.participants.find((participant) => !participant.isCurrentUser)
+      ?.username ?? "Your peer";
+  const peerLeftMessage = peerLeft
+    ? `${otherParticipantName} has closed the session. Any further edits will not be saved.`
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -345,14 +605,13 @@ export default function SessionPage() {
           }
         />
         <div className="min-w-0 flex-1">
-          <SessionOnboardingTour
-            onStepChange={handleTourStepChange}
-          >
+          <SessionOnboardingTour onStepChange={handleTourStepChange}>
             <div className="mx-auto max-w-[1680px] px-5 pt-8 pb-6 sm:px-8 lg:px-10 lg:pb-8">
               <SessionHeader
                 sessionId={session.sessionId}
                 participants={session.participants}
                 leaveError={leaveError}
+                peerLeftMessage={peerLeftMessage}
                 onLeaveSuccess={handleLeaveSuccess}
                 onLeaveError={setLeaveError}
               />
@@ -361,7 +620,6 @@ export default function SessionPage() {
                 <QuestionPanel question={question} />
                 <EditorPanel
                   sessionId={session.sessionId}
-                  ticket={collabTicket}
                   selectedLanguage={sessionLanguage}
                   value={codeByLanguage[sessionLanguage]}
                   onChange={handleEditorChange}
@@ -369,13 +627,15 @@ export default function SessionPage() {
                   walkthroughShowExplainDemo={
                     walkthroughState.isEditorExplainDemoActive
                   }
+                  yDocument={yDocument}
+                  provider={provider}
                 />
               </div>
             </div>
           </SessionOnboardingTour>
         </div>
       </div>
-      <ChatWidget 
+      <ChatWidget
         participants={session.participants}
         sessionId={session.sessionId}
         ticket={collabTicket}

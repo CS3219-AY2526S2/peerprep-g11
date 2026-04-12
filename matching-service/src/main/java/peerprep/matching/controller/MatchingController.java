@@ -1,4 +1,4 @@
-package peerprep.matching.controllers;
+package peerprep.matching.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import peerprep.matching.models.MatchRequest;
 import peerprep.matching.service.InvalidMatchPreferenceException;
+import peerprep.matching.service.MatchRequestConflictException;
 import peerprep.matching.service.MatchService;
-import peerprep.matching.documents.UserStateDoc;
 
 @RestController
 @RequestMapping("/matching/requests")
@@ -19,7 +19,6 @@ public class MatchingController {
     @Autowired
     private MatchService matchService;
 
-    // --- Start a new match ---
     @PostMapping
     public ResponseEntity<?> startMatch(@RequestBody MatchRequest req) {
         String[] userInfo = getAuthenticatedUser();
@@ -37,6 +36,11 @@ public class MatchingController {
             requestId = matchService.addUser(req);
         } catch (InvalidMatchPreferenceException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        } catch (MatchRequestConflictException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(),
+                    "reason", e.getReason()
+            ));
         }
 
         return ResponseEntity.status(201).body(Map.of(
@@ -45,7 +49,6 @@ public class MatchingController {
         ));
     }
 
-    // --- Cancel match ---
     @DeleteMapping("/{requestId}")
     public ResponseEntity<?> cancelMatch(@PathVariable String requestId) {
         String[] userInfo = getAuthenticatedUser();
@@ -54,8 +57,8 @@ public class MatchingController {
         }
 
         String jwtUserId = userInfo[0];
-        UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
-        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId)) {
+        Map<String, String> stateMap = matchService.getUserStateMapByRequestId(requestId);
+        if (stateMap == null || !jwtUserId.equals(stateMap.get("userId"))) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
         }
 
@@ -64,7 +67,6 @@ public class MatchingController {
         return ResponseEntity.status(404).body(Map.of("error", "Match not found"));
     }
 
-    // --- Get match status ---
     @GetMapping("/{requestId}")
     public ResponseEntity<?> getMatchStatus(@PathVariable String requestId) {
         String[] userInfo = getAuthenticatedUser();
@@ -73,12 +75,12 @@ public class MatchingController {
         }
 
         String jwtUserId = userInfo[0];
-        UserStateDoc stateDoc = matchService.getStateDocByRequestId(requestId);
-        if (stateDoc == null || !stateDoc.getUserId().equals(jwtUserId)) {
+        Map<String, String> stateMap = matchService.getUserStateMapByRequestId(requestId);
+        if (stateMap == null || !jwtUserId.equals(stateMap.get("userId"))) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
         }
 
-        Map<String, Object> statusInfo = matchService.getStatusWithMatchId(requestId);
+        Map<String, Object> statusInfo = matchService.getStatus(requestId);
         if (statusInfo == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Status not found"));
         }

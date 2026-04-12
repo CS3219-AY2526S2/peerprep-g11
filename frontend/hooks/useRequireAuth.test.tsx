@@ -2,8 +2,6 @@ import { renderHook, waitFor } from "@testing-library/react";
 
 import { Role } from "@/lib/auth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import * as mockAuthModule from "@/test-utils/mock-auth";
-import * as mockNextNavigationModule from "@/test-utils/next-navigation";
 import {
   mockReplace,
   resetNextNavigationMocks,
@@ -13,8 +11,12 @@ import {
   setMockAuthState,
 } from "@/test-utils/mock-auth";
 
-jest.mock("next/navigation", () => mockNextNavigationModule);
-jest.mock("@/contexts/AuthContext", () => mockAuthModule);
+jest.mock("next/navigation", () =>
+  jest.requireActual("@/test-utils/next-navigation")
+);
+jest.mock("@/contexts/AuthContext", () =>
+  jest.requireActual("@/test-utils/mock-auth")
+);
 
 describe("useRequireAuth", () => {
   beforeEach(() => {
