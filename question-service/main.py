@@ -14,7 +14,7 @@ from fastapi_pagination.ext.pymongo import paginate
 from pymongo import AsyncMongoClient, ReturnDocument, ASCENDING
 from pymongo.errors import PyMongoError
 from redis.asyncio import from_url as redis_from_url
-from schema import AttemptSchema, BulkDeleteSchema, QuestionSchema, RetrieveDeleteSchema, RetrieveHistoryListSchema
+from schema import AttemptSchema, BulkDeleteSchema, QuestionSchema, RetrieveDeleteSchema
 from typing import Annotated
 from utils import create_slug, create_timestamp, normalize_topic
 
@@ -138,7 +138,7 @@ async def home():
 #             User access APIs
 # ============================================
 
-@app.get('/questions', dependencies=[])
+@app.get('/questions')
 async def get_questions(
     topic: str | None = Query(default=None),
     difficulty: str | None = Query(default=None),
@@ -377,7 +377,7 @@ async def upload_history(attempt: AttemptSchema):
     '''
     data = attempt.model_dump()
     data['timestamp'] = create_timestamp()
-    data['code'] = base64.b64encode(data['code'].encode()).decode() # Encode in base64 for storage
+    # data['code'] = base64.b64encode(data['code'].encode()).decode() # Encode in base64 for storage
 
     try:
         db_result = await attempts.insert_one(data)
@@ -393,23 +393,25 @@ async def upload_history(attempt: AttemptSchema):
 
 
 @app.get('/history/list')
-async def get_history_list(user: RetrieveHistoryListSchema):
-    user_id = user.user_id
+async def get_history_list(user_id: str):
     filter = {
-        'user_ids': {'$in': user_id}
+        'user_ids': {'$in': [user_id]}
     }
     projection = {
         'language': 0,
         'code': 0
-    }
+    }    
 
     try:
         results = await attempts.find(filter, projection).to_list()
         for result in results:
-            for id in result['user_ids']:
-                if id != user_id:
-                    result['partner_id'] = id
-                    break
+            result['_id'] = str(result['_id'])
+            if user_id != result['user_ids'][0]:
+                result['partner_id'] = result['user_ids'][0]
+                result['partner_username'] = result['user_names'][0]
+            else:
+                result['partner_id'] = result['user_ids'][1]
+                result['partner_username'] = result['user_names'][1]
 
             qns_filter = {
                 'slug': result['slug']
@@ -424,17 +426,26 @@ async def get_history_list(user: RetrieveHistoryListSchema):
 
 
 @app.get('/history/{id}')
-async def get_history(id: str):
+async def get_history(id: str, user_token: dict = Depends(verify_jwt)):
     filter = {
         '_id': ObjectId(id)
     }
+    user_id = user_token['id']
 
     try:
         result = await attempts.find_one(filter)
         if not result:
             raise ValueError("Result not found")
 
-        result['partner_id'] = result['user_ids'][0]
+        result['_id'] = str(result['_id'])
+        if user_id != result['user_ids'][0]:
+            result['partner_id'] = result['user_ids'][0]
+            result['partner_username'] = result['user_names'][0]
+        else:
+            result['partner_id'] = result['user_ids'][1]
+            result['partner_username'] = result['user_names'][1]
+            
+        result['code'] = base64.b64decode(result['code'].encode()).decode()
         qns_filter = {
             'slug': result['slug']
         }
@@ -449,7 +460,7 @@ async def get_history(id: str):
     return result
 
 
-@app.get('/health', dependencies=[])
+@app.get('/health')
 async def health_check():
     '''
     Check repository status

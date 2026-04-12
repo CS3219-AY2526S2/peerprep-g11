@@ -218,6 +218,7 @@ Adds an attempt to the database.
 {
     "session_id": "81420ad8-9559-497b-8695-2585137a29d5",
     "user_ids": ["69be848b4e2576f0b59c492d", "69be848b4e2576f0b59c492d"],
+    "user_names": ["test1", "test2"],
     "slug": "two-sum-variations",
     "language": "Python",
     "code": "
@@ -231,7 +232,8 @@ Adds an attempt to the database.
 | Variable         | Description                            | Constraint                                                                           |
 |------------------|----------------------------------------|--------------------------------------------------------------------------------------|
 | `session_id`     | The completed session id               | Auto-managed by collaboration service                                                |
-| `user_ids`       | The  users' id                         | Must be exactly 2 ids, each in 24 hexadecimal characters (based on BSON)             |
+| `user_ids`       | The  users' id                         | Must be exactly 2 ids, each id must correspond to username in `user_names`           |
+| `user_names`     | The usernames                          | Must be exactly 2 names, each name must correspond to id in `user_ids`               |
 | `slug`           | The slug of the attempting question    | Required                                                                             |
 | `language`       | The coding language used               | Must be a language available in PeerPrep                                             |
 | `code`           | The full code                          | None                                                                                 |

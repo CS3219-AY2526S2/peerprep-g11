@@ -11,7 +11,7 @@ class QuestionSchema(BaseModel):
 
     @field_validator('title', mode='before')
     @classmethod
-    def validate_difficulty(cls, title):
+    def validate_title(cls, title):
         if not title:
             raise ValueError('Title need at least one character')
         elif not all(c in string.ascii_letters for c in title):
@@ -55,6 +55,9 @@ class QuestionSchema(BaseModel):
         
         return constraints
     
+#====================================================
+#                  Admin Schema
+#====================================================
 
 class RetrieveDeleteSchema(BaseModel):
     slug: str
@@ -81,10 +84,14 @@ class BulkDeleteSchema(BaseModel):
 
         return cleaned
     
+#====================================================
+#                 History Schema
+#====================================================    
 
 class AttemptSchema(BaseModel):
     session_id: str
     user_ids: list[str]
+    user_names: list[str]
     slug: str
     language: str
     code: str
@@ -93,7 +100,7 @@ class AttemptSchema(BaseModel):
     @classmethod
     def validate_user_ids(cls, user_ids):
         if len(user_ids) != 2:
-            raise ValueError('Unexpected numbers of users found')
+            raise ValueError('Unexpected numbers of user ids found')
         
         for id in user_ids:
             if not all(c in string.hexdigits for c in id):
@@ -101,15 +108,11 @@ class AttemptSchema(BaseModel):
             
         return user_ids
     
-
-class RetrieveHistoryListSchema(BaseModel):
-    user_id: str
-
-    @field_validator('user_id', mode='before')
+    @field_validator('user_names', mode='before')
     @classmethod
-    def validate_user_id(cls, user_id):
-        if len(user_id) != 24 or not all(c in string.hexdigits for c in user_id):
-            raise ValueError('Invalid user id') 
-        
-        return user_id
+    def validate_user_ids(cls, user_names):
+        if len(user_names) != 2:
+            raise ValueError('Unexpected numbers of user names found')
+
+        return user_names
     
