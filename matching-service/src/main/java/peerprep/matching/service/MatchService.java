@@ -264,37 +264,36 @@ public class MatchService {
         redisUserRepository.setUserState(user1, UserState.PENDING.name());
         redisUserRepository.setUserState(user2, UserState.PENDING.name());
 
-        String category = redisUserRepository.getUserCategory(user1);
-        if (category == null) {
-            category = redisUserRepository.getUserCategory(user2);
+        String topic = redisUserRepository.getUserTopic(user1);
+        if (topic == null) {
+            topic = redisUserRepository.getUserTopic(user2);
         }
+        String language = redisUserRepository.getUserLanguage(user1);
+        if (language == null) {
+            language = redisUserRepository.getUserLanguage(user2);
+        }
+        String difficulty1 = redisUserRepository.getUserDifficulty(user1);
+        String difficulty2 = redisUserRepository.getUserDifficulty(user2);
 
-        if (category != null) {
-            String[] parts = category.split("\\|");
-            if (parts.length == 3) {
-                String topic = parts[0];
-                String language = parts[2];
-                String difficulty = parts[1];
-
-                try {
-                    matchRepository.delete(matchDoc);
-                } catch (Exception e) {
-                    logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
-                }
-
-                Long joinTime1 = redisUserRepository.getJoinTime(user1);
-                if (joinTime1 == null) {
-                    joinTime1 = System.currentTimeMillis();
-                }
-                Long joinTime2 = redisUserRepository.getJoinTime(user2);
-                if (joinTime2 == null) {
-                    joinTime2 = System.currentTimeMillis();
-                }
-
-                redisQueueRepository.requeueUser(user1, topic, language, difficulty, joinTime1);
-                redisQueueRepository.requeueUser(user2, topic, language, difficulty, joinTime2);
-                return;
+        if (topic != null && language != null && difficulty1 != null && difficulty2 != null) {
+            try {
+                matchRepository.delete(matchDoc);
+            } catch (Exception e) {
+                logger.error("Failed to delete match doc during rollback: {}", e.getMessage());
             }
+
+            Long joinTime1 = redisUserRepository.getJoinTime(user1);
+            if (joinTime1 == null) {
+                joinTime1 = System.currentTimeMillis();
+            }
+            Long joinTime2 = redisUserRepository.getJoinTime(user2);
+            if (joinTime2 == null) {
+                joinTime2 = System.currentTimeMillis();
+            }
+
+            redisQueueRepository.requeueUser(user1, topic, language, difficulty1, joinTime1);
+            redisQueueRepository.requeueUser(user2, topic, language, difficulty2, joinTime2);
+            return;
         }
 
         try {
@@ -324,12 +323,11 @@ public class MatchService {
             return false;
         }
 
-        String category = redisUserRepository.getUserCategory(userId);
-        if (category != null) {
-            String[] parts = category.split("\\|");
-            if (parts.length == 3) {
-                redisQueueRepository.removeUserFromAllQueues(parts[0], parts[2], parts[1], userId);
-            }
+        String topic = redisUserRepository.getUserTopic(userId);
+        String language = redisUserRepository.getUserLanguage(userId);
+        String difficulty = redisUserRepository.getUserDifficulty(userId);
+        if (topic != null && language != null && difficulty != null) {
+            redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
         }
 
         redisUserRepository.removeUserState(userId);
@@ -380,21 +378,12 @@ public class MatchService {
                 continue;
             }
 
-            String category = redisUserRepository.getUserCategory(userId);
-            if (category == null) {
-                continue;
+            String topic = redisUserRepository.getUserTopic(userId);
+            String language = redisUserRepository.getUserLanguage(userId);
+            String difficulty = redisUserRepository.getUserDifficulty(userId);
+            if (topic != null && language != null && difficulty != null) {
+                redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
             }
-
-            String[] parts = category.split("\\|");
-            if (parts.length != 3) {
-                continue;
-            }
-
-            String topic = parts[0];
-            String language = parts[2];
-            String difficulty = parts[1];
-
-            redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
             redisUserRepository.setUserState(userId, UserState.TIMED_OUT.name());
         }
     }

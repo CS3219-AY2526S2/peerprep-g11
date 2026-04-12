@@ -81,14 +81,19 @@ public class RedisUserRepository {
         redisTemplate.delete(USER_STATE_PREFIX + userId);
     }
 
-    public String getUserCategory(String userId) {
+    public String getUserTopic(String userId) {
         String topic = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "topic");
+        return topic;
+    }
+
+    public String getUserLanguage(String userId) {
         String language = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "language");
+        return language;
+    }
+
+    public String getUserDifficulty(String userId) {
         String difficulty = (String) redisTemplate.opsForHash().get(USER_STATE_PREFIX + userId, "difficulty");
-        if (topic == null || language == null || difficulty == null) {
-            return null;
-        }
-        return topic + "|" + difficulty + "|" + language;
+        return difficulty;
     }
 
     public void setMatchFoundAt(String userId, long timestamp) {

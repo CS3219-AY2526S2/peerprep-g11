@@ -81,15 +81,11 @@ public class StuckMatchFoundHandler {
         if (matchId != null) {
             matchService.rollbackMatchByMatchId(matchId);
         } else {
-            String category = redisUserRepository.getUserCategory(userId);
-            if (category != null) {
-                String[] parts = category.split("\\|");
-                if (parts.length == 3) {
-                    String topic = parts[0];
-                    String language = parts[2];
-                    String difficulty = parts[1];
-                    redisQueueRepository.requeueUser(userId, topic, language, difficulty, joinTime);
-                }
+            String topic = redisUserRepository.getUserTopic(userId);
+            String language = redisUserRepository.getUserLanguage(userId);
+            String difficulty = redisUserRepository.getUserDifficulty(userId);
+            if (topic != null && language != null && difficulty != null) {
+                redisQueueRepository.requeueUser(userId, topic, language, difficulty, joinTime);
             }
         }
 
