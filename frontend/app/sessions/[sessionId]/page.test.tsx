@@ -184,7 +184,7 @@ describe('SessionPage peer departure flow', () => {
 
     expect(
       await screen.findByText(
-        'Taylor has left the session. Any further edits will not be saved.',
+        'Taylor has closed the session. Any further edits will not be saved.',
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('Session unavailable')).not.toBeInTheDocument();
@@ -240,7 +240,7 @@ describe('SessionPage peer departure flow', () => {
 
     expect(
       screen.queryByText(
-        'Taylor has left the session. Any further edits will not be saved.',
+        'Taylor has closed the session. Any further edits will not be saved.',
       ),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Taylor.*Connected/i })).toBeInTheDocument();
