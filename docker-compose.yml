@@ -1,0 +1,95 @@
+services:
+  user-service:
+    build:
+      context: ./user-service
+    restart: unless-stopped
+    env_file:
+      - ./user-service/.env
+    environment:
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3001}
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  question-service:
+    build:
+      context: ./question-service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+    env_file:
+      - ./question-service/.env
+    environment:
+      REDIS_URI: redis://redis:6379
+
+  matching-service:
+    build:
+      context: ./matching-service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      QUESTION_SERVICE_URL: http://question-service:8000
+      COLLABORATION_SERVICE_URL: http://collaboration-service:1234
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+
+  ai-assistant-service:
+    build:
+      context: ./ai-assistant-service
+    depends_on:
+      user-service:
+        condition: service_started
+    restart: unless-stopped
+    env_file:
+      - ./ai-assistant-service/.env
+    environment:
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3001}
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      user-service:
+        condition: service_started
+      question-service:
+        condition: service_started
+      matching-service:
+        condition: service_started
+      ai-assistant-service:
+        condition: service_started
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      USER_SERVICE_URL: http://user-service:4001
+      QUESTION_SERVICE_URL: http://question-service:8000
+      MATCHING_SERVICE_URL: http://matching-service:8080
+      AI_ASSISTANT_SERVICE_URL: http://ai-assistant-service:4002
+      COLLAB_SERVICE_URL: http://collaboration-service:1234
+      NEXT_PUBLIC_COLLAB_SERVICE_WS_URL: ${NEXT_PUBLIC_COLLAB_SERVICE_WS_URL:-ws://localhost:1234}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+
+  collaboration-service:
+    build:
+      context: ./collaboration-service
+    restart: unless-stopped
+    env_file:
+      - ./collaboration-service/.env
+    ports:
+      - "${COLLAB_PORT:-1234}:1234"

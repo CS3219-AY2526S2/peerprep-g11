@@ -1,0 +1,6 @@
+JWT_SECRET=put_Jwt_secret_here
+spring.data.mongodb.uri=put_uri_here
+spring.data.redis.host=${SPRING_REDIS_HOST:redis}
+spring.data.redis.port=${SPRING_REDIS_PORT:6379}
+question.service.url=${QUESTION_SERVICE_URL:http://question-service:8000}
+collaboration.service.url=${COLLABORATION_SERVICE_URL:http://collaboration-service:1234}
