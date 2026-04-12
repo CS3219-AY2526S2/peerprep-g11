@@ -6,7 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+
+import peerprep.matching.models.Difficulty;
 
 @Repository
 public class RedisQueueRepository {
@@ -16,6 +19,7 @@ public class RedisQueueRepository {
     private static final String DIRTY_SCOPES = "dirtyScopes";
 
     private static final long TWO_MIN_IN_MS = 120000;
+    private static final List<Difficulty> DIFFICULTIES = Arrays.asList(Difficulty.values());
 
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -64,8 +68,8 @@ public class RedisQueueRepository {
     }
 
     public boolean hasUsersInScope(String topic, String language) {
-        for (String difficulty : Arrays.asList("EASY", "MEDIUM", "HARD")) {
-            if (getQueueSize(topic, language, difficulty) > 0) {
+        for (Difficulty difficulty : DIFFICULTIES) {
+            if (getQueueSize(topic, language, difficulty.getLabel()) > 0) {
                 return true;
             }
         }

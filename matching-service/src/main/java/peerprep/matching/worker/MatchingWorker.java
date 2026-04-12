@@ -8,9 +8,10 @@ import org.springframework.stereotype.Component;
 
 import peerprep.matching.infrastructure.redis.RedisMatchRepository;
 import peerprep.matching.infrastructure.redis.RedisQueueRepository;
+import peerprep.matching.models.Difficulty;
+import peerprep.matching.models.DifficultyPair;
 import peerprep.matching.service.MatchService;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,14 +20,11 @@ public class MatchingWorker {
 
     private static final Logger logger = LoggerFactory.getLogger(MatchingWorker.class);
 
-    private static final List<String> DIFFICULTIES = Arrays.asList("Easy", "Medium", "Hard");
-    private static final List<String[]> RELAXED_PAIRS = Arrays.asList(
-            new String[]{"Easy", "Medium"},
-            new String[]{"Medium", "Hard"}
-    );
+    private static final List<Difficulty> DIFFICULTIES = List.of(Difficulty.values());
+    private static final List<DifficultyPair> RELAXED_PAIRS = Difficulty.getAdjacentPairs();
 
-    private static final int STRICT_CAP = 10;
-    private static final int RELAXED_CAP = 3;
+    private static final int STRICT_ROUNDS_LIMIT = 10;
+    private static final int RELAXED_ROUNDS_LIMIT = 3;
 
     private final RedisMatchRepository redisMatchRepository;
     private final RedisQueueRepository redisQueueRepository;
@@ -64,50 +62,15 @@ public class MatchingWorker {
         String topic = parts[0];
         String language = parts[1];
 
-        int totalStrict = 0;
-        while (totalStrict < STRICT_CAP) {
-            boolean madeMatch = false;
-
-            for (String difficulty : DIFFICULTIES) {
-                List<String> pair = redisMatchRepository.tryStrictMatch(topic, language, difficulty);
-                if (pair != null && pair.size() >= 2) {
-                    String user1 = pair.get(0);
-                    String user2 = pair.get(1);
-
-                    String matchId = UUID.randomUUID().toString();
-                    matchService.createMatchFromPair(user1, user2, difficulty, topic, language, matchId);
-
-                    totalStrict++;
-                    madeMatch = true;
-                }
-            }
-
+        for (int i = 0; i < STRICT_ROUNDS_LIMIT; i++) {
+            boolean madeMatch = tryStrictRound(topic, language);
             if (!madeMatch) {
                 break;
             }
         }
 
-        int totalRelaxed = 0;
-        while (totalRelaxed < RELAXED_CAP) {
-            boolean madeMatch = false;
-
-            for (String[] pair : RELAXED_PAIRS) {
-                String diff1 = pair[0];
-                String diff2 = pair[1];
-
-                List<String> matchedPair = redisMatchRepository.tryRelaxedMatch(topic, language, diff1, diff2);
-                if (matchedPair != null && matchedPair.size() >= 2) {
-                    String user1 = matchedPair.get(0);
-                    String user2 = matchedPair.get(1);
-
-                    String matchId = UUID.randomUUID().toString();
-                    matchService.createMatchFromPair(user1, user2, diff1, topic, language, matchId);
-
-                    totalRelaxed++;
-                    madeMatch = true;
-                }
-            }
-
+        for (int i = 0; i < RELAXED_ROUNDS_LIMIT; i++) {
+            boolean madeMatch = tryRelaxedRound(topic, language);
             if (!madeMatch) {
                 break;
             }
@@ -116,5 +79,46 @@ public class MatchingWorker {
         if (redisQueueRepository.hasUsersInScope(topic, language)) {
             redisQueueRepository.addToDirtyScopes(topic, language);
         }
+    }
+
+    private boolean tryStrictRound(String topic, String language) {
+        boolean madeMatch = false;
+
+        for (Difficulty difficulty : DIFFICULTIES) {
+            String diffLabel = difficulty.getLabel();
+            List<String> pair = redisMatchRepository.tryStrictMatch(topic, language, diffLabel);
+            if (pair != null && pair.size() >= 2) {
+                String user1 = pair.get(0);
+                String user2 = pair.get(1);
+
+                String matchId = UUID.randomUUID().toString();
+                matchService.createMatchFromPair(user1, user2,  diffLabel, topic, language, matchId);
+                madeMatch = true;
+            }
+        }
+
+        return madeMatch;
+    }
+
+    private boolean tryRelaxedRound(String topic, String language) {
+        boolean madeMatch = false;
+
+        for (DifficultyPair pair : RELAXED_PAIRS) {
+            String diffLabel1 = pair.first().getLabel();
+            String diffLabel2 = pair.second().getLabel();
+
+            List<String> matchedPair = redisMatchRepository.tryRelaxedMatch(topic, language, diffLabel1, diffLabel2);
+            if (matchedPair != null && matchedPair.size() >= 2) {
+                String user1 = matchedPair.get(0);
+                String user2 = matchedPair.get(1);
+
+                String matchId = UUID.randomUUID().toString();
+                matchService.createMatchFromPair(user1, user2, diffLabel1, topic, language, matchId);
+
+                madeMatch = true;
+            }
+        }
+
+        return madeMatch;
     }
 }
