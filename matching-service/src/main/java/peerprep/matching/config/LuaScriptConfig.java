@@ -73,4 +73,13 @@ public class LuaScriptConfig {
         script.setResultType(Long.class);
         return script;
     }
+
+    @Bean
+    public DefaultRedisScript<Long> removeTimeoutUserScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/remove_timeout_user.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

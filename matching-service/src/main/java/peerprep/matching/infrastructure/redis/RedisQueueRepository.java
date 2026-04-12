@@ -2,6 +2,7 @@ package peerprep.matching.infrastructure.redis;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
 import java.util.Arrays;
@@ -22,10 +23,14 @@ public class RedisQueueRepository {
     private static final List<Difficulty> DIFFICULTIES = Arrays.asList(Difficulty.values());
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final DefaultRedisScript<Long> removeTimeoutUserScript;
+
 
     @Autowired
-    public RedisQueueRepository(RedisTemplate<String, Object> redisTemplate) {
+    public RedisQueueRepository(RedisTemplate<String, Object> redisTemplate,
+                               DefaultRedisScript<Long> removeTimeoutUserScript) {
         this.redisTemplate = redisTemplate;
+        this.removeTimeoutUserScript = removeTimeoutUserScript;
     }
 
     public void addUserToQueue(String topic, String language, String difficulty, String userId) {
@@ -95,5 +100,11 @@ public class RedisQueueRepository {
 
         long expiry = joinTime + TWO_MIN_IN_MS;
         redisTemplate.opsForZSet().add(TIMEOUT_QUEUE, userId, expiry);
+    }
+
+    public boolean removeTimeoutUser(String userId) {
+        List<String> keys = Arrays.asList(userId);
+        Long result = redisTemplate.execute(removeTimeoutUserScript, keys);
+        return result != null && result == 1L;
     }
 }

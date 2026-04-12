@@ -300,20 +300,7 @@ public class MatchService {
         Set<String> expiredUserIds = redisQueueRepository.getExpiredTimeoutUsers();
 
         for (String userId : expiredUserIds) {
-            redisQueueRepository.removeFromTimeoutQueue(userId);
-
-            String state = redisUserRepository.getUserState(userId);
-            if (!UserState.PENDING.name().equals(state)) {
-                continue;
-            }
-
-            String topic = redisUserRepository.getUserTopic(userId);
-            String language = redisUserRepository.getUserLanguage(userId);
-            String difficulty = redisUserRepository.getUserDifficulty(userId);
-            if (topic != null && language != null && difficulty != null) {
-                redisQueueRepository.removeUserFromAllQueues(topic, language, difficulty, userId);
-            }
-            redisUserRepository.setUserState(userId, UserState.TIMED_OUT.name());
+            redisQueueRepository.removeTimeoutUser(userId);
         }
     }
 
