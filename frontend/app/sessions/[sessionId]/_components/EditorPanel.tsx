@@ -3,12 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { editor } from "monaco-editor";
-import { SparklesIcon } from "lucide-react";
+import { InfoIcon, SparklesIcon, WandSparklesIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SessionLanguage } from "@/app/sessions/[sessionId]/types";
 import { PROGRAMMING_LANGUAGE_LABELS } from "@/lib/programming-languages";
+import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import * as Y from "yjs";
 
 type MonacoInstance = typeof import("monaco-editor");
@@ -41,6 +49,30 @@ interface WidgetPosition {
   left: number;
 }
 
+const FORMATTING_RULES: Record<SessionLanguage, string[]> = {
+  python: [
+    "Formatted with Black (PEP 8 compliant)",
+    "Consistent indentation (4 spaces)",
+    "Line length (defaults to 88 characters)",
+    "Trailing commas and whitespace cleanup",
+    "Consistent string quoting",
+  ],
+  javascript: [
+    "Consistent indentation (2 spaces)",
+    "Semicolons auto-inserted",
+    "Line length (defaults to 80 characters)",
+    "Trailing commas, whitespace, blank lines",
+    "Consistent string quoting",
+  ],
+  java: [
+    "Formatted with google-java-format",
+    "Consistent indentation and brace placement",
+    "Proper spacing and line wrapping",
+    "Import ordering and cleanup",
+    "Google Java Style compliant",
+  ],
+};
+
 function handleEditorWillMount(monaco: typeof import("monaco-editor")) {
   monaco.editor.defineTheme("peerprep-light", {
     base: "vs",
@@ -50,6 +82,8 @@ function handleEditorWillMount(monaco: typeof import("monaco-editor")) {
       { token: "keyword", foreground: "2E4E66" },
       { token: "string", foreground: "3A7664" },
       { token: "number", foreground: "A1621A" },
+      { token: "delimiter", foreground: "8B5CF6" },
+      { token: "operator", foreground: "8B5CF6" },
     ],
     colors: {
       "editor.background": "#FBF8F4",
@@ -92,6 +126,58 @@ export function EditorPanel({
   });
 
   const [isEditorReady, setEditorReady] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
+
+  async function handleFormatCode() {
+    const ed = editorRef.current;
+    if (!ed || isFormatting) return;
+
+    const model = ed.getModel();
+    if (!model) return;
+
+    const code = model.getValue();
+    if (!code.trim()) return;
+
+    const langLabel = PROGRAMMING_LANGUAGE_LABELS[selectedLanguage];
+    setIsFormatting(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/format`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language: selectedLanguage }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err.error ?? "Unexpected error from formatter";
+        toast.error(`Failed to format ${langLabel}`, {
+          description: detail,
+          descriptionClassName: '!text-black'
+        });
+        return;
+      }
+
+      const formatted = (await res.json()).formatted;
+
+      if (typeof formatted === "string") {
+        const fullRange = model.getFullModelRange();
+        ed.executeEdits("format-code", [
+          { range: fullRange, text: formatted },
+        ]);
+        toast.success(`${langLabel} code formatted`);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred";
+      toast.error(`Failed to format ${langLabel}`, {
+        description: message,
+        descriptionClassName: '!text-black'
+      });
+    } finally {
+      setIsFormatting(false);
+    }
+  }
 
   useEffect(() => {
     if (!isEditorReady || !provider || !yDocument || !editorRef.current) {
@@ -299,13 +385,15 @@ export function EditorPanel({
             </Badge>
           </div>
 
-          <div className="space-y-1 text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Language
-            </p>
-            <p className="text-base font-semibold text-foreground">
-              {PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]}
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="space-y-1 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Language
+              </p>
+              <p className="text-base font-semibold text-foreground">
+                {PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]}
+              </p>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -385,6 +473,42 @@ export function EditorPanel({
           </button>
         )}
       </CardContent>
+
+      <div className="flex items-center gap-3 border-t border-border/80 px-4 py-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFormatting || !isEditorReady}
+          onClick={handleFormatCode}
+          className="gap-1.5"
+        >
+          <WandSparklesIcon className="h-3.5 w-3.5" />
+          {isFormatting ? "Formatting\u2026" : "Format Code"}
+        </Button>
+
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                <InfoIcon className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <p className="mb-1.5 text-xs font-semibold">
+                {PROGRAMMING_LANGUAGE_LABELS[selectedLanguage]} formatting rules
+              </p>
+              <ul className="space-y-0.5">
+                {FORMATTING_RULES[selectedLanguage].map((rule) => (
+                  <li key={rule} className="text-xs">
+                    <span className="text-emerald-300">&#x2022;</span>{" "}
+                    {rule}
+                  </li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </Card>
   );
 }
