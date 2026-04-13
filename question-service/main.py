@@ -70,6 +70,13 @@ async def cache_invalidate_questions(slugs: list[str]):
     except Exception:
         pass
 
+async def cache_invalidate_histories(user_ids: list[str]):
+    try:
+        keys = [f"{CACHE_PREFIX}userid:{user_id}" for user_id in user_ids]
+        await redis.delete(*keys)
+    except Exception:
+        pass
+
 # Make the slug column be index for faster search
 @asynccontextmanager
 async def lifespan(app):
@@ -388,6 +395,7 @@ async def upload_history(attempt: AttemptSchema):
         'id': str(db_result.inserted_id)
     }
     
+    cache_invalidate_histories(data['user_ids'])
     return result
 
 
@@ -404,9 +412,12 @@ async def get_history_list(user_id: str,
     }    
 
     try:
-        skip_size = (page - 1) * size
-        results = attempts.find(filter, projection).skip(skip_size).limit(size)
-        results = await results.to_list()
+        cache_key = f"attempts:userid={user_id}:page={page}:size={size}"
+        results = await cache_get(cache_key)
+        if not results:
+            skip_size = (page - 1) * size
+            results = attempts.find(filter, projection).skip(skip_size).limit(size)
+            results = await results.to_list()
 
         for result in results:
             result['_id'] = str(result['_id'])
@@ -426,6 +437,7 @@ async def get_history_list(user_id: str,
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
     
+    await cache_set(cache_key, results)
     return results
 
 
@@ -437,9 +449,12 @@ async def get_history(id: str, user_token: dict = Depends(verify_jwt)):
     user_id = user_token['id']
 
     try:
-        result = await attempts.find_one(filter)
+        cache_key = f"attempt:id={id}"
+        result = await cache_get(cache_key)
         if not result:
-            raise ValueError("Result not found")
+            result = await attempts.find_one(filter)
+            if not result:
+                raise ValueError("Result not found")
 
         result['_id'] = str(result['_id'])
         if user_id != result['user_ids'][0]:
@@ -449,12 +464,14 @@ async def get_history(id: str, user_token: dict = Depends(verify_jwt)):
             result['partner_id'] = result['user_ids'][1]
             result['partner_username'] = result['user_names'][1]
             
-        result['code'] = base64.b64decode(result['code'].encode()).decode()
         qns_filter = {
             'slug': result['slug']
         }
         result['question'] = await collection.find_one(qns_filter)
         result['question']['_id'] = str(result['question']['_id'])
+
+        await cache_set(cache_key, result)
+        result['code'] = base64.b64decode(result['code'].encode()).decode()
 
     except PyMongoError as e:
         raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
