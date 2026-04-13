@@ -13,7 +13,25 @@ local user1, user2 = userIds1[1], userIds2[1]
 local state1 = redis.call('HGET', 'userState:' .. user1, 'state')
 local state2 = redis.call('HGET', 'userState:' .. user2, 'state')
 
+if state1 ~= 'PENDING' then
+    redis.call('ZREM', queue1, user1)
+end
+if state2 ~= 'PENDING' then
+    redis.call('ZREM', queue2, user2)
+end
+
 if state1 ~= 'PENDING' or state2 ~= 'PENDING' then
+    return nil
+end
+
+local joinTime1 = tonumber(redis.call('HGET', 'userState:' .. user1, 'joinTime'))
+local joinTime2 = tonumber(redis.call('HGET', 'userState:' .. user2, 'joinTime'))
+
+local t = redis.call('TIME')
+local nowMs = t[1] * 1000 + math.floor(t[2] / 1000)
+local cutoffTime = nowMs - 20000
+
+if joinTime1 > cutoffTime or joinTime2 > cutoffTime then
     return nil
 end
 
