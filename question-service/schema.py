@@ -110,7 +110,7 @@ class AttemptSchema(BaseModel):
     
     @field_validator('user_names', mode='before')
     @classmethod
-    def validate_user_ids(cls, user_names):
+    def validate_user_names(cls, user_names):
         if len(user_names) != 2:
             raise ValueError('Unexpected numbers of user names found')
 
