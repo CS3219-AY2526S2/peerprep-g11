@@ -478,6 +478,7 @@ export function EditorPanel({
         <Button
           variant="outline"
           size="sm"
+          data-nextstep="format-code-button"
           disabled={isFormatting || !isEditorReady}
           onClick={handleFormatCode}
           className="gap-1.5"

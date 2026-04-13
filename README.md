@@ -16,18 +16,21 @@ graph TD
         QuestionSvc[Question Service\nCRUD & Search]
         MatchingSvc[Matching Service\nPeer Pairing]
         CollabSvc[Collaboration Service\nReal-time Editor]
-        AISvc[AI Assistant Service\nHints & Debugging]
+        FormatSvc[Format Service\nCode Formatting]
+        AISvc[AI Assistant Service\nHints, Explain and Translate]
         Redis[(Redis)]
     end
 
     Frontend -->|HTTP| UserSvc
     Frontend -->|HTTP| QuestionSvc
     Frontend -->|HTTP| MatchingSvc
+    Frontend -->|HTTP| FormatSvc
     Frontend -->|HTTP| AISvc
     Frontend -->|WebSocket| CollabSvc
 
     MatchingSvc -->|HTTP| QuestionSvc
     MatchingSvc -->|HTTP| CollabSvc
+    CollabSvc -->|HTTP| QuestionSvc
     QuestionSvc --- Redis
 ```
 
@@ -38,7 +41,8 @@ graph TD
 | **Question Service** | Question bank with CRUD operations |
 | **Matching Service** | Pairs users based on topic, difficulty, and language |
 | **Collaboration Service** | Real-time collaborative code editing via WebSockets |
-| **AI Assistant Service** | AI-powered hints, explanations, and debugging suggestions |
+| **Format Service** | Formats code sent from the frontend |
+| **AI Assistant Service** | AI-powered hints, explanations, and translation |
 
 ## Getting Started
 

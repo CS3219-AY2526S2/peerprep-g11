@@ -2,8 +2,10 @@ import {
   ClipboardList,
   Code,
   Sparkles,
+  WandSparkles,
   PanelLeft,
   MessageCircle,
+  Users,
   LogOut,
 } from "lucide-react";
 import type { Tour } from "nextstepjs";
@@ -14,8 +16,10 @@ export const SESSION_TOUR_STEP_INDEX = {
   SHARED_EDITOR: 1,
   EXPLAIN_DEMO: 2,
   AI_SIDEBAR: 3,
-  CHAT_WIDGET: 4,
-  LEAVE_SESSION: 5,
+  FORMAT_CODE: 4,
+  CHAT_WIDGET: 5,
+  PRESENCE_INDICATOR: 6,
+  LEAVE_SESSION: 7,
 } as const;
 
 export const sessionTourSteps: Tour[] = [
@@ -47,7 +51,7 @@ export const sessionTourSteps: Tour[] = [
         pointerRadius: 16,
       },
       {
-        icon: <Sparkles size={15} />,
+        icon: <WandSparkles size={15} />,
         title: "Explain Selected Code",
         content:
           "The walkthrough highlights the starter code for you here. When you select code in the shared editor, the Explain action appears so you can ask AI to break it down.",
@@ -72,12 +76,36 @@ export const sessionTourSteps: Tour[] = [
         pointerRadius: 16,
       },
       {
+        icon: <Sparkles size={15} />,
+        title: "Format Your Code",
+        content:
+          "Use this button to quickly clean up spacing and style of your code",
+        selector: '[data-nextstep="format-code-button"]',
+        side: "top-left",
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
         icon: <MessageCircle size={15} />,
         title: "Session Chat",
         content:
           "Use the chat widget to coordinate with your peer without leaving the coding flow. Open it anytime to discuss approaches or ask quick clarifying questions.",
         selector: '[data-nextstep="chat-widget"]',
         side: "top-right",
+        showControls: true,
+        showSkip: false,
+        pointerPadding: 8,
+        pointerRadius: 16,
+      },
+      {
+        icon: <Users size={15} />,
+        title: "Presence Indicator",
+        content:
+          "Keep an eye on these presence dots during the session. Green means your peer is on the page, while yellow means they have left the page.",
+        selector: '[data-nextstep="participants-card"]',
+        side: "bottom-right",
         showControls: true,
         showSkip: false,
         pointerPadding: 8,

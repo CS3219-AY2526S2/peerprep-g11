@@ -3,6 +3,7 @@ import { getCurrentServerUser } from '@/lib/server-auth';
 import { Role, forwardAuthHeaders } from '@/lib/auth';
 import type {
   QuestionDuplicateCheckResponse,
+  QuestionUpdatePayload,
   QuestionUpsertPayload,
   QuestionUpsertResponse,
 } from '@/app/questions/types';
@@ -12,6 +13,11 @@ const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localho
 interface QuestionServiceListItem {
   title?: string;
   slug?: string;
+}
+
+interface QuestionServiceListResponse {
+  data?: QuestionServiceListItem[];
+  totalPages?: number;
 }
 
 function normalizeText(value: string) {
@@ -71,6 +77,20 @@ function getErrorMessage(payload: unknown) {
     if (typeof detail === 'string') {
       return detail;
     }
+
+    if (Array.isArray(detail)) {
+      const firstIssue = detail.find(
+        (item): item is { msg?: string } => Boolean(item && typeof item === 'object')
+      );
+
+      if (firstIssue?.msg) {
+        return firstIssue.msg;
+      }
+    }
+
+    if (detail && typeof detail === 'object' && 'message' in detail && typeof detail.message === 'string') {
+      return detail.message;
+    }
   }
 
   if ('error' in payload && typeof payload.error === 'string') {
@@ -92,26 +112,48 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${QUESTION_SERVICE_URL}/questions`, {
-      headers: {
-        ...forwardAuthHeaders(request),
-      },
-      cache: 'no-store',
-    });
-
-    const payload = (await response.json().catch(() => [])) as QuestionServiceListItem[] | { error?: string };
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: getErrorMessage(payload) },
-        { status: response.status }
-      );
-    }
-
     const normalizedTitle = title.toLowerCase();
-    const matched = (payload as QuestionServiceListItem[]).find(
-      (question) => question.title?.trim().toLowerCase() === normalizedTitle
-    );
+    let matched: QuestionServiceListItem | undefined;
+    let page = 1;
+    let totalPages = 1;
+
+    while (page <= totalPages && !matched) {
+      const params = new URLSearchParams({
+        search: title,
+        page: String(page),
+        size: '100',
+      });
+
+      const response = await fetch(`${QUESTION_SERVICE_URL}/questions?${params.toString()}`, {
+        headers: {
+          ...forwardAuthHeaders(request),
+        },
+        cache: 'no-store',
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | QuestionServiceListResponse
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        return NextResponse.json(
+          { error: getErrorMessage(payload) },
+          { status: response.status }
+        );
+      }
+
+      const pageData = Array.isArray((payload as QuestionServiceListResponse | null)?.data)
+        ? (payload as QuestionServiceListResponse).data ?? []
+        : [];
+
+      matched = pageData.find((question) => question.title?.trim().toLowerCase() === normalizedTitle);
+      totalPages =
+        typeof (payload as QuestionServiceListResponse | null)?.totalPages === 'number'
+          ? Math.max(1, (payload as QuestionServiceListResponse).totalPages ?? 1)
+          : 1;
+      page += 1;
+    }
 
     const body: QuestionDuplicateCheckResponse = matched?.title && matched.slug
       ? {
@@ -135,7 +177,7 @@ export async function POST(request: NextRequest) {
     return authError;
   }
 
-  let body: QuestionUpsertPayload;
+  let body: QuestionUpsertPayload | QuestionUpdatePayload;
 
   try {
     body = (await request.json()) as QuestionUpsertPayload;
@@ -143,7 +185,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const payload = normalizeQuestionPayload(body);
+  const { originalSlug: _originalSlug, ...upsertPayload } = body as QuestionUpsertPayload & {
+    originalSlug?: string;
+  };
+  const payload = normalizeQuestionPayload(upsertPayload);
 
   if (!isValidPayload(payload)) {
     return NextResponse.json({ error: 'Please complete all required question fields' }, { status: 400 });

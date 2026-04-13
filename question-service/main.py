@@ -332,6 +332,79 @@ async def add_question(question: QuestionSchema, admin: dict = Depends(verify_ad
     result['message'] = "Question updated."
     return result
 
+@app.put('/questions/{question_slug}')
+async def update_question(
+    question_slug: str,
+    question: QuestionSchema,
+    admin: dict = Depends(verify_admin_access),
+):
+    '''
+    Updates an existing question by slug.
+    Admin access only.
+    '''
+
+    data = question.model_dump()
+    title = data['title']
+    slug = create_slug(title)
+    now = create_timestamp()
+
+    try:
+        existing_question = await collection.find_one({'slug': question_slug})
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+
+    if not existing_question:
+        raise HTTPException(status_code=404, detail=f"Question {question_slug} not found")
+
+    if not slug:
+        raise HTTPException(status_code=400, detail="Invalid title")
+
+    if slug != question_slug:
+        try:
+            conflicting_question = await collection.find_one({'slug': slug})
+        except PyMongoError as e:
+            raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+
+        if conflicting_question and conflicting_question['_id'] != existing_question['_id']:
+            raise HTTPException(status_code=409, detail="A question with this title already exists.")
+
+    update = {
+        '$set': {
+            'title': title,
+            'slug': slug,
+            'description': data['description'],
+            'difficulty': data['difficulty'],
+            'topics': data['topics'],
+            'examples': data['examples'],
+            'constraints': data['constraints'],
+            'updated_at': now,
+        }
+    }
+
+    try:
+        result = await collection.find_one_and_update(
+            {'slug': question_slug},
+            update,
+            return_document=ReturnDocument.AFTER,
+        )
+    except PyMongoError as e:
+        raise HTTPException(status_code=503, detail="Database unavailable, please try again later") from e
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Question {question_slug} not found")
+
+    await cache_invalidate_question(question_slug)
+    if slug != question_slug:
+        await cache_invalidate_question(slug)
+
+    return {
+        'created_at': result.get('created_at'),
+        'updated_at': now,
+        'title': title,
+        'slug': slug,
+        'message': "Question updated.",
+    }
+
 @app.delete('/questions/delete')
 async def delete_question(question: RetrieveDeleteSchema, admin: dict = Depends(verify_admin_access)):
     '''

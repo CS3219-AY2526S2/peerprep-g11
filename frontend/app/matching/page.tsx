@@ -3,12 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { NavBar } from '@/components/ui/navBar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { MatchingPreferencesForm } from '@/app/matching/_components/MatchingPreferencesForm';
 import { HowMatchingWorks } from '@/app/matching/_components/HowMatchingWorks';
 import { WaitingCard } from '@/app/matching/_components/WaitingCard';
 import { TimedOutCard } from '@/app/matching/_components/TimedOutCard';
+import { MatchingErrorAlert } from '@/app/matching/_components/MatchingErrorAlert';
 import type {
     AvailableMatchingTopicsResponse,
     MatchingPreferences,
@@ -19,6 +19,11 @@ import { useRouter } from 'next/navigation';
 
 type MatchingState = 'preferences' | 'searching' | 'matched' |'timed_out';
 
+interface MatchingErrorState {
+    message: string;
+    matchId?: string;
+}
+
 export default function MatchingPage() {
     const { user, isLoading } = useRequireAuth();
 
@@ -28,7 +33,7 @@ export default function MatchingPage() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
-    const [matchingError, setMatchingError] = useState('');
+    const [matchingError, setMatchingError] = useState<MatchingErrorState | null>(null);
     const [topics, setTopics] = useState<string[]>([]);
     const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficulties>({});
 
@@ -127,7 +132,7 @@ export default function MatchingPage() {
     const handleStartMatching = async (prefs: MatchingPreferences) => {
         cancelledRef.current = false;
         setIsSubmitting(true);
-        setMatchingError('');
+        setMatchingError(null);
         try {
             const res = await fetch('/api/matching/requests', {
                 method: 'POST',
@@ -136,13 +141,15 @@ export default function MatchingPage() {
             });
 
             const payload = (await res.json().catch(() => null)) as
-                | { error?: string; message?: string }
+                | { error?: string; message?: string; matchId?: string }
                 | null;
 
             if (!res.ok) {
-                throw new Error(
-                    payload?.message ?? payload?.error ?? 'Failed to start matching'
-                );
+                setMatchingError({
+                    message: payload?.message ?? payload?.error ?? 'Failed to start matching',
+                    matchId: payload?.matchId,
+                });
+                return;
             }
 
             const data: MatchRequest = payload as MatchRequest;
@@ -178,11 +185,11 @@ export default function MatchingPage() {
             }, 2000);
         } catch (error) {
             console.error('Error starting matching:', error);
-            setMatchingError(
-                error instanceof Error
+            setMatchingError({
+                message: error instanceof Error
                     ? error.message
-                    : 'Unable to start matching. Please check if you have started matching on another tab.'
-            );
+                    : 'Unable to start matching. Please check if you have started matching on another tab.',
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -258,9 +265,10 @@ export default function MatchingPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10 items-start">
                         <div className="w-full max-w-[480px]">
                             {matchingError && (
-                                <Alert variant="destructive" className="mb-5 rounded-xl">
-                                    <AlertDescription className="text-[12px]">{matchingError}</AlertDescription>
-                                </Alert>
+                                <MatchingErrorAlert
+                                    message={matchingError.message}
+                                    matchId={matchingError.matchId}
+                                />
                             )}
 
                             <MatchingPreferencesForm
@@ -298,7 +306,7 @@ export default function MatchingPage() {
                         preferences={preferences}
                         onRetry={handleRetry}
                         onBack={handleBackToPreferences}
-                        errorMessage={matchingError}
+                        errorMessage={matchingError?.message}
                         isRetrying={isSubmitting}
                     />
                 </div>

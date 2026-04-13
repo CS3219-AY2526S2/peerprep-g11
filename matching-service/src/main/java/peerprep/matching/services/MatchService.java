@@ -105,6 +105,15 @@ public class MatchService {
                 "Please try again.");
     }
 
+    public String getExistingMatchIdForUser(String userId) {
+        MatchDoc matchDoc = matchRepository.findActiveMatch(userId);
+        if (matchDoc != null) {
+            return matchDoc.getMatchId();
+        }
+
+        return redisUserRepository.getUserMatchId(userId);
+    }
+
     /**
      * Try to create a match between two users. 
      * 
