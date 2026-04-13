@@ -49,34 +49,163 @@ queue:Arrays:python:Easy
 
 ```mermaid
 stateDiagram
-    [*] --> IDLE : start matching
-    IDLE --> WAITING : start
-    WAITING --> MATCHED : match
-    WAITING --> IDLE : cancel / timeout
-    MATCHED --> IDLE : endMatch
+    [*] --> PENDING : join queue
+    PENDING --> MATCH_FOUND: match found
+    PENDING --> [*] : cancel
+    PENDING --> TIMED_OUT : timeout
+    TIMED_OUT --> [*] : cleanup
+    MATCH_FOUND --> MATCHED : confirm match
+    MATCH_FOUND --> PENDING : rollback
+    MATCHED --> [*] : end match
 ```
 
 ### Matching Strategy
-- Strict Matching
-    - Same difficulty pairing:
-        - EASY-EASY
-        - MEDIUM-MEDIUM
-        - HARD-HARD
-- Relaxed Matching
-    - Adjacent difficulty pairing: 
-        - EASY ↔ MEDIUM
-        - MEDIUM ↔ HARD
-- Lua Script Guarantees
-    - Atomic dequeue + state update
-    - Prevents double matching
+The system supports a two-tier matchmaking model to balance fairness and queue latency.
+
+#### Strict Matching
+> Pairs users with identical difficulty levels:
+>
+> - EASY-EASY
+> - MEDIUM-MEDIUM
+> - HARD-HARD
+> 
+> This ensures fair skill-based matching.
+
+#### Relaxed Matching
+> Allows cross-difficulty pairing when strict matches are insufficient:
+> 
+> - EASY ↔ MEDIUM
+> - MEDIUM ↔ HARD
+> 
+> Eligibility constraint:
+> - Users must have been in queue for ≥ 20 seconds before they are eligible for relaxed matching
+>
+> This improves queue throughput and reduces wait time while maintaining reasonable skill proximity.
+
+#### Lua Script Guarantees
+
+Lua scripts handle all critical lifecycle operations under concurrency:
+- User add / cancel / timeout / matching
+
+Guarantees
+- Atomic execution of multi-key operations
+- Prevents race conditions and double matching
+- Ensures consistent state transitions across Redis structures
+- Eliminates partial updates
 
 ### Matching Worker Flow
 1. Polls Redis dirtyScopes
 2. Processes scope: ```topic:language```
 3. Runs:
-    - Strict match loop (cap 10)
-    - Relaxed match loop (cap 3)
+    - Strict match loop (max 10 iterations)
+    - Relaxed match loop (max 3 iterations)
 4. Re-adds scope if queue still has users
+
+## Redis Data Structures
+### 👤 User State
+```
+userState:{userId} → Hash
+```
+Fields:
+- userId
+- requestId
+- userName
+- state (PENDING / MATCH_FOUND / MATCHED / TIMED_OUT)
+- topic
+- language
+- difficulty
+- joinTime
+
+### 📊 Matchmaking Queues
+```
+queue:{topic}:{language}:{difficulty} → Sorted Set
+```
+- member: userId
+- score: joinTime
+- used for FIFO-style matching
+
+### ⏱️ Timeout Tracking
+```
+timeout:queue → Sorted Set
+```
+- member: userId
+- score: expiryTime
+
+### 🔗 Request Mapping
+```
+requestUser:{requestId} → userId
+```
+```
+userRequest:{userId} → requestId
+```
+
+### 🤝 Match Finalization & Lifecycle Tracking
+
+This section tracks the state of matches after they are found, including finalization, retries, and rollback safety.
+
+#### 🧾 Pending Finalizations
+```
+pendingFinalizations → Set
+```
+- member: "userId1:userId2"
+- tracks matches awaiting final confirmation
+- serves as a reconciliation queue for retrying failed finalization
+
+#### 🔁 Match Found Tracking (Rollback Safety)
+```
+matchFoundUsers → Set
+```
+- member: userId
+- users currently in MATCH_FOUND state
+```
+matchFoundAt:{userId} → timestamp
+```
+- time when user entered MATCH_FOUND
+- used for rollback decisions
+
+#### 🔗 Match Resolution Mapping
+```
+userMatch:{userId} → matchId
+```
+- maps user → matchId
+- used to for rollback lookup
+
+#### 🔔 Collaboration Notification Guard
+```
+collabNotified:{matchId} → String ("true" | "false")
+```
+- indicates whether collaboration service has been notified
+- acts as a finalization checkpoint
+
+#### ♻️ Rollback & Retry Rules
+If collabNotified = false:
+- match is safe to rollback
+- users can be requeued
+
+If collabNotified = true:
+- match is considered externally visible
+- rollback is disabled
+- only retry finalization is allowed
+
+## MongoDB Data Structures
+Stores persistent match history after completion.
+```
+@Document(collection = "matches")
+public class MatchDoc {
+    @Id
+    private String id;
+
+    @Indexed(unique = true)
+    private String matchId;
+    
+    private String user1;
+    private String user2;
+    private String status;  // "active" or "ended"
+    private String questionSlug;
+    private Date createdAt;
+    private Date endedAt;
+}
+```
 
 ## Debugging Tools
 Redis CLI
@@ -102,7 +231,7 @@ SMEMBERS dirtyScopes
 
 ## Development Notes
 - Matching runs every 100ms via scheduled worker
-- Timeout runs every 500ms via scheduled worker
+- Timeout runs every 5000ms via scheduled worker
 - Redis ZSET used for ordering by join timestamp
 - Lua scripts ensure atomic match operations
 - Dirty scope system triggers reprocessing when queue changes
