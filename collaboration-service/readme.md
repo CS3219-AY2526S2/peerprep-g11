@@ -55,3 +55,8 @@ node server.ts
   - accepts a json body with required fields sessionId, questionId, selectedLanguage, participants.
   - details of what values are expected in each field can be found in the mock data above.
     - mongodb schema definition in `Sessions.ts` is also a good reference
+
+- DELETE /sessions/:sessionId
+  - Called by the BFF when a user leaves a session.
+  - Deletes the session document from the DB.
+  - Either participant leaving is sufficient to end the session.
