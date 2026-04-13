@@ -13,11 +13,17 @@ Standalone service for managing CRUD operations on PeerPrep question repository.
 # Copy the environment file and fill in the values
 cp .env.example .env
 
-# Build the docker image
-docker build -t question-service .
+# Create a virtual environment
+python3 -m venv .venv
 
-# Run the built image
-docker run -p 8000:8000 question-service
+# Activate the vietual environment
+source .venv/Scripts/activate
+
+# Install the required modules
+pip install -r requirements.txt
+
+# Start the service
+python3 main.py
 ```
 
 ## Environment Variables
@@ -61,10 +67,12 @@ Get questions from the repository, optionally filtered by exact `topic` and/or `
 
 **Query parameters:**
 
-| Parameter    | Required | Description                                         |
+| Parameter    | Required | Constraint                                          |
 |--------------|----------|-----------------------------------------------------|
 | `topic`      | No       | Exact topic match, case-insensitive                 |
 | `difficulty` | No       | Exact difficulty match: `Easy`, `Medium`, or `Hard` |
+| `page`       | No       | Must be at least 1, degault is 1                    |
+| `size`       | No       | Must be between 1 and 100, default is 10            |
 
 **Responses:**
 
@@ -249,17 +257,13 @@ Adds an attempt to the database.
 
 Retrieves the full history of users.
 
-**Request body:**
+**Query parameters:**
 
-```json
-{
-    "user_id": "69be848b4e2576f0b59c492d"
-}
-```
-
-| Variable      | Description                    | Constraint                                                          |
-|---------------|--------------------------------|---------------------------------------------------------------------|
-| `user_id`     | The target user's id           | Must be 24 characters and in hexadcimal characters (based on BSON)  |
+| Parameter    | Required | Constraint                                                          |
+|--------------|----------|---------------------------------------------------------------------|
+| `user_id`    | Yes      | Must be 24 characters and in hexadcimal characters (based on BSON)  |
+| `page`       | No       | Must be at least 1, degault is 1                                    |
+| `size`       | No       | Must be between 1 and 100, default is 10                            |
 
 **Responses:**
 
