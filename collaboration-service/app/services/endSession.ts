@@ -70,7 +70,7 @@ export async function endSession(
     user_names: [p0.username, p1.username] as [string, string],
     slug: session.questionId,          // questionId IS the slug in our naming convention
     language: capitaliseLanguage(session.selectedLanguage),
-    code,
+    code: Buffer.from(code).toString("base64"),
   };
 
   const results = await Promise.allSettled([
