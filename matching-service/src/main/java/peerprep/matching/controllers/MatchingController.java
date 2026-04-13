@@ -38,6 +38,18 @@ public class MatchingController {
         } catch (InvalidMatchPreferenceException e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
         } catch (MatchRequestConflictException e) {
+            String matchId = "ALREADY_IN_SESSION".equals(e.getReason())
+                    ? matchService.getExistingMatchIdForUser(jwtUserId)
+                    : null;
+
+            if (matchId != null && !matchId.isBlank()) {
+                return ResponseEntity.status(409).body(Map.of(
+                        "error", e.getMessage(),
+                        "reason", e.getReason(),
+                        "matchId", matchId
+                ));
+            }
+
             return ResponseEntity.status(409).body(Map.of(
                     "error", e.getMessage(),
                     "reason", e.getReason()

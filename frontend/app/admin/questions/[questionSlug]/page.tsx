@@ -201,8 +201,8 @@ export default function AdminQuestionDetailsPage() {
 
     try {
       const payload = normalizeAdminQuestionPayload(values);
-      const response = await fetch('/api/admin/questions', {
-        method: 'POST',
+      const response = await fetch(`/api/admin/questions/${params.questionSlug}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },

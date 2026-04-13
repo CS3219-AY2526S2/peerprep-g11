@@ -42,18 +42,18 @@ public class QuestionServiceClient {
         }
 
         try {
-            List<Map<String, Object>> questions = (List<Map<String, Object>>) (List<?>) webClient.get()
+            Object payload = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/questions")
                             .queryParam("topic", topic)
                             .queryParamIfPresent("difficulty", Optional.ofNullable(difficulty).filter(diff -> !diff.isBlank()))
+                            .queryParam("size", 100)
                             .build())
                     .retrieve()
-                    .bodyToFlux(Map.class)
-                    .collectList()
+                    .bodyToMono(Object.class)
                     .block();
 
-            return questions == null ? Collections.emptyList() : questions;
+            return extractQuestions(payload);
         } catch (Exception e) {
             logger.error(
                     "Failed to fetch questions for topic={} difficulty={}: {}",
@@ -62,5 +62,37 @@ public class QuestionServiceClient {
                     e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    static List<Map<String, Object>> extractQuestions(Object payload) {
+        if (payload == null) {
+            return Collections.emptyList();
+        }
+
+        if (payload instanceof List<?> rawList) {
+            List<Map<String, Object>> questions = new ArrayList<>();
+            for (Object item : rawList) {
+                if (item instanceof Map<?, ?> rawMap) {
+                    questions.add((Map<String, Object>) rawMap);
+                }
+            }
+            return questions;
+        }
+
+        if (payload instanceof Map<?, ?> rawMap) {
+            Object data = rawMap.get("data");
+            if (data instanceof List<?> rawList) {
+                List<Map<String, Object>> questions = new ArrayList<>();
+                for (Object item : rawList) {
+                    if (item instanceof Map<?, ?> itemMap) {
+                        questions.add((Map<String, Object>) itemMap);
+                    }
+                }
+                return questions;
+            }
+        }
+
+        return Collections.emptyList();
     }
 }

@@ -229,6 +229,7 @@ LOCAL_QUESTION_SERVICE_URL="http://localhost:8000"
 LOCAL_MATCHING_SERVICE_URL="http://localhost:8080"
 LOCAL_COLLAB_SERVICE_URL="http://localhost:1234"
 LOCAL_AI_ASSISTANT_SERVICE_URL="http://localhost:4002"
+LOCAL_FORMAT_SERVICE_URL="http://localhost:4003"
 LOCAL_FRONTEND_ORIGIN="http://localhost:3000"
 LOCAL_COLLAB_WS_URL="ws://localhost:1234"
 LOCAL_REDIS_HOST="localhost"
@@ -243,6 +244,7 @@ start_task "question-service dependencies" "cd '$ROOT_DIR/question-service' && i
 start_task "collaboration-service dependencies" "cd '$ROOT_DIR/collaboration-service' && [ -d node_modules ] || npm install"
 start_task "user-service dependencies" "cd '$ROOT_DIR/user-service' && [ -d node_modules ] || npm install"
 start_task "ai-assistant-service dependencies" "cd '$ROOT_DIR/ai-assistant-service' && [ -d node_modules ] || npm install"
+start_task "format-service dependencies" "cd '$ROOT_DIR/format-service' && [ -d node_modules ] || npm install"
 start_task "frontend dependencies" "cd '$ROOT_DIR/frontend' && [ -d node_modules ] || npm install"
 wait_for_tasks
 
@@ -250,6 +252,7 @@ assert_port_free "question-service" "8000"
 assert_port_free "collaboration-service" "1234"
 assert_port_free "user-service" "4001"
 assert_port_free "ai-assistant-service" "4002"
+assert_port_free "format-service" "4003"
 assert_port_free "matching-service" "8080"
 assert_port_free "frontend" "3000"
 
@@ -257,16 +260,18 @@ start_service "question-service" "question-service" "source .venv/bin/activate &
 start_service "collaboration-service" "collaboration-service" "npm run dev"
 start_service "user-service" "user-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
 start_service "ai-assistant-service" "ai-assistant-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
+start_service "format-service" "format-service" "npm run dev"
 
 wait_for_http "question-service" "$LOCAL_QUESTION_SERVICE_URL/health"
 wait_for_http "collaboration-service" "$LOCAL_COLLAB_SERVICE_URL/health"
 wait_for_http "user-service" "$LOCAL_USER_SERVICE_URL/health"
 wait_for_http "ai-assistant-service" "$LOCAL_AI_ASSISTANT_SERVICE_URL/health"
+wait_for_http "format-service" "$LOCAL_FORMAT_SERVICE_URL/health"
 
 start_service "matching-service" "matching-service" "export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export SPRING_REDIS_HOST='$LOCAL_REDIS_HOST'; export SPRING_REDIS_PORT='$LOCAL_REDIS_PORT'; ./gradlew bootRun"
 wait_for_port "matching-service" "localhost" "8080"
 
-start_service "frontend" "frontend" "export USER_SERVICE_URL='$LOCAL_USER_SERVICE_URL'; export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export MATCHING_SERVICE_URL='$LOCAL_MATCHING_SERVICE_URL'; export COLLAB_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export NEXT_PUBLIC_COLLAB_SERVICE_WS_URL='$LOCAL_COLLAB_WS_URL'; export AI_ASSISTANT_SERVICE_URL='$LOCAL_AI_ASSISTANT_SERVICE_URL'; npm run dev"
+start_service "frontend" "frontend" "export USER_SERVICE_URL='$LOCAL_USER_SERVICE_URL'; export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export MATCHING_SERVICE_URL='$LOCAL_MATCHING_SERVICE_URL'; export COLLAB_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export COLLABORATION_SERVICE_URL='$LOCAL_COLLAB_SERVICE_URL'; export NEXT_PUBLIC_COLLAB_SERVICE_WS_URL='$LOCAL_COLLAB_WS_URL'; export AI_ASSISTANT_SERVICE_URL='$LOCAL_AI_ASSISTANT_SERVICE_URL'; export FORMAT_SERVICE_URL='$LOCAL_FORMAT_SERVICE_URL'; npm run dev"
 wait_for_port "frontend" "localhost" "3000"
 
 echo

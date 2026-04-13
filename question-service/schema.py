@@ -12,12 +12,14 @@ class QuestionSchema(BaseModel):
     @field_validator('title', mode='before')
     @classmethod
     def validate_title(cls, title):
-        if not title:
+        if not isinstance(title, str):
             raise ValueError('Title need at least one character')
-        elif not all(c in string.ascii_letters for c in title):
-            raise ValueError('Invalid characters in title')
-        
-        return title
+
+        normalized_title = title.strip()
+        if not normalized_title:
+            raise ValueError('Title need at least one character')
+
+        return normalized_title
 
     @field_validator('difficulty', mode='before')
     @classmethod

@@ -182,7 +182,7 @@ export default function AdminQuestionsPage() {
     );
   }
 
-  const primaryActionLabel = selectedSlugs.length > 0 ? 'Delete' : 'Edit';
+  const primaryActionLabel = 'Delete';
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -225,11 +225,7 @@ export default function AdminQuestionsPage() {
                 }
               }}
               disabled={isEditMode && selectedSlugs.length === 0}
-              className={`rounded-lg border text-[12.5px] font-semibold transition-colors ${
-                selectedSlugs.length > 0
-                  ? 'border-rose-200 bg-rose-50 text-rose-800 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-900'
-                  : 'border-accent/25 bg-accent-soft text-foreground hover:border-accent/35 hover:bg-accent-soft/80 hover:text-foreground'
-              }`}
+              className="rounded-lg border border-rose-200 bg-rose-50 text-[12.5px] font-semibold text-rose-800 transition-colors hover:border-rose-300 hover:bg-rose-100 hover:text-rose-900"
             >
               {primaryActionLabel}
             </Button>

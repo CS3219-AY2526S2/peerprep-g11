@@ -17,6 +17,10 @@ export interface QuestionUpsertPayload {
     constraints: string[];
 }
 
+export interface QuestionUpdatePayload extends QuestionUpsertPayload {
+    originalSlug: string;
+}
+
 export interface QuestionUpsertResponse {
     message: string;
     title: string;
