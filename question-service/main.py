@@ -290,7 +290,6 @@ async def get_question(question_slug: str):
 # ============================================
 #             Admin access APIs
 # ============================================
-
 @app.post('/questions/upsert', status_code=201)
 async def add_question(question: QuestionSchema, admin: dict = Depends(verify_admin_access)):
     '''
@@ -331,6 +330,7 @@ async def add_question(question: QuestionSchema, admin: dict = Depends(verify_ad
     
     result['message'] = "Question updated."
     return result
+
 
 @app.put('/questions/{question_slug}')
 async def update_question(
@@ -476,7 +476,6 @@ async def upload_history(attempt: AttemptSchema):
     '''
     data = attempt.model_dump()
     data['timestamp'] = create_timestamp()
-    # data['code'] = base64.b64encode(data['code'].encode()).decode() # Encode in base64 for storage
 
     try:
         db_result = await attempts.insert_one(data)

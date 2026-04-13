@@ -1,6 +1,6 @@
 # Question Service
 
-Standalone service for managing CRUD operations on PeerPrep question repository. Built with FastAPI and MongoDB.
+Standalone service for managing CRUD operations on PeerPrep question repository. Built with FastAPI, MongoDB and Redis.
 
 ## Prerequisites
 
@@ -33,6 +33,7 @@ python3 main.py
 | `MONGODB_URI`     | Yes      | MongoDB connection string                            | `mongodb+srv://...`              |
 | `JWT_SECRET`      | Yes      | Secret used for JWT verification                     | `some_random_string`             |
 | `PORT`            | No       | Port the server listens on (default: `8000`)         | `8000`                           |
+| `REDIS_URI`       | Yes      | Redis connection string                              | `redis://...`                    |
 
 Refer to [MongoDB connection string](https://www.mongodb.com/resources/products/fundamentals/mongodb-connection-string) for connecting to your db.
 
@@ -40,7 +41,7 @@ Refer to [MongoDB connection string](https://www.mongodb.com/resources/products/
 
 ## Authentication
 
-All endpoints, except `\health` and `\questions`, require JWT authenthication. The JWT will be retrieved from cookie parameter `token`, or `Bearer <token>` from `Authorization` header as backup.
+All endpoints, except `\health`, `\questions`, `\question\topics` and `\history\insert`, require JWT authenthication. The JWT will be retrieved from cookie parameter `token`, or `Bearer <token>` from `Authorization` header as backup.
 
 ## API Reference
 
@@ -72,7 +73,7 @@ Get questions from the repository, optionally filtered by `search`, exact `topic
 | `search`     | No       | Case-insensitive partial match against title/topics |
 | `topic`      | No       | Exact topic match, case-insensitive                 |
 | `difficulty` | No       | Exact difficulty match: `Easy`, `Medium`, or `Hard` |
-| `page`       | No       | Must be at least 1, degault is 1                    |
+| `page`       | No       | Must be at least 1, default is 1                    |
 | `size`       | No       | Must be between 1 and 100, default is 10            |
 
 **Response body:**
@@ -176,6 +177,58 @@ Upsert (update/insert) a question to the database. It searches the question with
 
 ---
 
+#### PUT /questions/`{slug}`
+
+Updates an existing question by its slug.
+
+**Path parameters:**
+
+| Variable     | Description                        | Constraint                                         |
+|--------------|------------------------------------|----------------------------------------------------|
+| `slug`       | Slug of the question               | Must have an corresponding question exist          |
+
+**Request body:**
+
+```json
+{
+    "title": "Two Sum Variations",
+    "description":"Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.",
+    "topics": ["Arrays", "Hash Table"],
+    "difficulty": "Easy",
+    "examples": [
+      {
+        "input": "nums = [2,7,11,15], target = 9",
+        "output": "[0,1]",
+        "explanation": "Because nums[0] + nums[1] == 9, we return [0, 1].",
+      },
+    ],
+    "constraints": [
+      "2 ≤ nums.length ≤ 10⁴",
+      "-10⁹ ≤ nums[i] ≤ 10⁹",
+      "Only one valid answer exists.",
+    ]
+}
+```
+
+| Variable          | Description                                                                                     | Constraint                                         |
+|-------------------|-------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| `title`           | Title of the question                                                                           | Required                                           |
+| `description`     | Description of the question                                                                     | Required                                           |
+| `topics`          | Relevant data structures and algorithms to solve the question                                   | Must have at least one topic for all questions     |
+| `difficulty`      | Difficulty of the question                                                                      | Must be between `Easy`, `Medium` or `Hard`         |
+| `examples`        | Examples with input and their expected output, provided with explanation for understanding      | At least one example is needed, and each example needs `input` and `output`  |
+| `constraints`     | Designated constraint for inputs of the question                                                | Must include at least one constraint               |
+
+**Responses:**
+
+| Status | Description                                         |
+|--------|-----------------------------------------------------|
+| 201    | Question updated                                    |
+| 404    | Question not found                                  |
+| 503    | Database down, check health status of your database |
+
+---
+
 #### DELETE /questions/delete
 
 Delete a question with exact slug from the repository.
@@ -240,7 +293,7 @@ These routes are used for storing and retrieving user attempt history.
 
 #### POST /history/insert
 
-Adds an attempt to the database.
+Adds an attempt to the database after an session ends. To be used by collaboration service only.
 
 **Request body:**
 
@@ -264,9 +317,9 @@ Adds an attempt to the database.
 | `session_id`     | The completed session id               | Auto-managed by collaboration service                                                |
 | `user_ids`       | The users' id                          | Must be exactly 2 ids, each id must correspond to username in `user_names`           |
 | `user_names`     | The usernames                          | Must be exactly 2 names, each name must correspond to id in `user_ids`               |
-| `slug`           | The slug of the attempting question    | Required                                                                             |
+| `slug`           | The slug of the attempting question    | Required, provided by collaboration service                                          |
 | `language`       | The coding language used               | Must be a language available in PeerPrep                                             |
-| `code`           | The full code                          | None                                                                                 |
+| `code`           | The full code                          | Encoded in base64                                                                    |
 
 **Responses:**
 
@@ -277,14 +330,14 @@ Adds an attempt to the database.
 
 #### GET /history/list
 
-Retrieves the full history of users.
+Retrieves the full history of the selected user.
 
 **Query parameters:**
 
 | Parameter    | Required | Constraint                                                          |
 |--------------|----------|---------------------------------------------------------------------|
 | `user_id`    | Yes      | Must be 24 characters and in hexadcimal characters (based on BSON)  |
-| `page`       | No       | Must be at least 1, degault is 1                                    |
+| `page`       | No       | Must be at least 1, default is 1                                    |
 | `size`       | No       | Must be between 1 and 100, default is 10                            |
 
 **Responses:**
@@ -296,9 +349,9 @@ Retrieves the full history of users.
 
 #### GET /history/`{id}`
 
-Retrieves the full history of users
+Retrieves the selected attempt.
 
-**Request query:**
+**Path parameters:**
 
 | Variable   | Description                | Constraint                                                          |
 |------------|----------------------------|---------------------------------------------------------------------|
