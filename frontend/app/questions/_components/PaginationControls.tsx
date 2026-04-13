@@ -31,9 +31,9 @@ export function PaginationControls({
                 <Button
                     variant="outline"
                     size="sm"
-                    className="text-[11.5px] rounded-lg h-auto py-1.5 px-3 border-border
+                    className="text-[11.5px] text-foreground rounded-lg h-auto py-1.5 px-3 border-border
                         transition-all duration-150 ease-out
-                        hover:bg-secondary hover:border-border hover:shadow-sm
+                        hover:bg-secondary hover:text-foreground hover:border-border hover:shadow-sm
                         active:scale-[0.97] active:shadow-none
                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
                     disabled={page <= 1}
@@ -47,9 +47,9 @@ export function PaginationControls({
                 <Button
                     variant="outline"
                     size="sm"
-                    className="text-[11.5px] rounded-lg h-auto py-1.5 px-3 border-border
+                    className="text-[11.5px] text-foreground rounded-lg h-auto py-1.5 px-3 border-border
                         transition-all duration-150 ease-out
-                        hover:bg-secondary hover:border-border hover:shadow-sm
+                        hover:bg-secondary hover:text-foreground hover:border-border hover:shadow-sm
                         active:scale-[0.97] active:shadow-none
                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
                     disabled={page >= totalPages}

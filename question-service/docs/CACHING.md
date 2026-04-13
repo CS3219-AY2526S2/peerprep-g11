@@ -27,9 +27,9 @@ All keys are prefixed with `qs:` to namespace them within Redis.
 
 | Endpoint | Cache Key | Example |
 |---|---|---|
-| `GET /questions` | `qs:questions:topic={topic}:diff={difficulty}` | `qs:questions:topic=None:diff=None` |
-| `GET /questions?topic=Arrays` | `qs:questions:topic={topic}:diff={difficulty}` | `qs:questions:topic=Arrays:diff=None` |
-| `GET /questions?topic=Arrays&difficulty=Easy` | `qs:questions:topic={topic}:diff={difficulty}` | `qs:questions:topic=Arrays:diff=Easy` |
+| `GET /questions` | `qs:questions:search={search}:topic={topic}:diff={difficulty}:page={page}:size={size}` | `qs:questions:search=:topic=:diff=:page=1:size=10` |
+| `GET /questions?topic=Arrays` | `qs:questions:search={search}:topic={topic}:diff={difficulty}:page={page}:size={size}` | `qs:questions:search=:topic=Arrays:diff=:page=1:size=10` |
+| `GET /questions?topic=Arrays&difficulty=Easy&page=2&size=20` | `qs:questions:search={search}:topic={topic}:diff={difficulty}:page={page}:size={size}` | `qs:questions:search=:topic=Arrays:diff=Easy:page=2:size=20` |
 | `GET /questions/topics` | `qs:topics` | `qs:topics` |
 | `GET /questions/{slug}` | `qs:question:{slug}` | `qs:question:two-sum` |
 

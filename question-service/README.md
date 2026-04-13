@@ -63,16 +63,38 @@ Return health status of the connected MongoDB server.
 
 #### GET /questions
 
-Get questions from the repository, optionally filtered by exact `topic` and/or `difficulty`.
+Get questions from the repository, optionally filtered by `search`, exact `topic`, and/or exact `difficulty`.
 
 **Query parameters:**
 
 | Parameter    | Required | Constraint                                          |
 |--------------|----------|-----------------------------------------------------|
+| `search`     | No       | Case-insensitive partial match against title/topics |
 | `topic`      | No       | Exact topic match, case-insensitive                 |
 | `difficulty` | No       | Exact difficulty match: `Easy`, `Medium`, or `Hard` |
 | `page`       | No       | Must be at least 1, degault is 1                    |
 | `size`       | No       | Must be between 1 and 100, default is 10            |
+
+**Response body:**
+
+```json
+{
+  "data": [
+    {
+      "_id": "67f5e9c7a4d7d9d8f6ab1234",
+      "title": "Two Sum",
+      "slug": "two-sum",
+      "topics": ["Arrays", "Hash Table"],
+      "difficulty": "Easy",
+      "status": "Pending"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
 
 **Responses:**
 

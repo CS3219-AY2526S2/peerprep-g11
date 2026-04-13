@@ -14,6 +14,14 @@ interface QuestionServiceResponse {
   status: QuestionStatus;
 }
 
+interface QuestionServicePaginatedResponse {
+  data: QuestionServiceResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 function mapQuestion(raw: QuestionServiceResponse): QuestionListElement {
   return {
     id: raw._id,
@@ -36,8 +44,11 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.max(1, parseInt(searchParams.get('pageSize') ?? '10', 10));
     const upstreamParams = new URLSearchParams();
 
+    if (search) upstreamParams.set('search', search);
     if (topic) upstreamParams.set('topic', topic);
     if (difficulty) upstreamParams.set('difficulty', difficulty);
+    upstreamParams.set('page', String(page));
+    upstreamParams.set('size', String(pageSize));
 
     const queryString = upstreamParams.toString();
     const res = await fetch(
@@ -56,29 +67,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const rawQuestions: QuestionServiceResponse[] = await res.json();
-    let filtered = rawQuestions.map(mapQuestion);
-
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.title.toLowerCase().includes(q) ||
-          item.topics.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const start = (page - 1) * pageSize;
-    const data = filtered.slice(start, start + pageSize);
+    const body: QuestionServicePaginatedResponse = await res.json();
 
     const response: PaginatedResponse<QuestionListElement> = {
-      data,
-      total,
-      page,
-      pageSize,
-      totalPages,
+      data: body.data.map(mapQuestion),
+      total: body.total,
+      page: body.page,
+      pageSize: body.pageSize,
+      totalPages: body.totalPages,
     };
 
     return NextResponse.json(response);

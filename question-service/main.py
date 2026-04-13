@@ -143,6 +143,7 @@ async def home():
 
 @app.get('/questions')
 async def get_questions(
+    search: str | None = Query(default=None),
     topic: str | None = Query(default=None),
     difficulty: str | None = Query(default=None),
     page: int = Query(1, ge=1),
@@ -150,15 +151,18 @@ async def get_questions(
 ):
     '''
     Retrieves questions in the database, optionally filtered by
-    exact topic and/or exact difficulty.
+    search, exact topic, and/or exact difficulty, then paginated.
     '''
-    cache_key = f"questions:topic={topic}:diff={difficulty}"
+    normalized_search = search.strip() if isinstance(search, str) else ''
+    normalized_topic = normalize_topic(topic) if isinstance(topic, str) else ''
+    normalized_difficulty = difficulty.strip() if isinstance(difficulty, str) else ''
+    cache_key = (
+        f"questions:search={normalized_search}:topic={normalized_topic}:"
+        f"diff={normalized_difficulty}:page={page}:size={size}"
+    )
     cached = await cache_get(cache_key)
     if cached is not None:
         return cached
-
-    normalized_topic = normalize_topic(topic) if isinstance(topic, str) else ''
-    normalized_difficulty = difficulty.strip() if isinstance(difficulty, str) else ''
 
     if normalized_difficulty and normalized_difficulty not in VALID_DIFFICULTIES:
         raise HTTPException(status_code=400, detail="Invalid difficulty")
@@ -180,9 +184,17 @@ async def get_questions(
 
     if normalized_difficulty:
         filter['difficulty'] = normalized_difficulty
+
+    if normalized_search:
+        escaped_search = re.escape(normalized_search)
+        filter['$or'] = [
+            {'title': {'$regex': escaped_search, '$options': 'i'}},
+            {'topics': {'$regex': escaped_search, '$options': 'i'}},
+        ]
     
     try:
         skip_amount = (page - 1) * size
+        total = await collection.count_documents(filter)
         cursor = collection.find(filter, projection).skip(skip_amount).limit(size)
         results = await cursor.to_list()
     except PyMongoError as e:
@@ -190,8 +202,16 @@ async def get_questions(
 
     for r in results:
         r['_id'] = str(r['_id'])
-    await cache_set(cache_key, results)
-    return results
+
+    response = {
+        'data': results,
+        'total': total,
+        'page': page,
+        'pageSize': size,
+        'totalPages': (total + size - 1) // size if total else 0,
+    }
+    await cache_set(cache_key, response)
+    return response
 
 @app.get('/questions/topics')
 async def get_all_topics():
