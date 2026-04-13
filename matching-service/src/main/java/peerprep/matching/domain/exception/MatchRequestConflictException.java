@@ -1,4 +1,4 @@
-package peerprep.matching.service;
+package peerprep.matching.domain.exception;
 
 public class MatchRequestConflictException extends RuntimeException {
     private final String reason;

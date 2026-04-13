@@ -1,10 +1,10 @@
-package peerprep.matching.client;
+package peerprep.matching.clients;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import peerprep.matching.models.MatchNotificationRequestDto;
+import peerprep.matching.dto.MatchNotificationRequestDto;
 
 @Component
 public class CollaborationServiceClient {

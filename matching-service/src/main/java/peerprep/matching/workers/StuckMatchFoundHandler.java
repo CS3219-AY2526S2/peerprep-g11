@@ -1,4 +1,6 @@
-package peerprep.matching.worker;
+package peerprep.matching.workers;
+
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,11 +9,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import peerprep.matching.infrastructure.redis.RedisQueueRepository;
 import peerprep.matching.infrastructure.redis.RedisUserRepository;
-import peerprep.matching.service.MatchService;
-
-import java.util.Set;
+import peerprep.matching.services.MatchService;
 
 @Component
 public class StuckMatchFoundHandler {
@@ -20,17 +19,14 @@ public class StuckMatchFoundHandler {
     private static final long STUCK_THRESHOLD_MS = 15000;
 
     private final RedisUserRepository redisUserRepository;
-    private final RedisQueueRepository redisQueueRepository;
     private final MatchService matchService;
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
     public StuckMatchFoundHandler(RedisUserRepository redisUserRepository,
-                                  RedisQueueRepository redisQueueRepository,
                                   MatchService matchService,
                                   RedisTemplate<String, Object> redisTemplate) {
         this.redisUserRepository = redisUserRepository;
-        this.redisQueueRepository = redisQueueRepository;
         this.matchService = matchService;
         this.redisTemplate = redisTemplate;
     }
@@ -72,27 +68,15 @@ public class StuckMatchFoundHandler {
     }
 
     private void rollbackStuckMatch(String userId, String matchId) {
-        redisUserRepository.removeFromMatchFoundUsers(userId);
-        Long joinTime = redisUserRepository.getJoinTime(userId);
-        if (joinTime == null) {
-            joinTime = System.currentTimeMillis();
-        }
-
         if (matchId != null) {
-            matchService.rollbackMatchByMatchId(matchId);
-        } else {
-            String category = redisUserRepository.getUserCategory(userId);
-            if (category != null) {
-                String[] parts = category.split("\\|");
-                if (parts.length == 3) {
-                    String topic = parts[0];
-                    String language = parts[2];
-                    String difficulty = parts[1];
-                    redisQueueRepository.requeueUser(userId, topic, language, difficulty, joinTime);
-                }
+            String otherUserId = matchService.getOtherUserInMatch(userId, matchId);
+            if (otherUserId != null) {
+                matchService.rollbackMatch(userId, otherUserId, matchId);
+                return;
             }
         }
 
+        redisUserRepository.removeFromMatchFoundUsers(userId);
         redisUserRepository.deleteMatchFoundAt(userId);
         redisUserRepository.deleteUserMatchId(userId);
     }

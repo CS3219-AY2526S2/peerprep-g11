@@ -1,12 +1,12 @@
 package peerprep.matching.config;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scripting.support.ResourceScriptSource;
-
-import java.util.List;
 
 @Configuration
 public class LuaScriptConfig {
@@ -43,6 +43,42 @@ public class LuaScriptConfig {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setScriptSource(new ResourceScriptSource(
                 new ClassPathResource("lua/add_to_pending.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    @Bean
+    public DefaultRedisScript<Long> addUserScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/add_user.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    @Bean
+    public DefaultRedisScript<Long> rollbackMatchScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/rollback_match.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    @Bean
+    public DefaultRedisScript<Long> cancelMatchScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/cancel_match.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    @Bean
+    public DefaultRedisScript<Long> removeTimeoutUserScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("lua/remove_timeout_user.lua")));
         script.setResultType(Long.class);
         return script;
     }
