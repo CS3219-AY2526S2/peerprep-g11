@@ -94,6 +94,9 @@ services:
     restart: unless-stopped
     env_file:
       - ./collaboration-service/.env
+    environment:
+      QUESTION_SERVICE_URL: http://question-service:8000
+      MATCHING_SERVICE_URL: http://matching-service:8080
     ports:
       - "${COLLAB_PORT:-1234}:1234"
 
