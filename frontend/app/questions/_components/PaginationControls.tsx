@@ -8,6 +8,7 @@ interface PaginationControlsProps {
     total: number;
     pageSize: number;
     onPageChange: (page: number) => void;
+    itemLabel?: string;
 }
 
 export function PaginationControls({
@@ -16,6 +17,7 @@ export function PaginationControls({
     total,
     pageSize,
     onPageChange,
+    itemLabel = 'questions',
 }: PaginationControlsProps) {
     if (totalPages <= 1) return null;
 
@@ -25,7 +27,7 @@ export function PaginationControls({
     return (
         <div className="flex items-center justify-between mt-4">
             <p className="text-[11.5px] text-muted-foreground">
-                Showing {start}–{end} of {total} questions
+                Showing {start}–{end} of {total} {itemLabel}
             </p>
             <div className="flex gap-2">
                 <Button

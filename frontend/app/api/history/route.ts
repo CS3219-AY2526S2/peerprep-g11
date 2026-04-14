@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { forwardAuthHeaders } from '@/lib/auth';
+import type { HistoryListResponse } from '@/app/history/types';
 
 const QUESTION_SERVICE_URL =
   process.env.QUESTION_SERVICE_URL ?? 'http://localhost:8000';
@@ -69,7 +70,8 @@ const MOCK_HISTORY_LIST = [
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get('user_id');
+    const { searchParams } = request.nextUrl;
+    const userId = searchParams.get('user_id');
     if (!userId) {
       return NextResponse.json(
         { error: 'user_id query parameter is required' },
@@ -77,11 +79,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const pageSize = Math.max(1, parseInt(searchParams.get('pageSize') ?? '10', 10));
+    const upstreamParams = new URLSearchParams({
+      user_id: userId,
+      page: String(page),
+      size: String(pageSize),
+    });
+
     // return NextResponse.json(MOCK_HISTORY_LIST);
 
     const authHeaders = forwardAuthHeaders(request);
     const res = await fetch(
-      `${QUESTION_SERVICE_URL}/history/list?user_id=${encodeURIComponent(userId)}`,
+      `${QUESTION_SERVICE_URL}/history/list?${upstreamParams.toString()}`,
       {
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         cache: 'no-store',
@@ -95,7 +105,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const items = await res.json();
+    const items: HistoryListResponse = await res.json();
     return NextResponse.json(items);
   } catch {
     return NextResponse.json(

@@ -32,6 +32,7 @@ All keys are prefixed with `qs:` to namespace them within Redis.
 | `GET /questions?topic=Arrays&difficulty=Easy&page=2&size=20` | `qs:questions:search={search}:topic={topic}:diff={difficulty}:page={page}:size={size}` | `qs:questions:search=:topic=Arrays:diff=Easy:page=2:size=20` |
 | `GET /questions/topics` | `qs:topics` | `qs:topics` |
 | `GET /questions/{slug}` | `qs:question:{slug}` | `qs:question:two-sum` |
+| `GET /history/list?user_id={user_id}&page={page}&size={size}` | `qs:attempts:userid={user_id}:page={page}:size={size}` | `qs:attempts:userid=6801a90b4b4d11f2f5f13d29:page=1:size=10` |
 
 Different query parameter combinations produce different cache entries.
 
@@ -46,6 +47,10 @@ Cache is invalidated (all `qs:{slug}, qs:topics, qs:questions:*` keys are delete
 Full invalidation is used rather than surgical key deletion because:
 - Admin writes are infrequent
 - A single question change can affect multiple cached responses (e.g., the questions list, topics list, and the individual question)
+
+History caches are invalidated separately when `POST /history/insert` succeeds:
+- All cached keys matching `qs:attempts:userid={user_id}:*` are deleted for each participant in the attempt
+- This clears every cached history page for the affected users, so pagination metadata stays in sync without needing per-page bookkeeping
 
 ## TTL (Time To Live)
 

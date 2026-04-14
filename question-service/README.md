@@ -330,7 +330,7 @@ Adds an attempt to the database after an session ends. To be used by collaborati
 
 #### GET /history/list
 
-Retrieves the full history of the selected user.
+Retrieves the paginated history of the selected user.
 
 **Query parameters:**
 
@@ -346,6 +346,37 @@ Retrieves the full history of the selected user.
 |--------|-----------------------------------------------------|
 | 200    | History retrieved                                   |
 | 503    | Database down, check health status of your database |
+
+**Response body:**
+
+```json
+{
+  "data": [
+    {
+      "_id": "6801a9c74b4d11f2f5f13d2c",
+      "session_id": "session-123",
+      "user_ids": ["6801a90b4b4d11f2f5f13d29", "6801a9154b4d11f2f5f13d2a"],
+      "user_names": ["alex", "jamie"],
+      "slug": "two-sum",
+      "timestamp": "2026-04-14T07:55:01.234567+00:00",
+      "partner_id": "6801a9154b4d11f2f5f13d2a",
+      "partner_username": "jamie",
+      "question": {
+        "_id": "6801a98a4b4d11f2f5f13d2b",
+        "title": "Two Sum",
+        "slug": "two-sum",
+        "topics": ["Arrays"],
+        "difficulty": "Easy",
+        "status": "Completed"
+      }
+    }
+  ],
+  "total": 12,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 2
+}
+```
 
 #### GET /history/`{id}`
 

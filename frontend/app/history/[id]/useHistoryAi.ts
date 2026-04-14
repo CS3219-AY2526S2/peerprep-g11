@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import type { Question } from '@/app/questions/types';
 import { readSseStream, type ParsedSseEvent } from '@/lib/sse';
+import { coerceProgrammingLanguage } from '@/lib/programming-languages';
 import type {
   AiStreamChunkEvent,
   AiStreamDoneEvent,
@@ -124,6 +125,7 @@ export function useHistoryAi({
   language,
   code,
 }: HistoryAiCodeContext) {
+  const normalizedLanguage = coerceProgrammingLanguage(language);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeAiTab, setActiveAiTab] = useState<AiTab>('hints');
   const [explanations, setExplanations] = useState<ExplainEntry[]>([]);
@@ -145,7 +147,7 @@ export function useHistoryAi({
       const newEntry: ExplainEntry = {
         id: entryId,
         selectedCode,
-        language,
+        language: normalizedLanguage,
         response: null,
         createdAt: new Date().toISOString(),
       };
@@ -162,7 +164,7 @@ export function useHistoryAi({
             questionDescription: question?.description ?? '',
             questionExamples: question?.examples ?? [],
             questionConstraints: question?.constraints ?? [],
-            language,
+            language: normalizedLanguage,
             fullCode: code,
             selectedCode,
           },
@@ -214,7 +216,7 @@ export function useHistoryAi({
         );
       }
     },
-    [code, explanations.length, question, language, historyId]
+    [code, explanations.length, question, normalizedLanguage, historyId]
   );
 
   const handleSendHint = useCallback(
@@ -256,7 +258,7 @@ export function useHistoryAi({
             questionDescription: question.description,
             questionExamples: question.examples,
             questionConstraints: question.constraints,
-            language,
+            language: normalizedLanguage,
             fullCode: code,
             messages: requestMessages,
           },
@@ -349,7 +351,7 @@ export function useHistoryAi({
         setIsHintStreaming(false);
       }
     },
-    [code, hintMessages, isHintStreaming, question, language, historyId]
+    [code, hintMessages, isHintStreaming, question, normalizedLanguage, historyId]
   );
 
   const handleTranslateCode = useCallback(
@@ -361,7 +363,7 @@ export function useHistoryAi({
       const cachedIndex = translations.findIndex(
         (t) =>
           t.targetLanguage === targetLanguage &&
-          t.sourceLanguage === language &&
+          t.sourceLanguage === normalizedLanguage &&
           t.originalCode === code &&
           t.translatedCode !== null
       );
@@ -377,7 +379,7 @@ export function useHistoryAi({
       const nextTranslateIndex = translations.length;
       const newEntry: TranslateEntry = {
         id: entryId,
-        sourceLanguage: language,
+        sourceLanguage: normalizedLanguage,
         targetLanguage,
         originalCode: code,
         translatedCode: null,
@@ -397,7 +399,7 @@ export function useHistoryAi({
             questionDescription: question?.description ?? '',
             questionExamples: question?.examples ?? [],
             questionConstraints: question?.constraints ?? [],
-            language,
+            language: normalizedLanguage,
             targetLanguage,
             fullCode: code,
           },
@@ -451,7 +453,7 @@ export function useHistoryAi({
         setIsTranslateStreaming(false);
       }
     },
-    [code, translations, question, language, historyId, isTranslateStreaming]
+    [code, translations, question, normalizedLanguage, historyId, isTranslateStreaming]
   );
 
   const handleClearHints = useCallback(() => {

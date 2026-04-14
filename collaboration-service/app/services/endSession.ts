@@ -23,14 +23,6 @@ import { Session, type ISession } from "../model/Session";
 import { insertHistory } from "../clients/questionServiceClient";
 import { deleteMatch } from "../clients/matchingServiceClient";
 
-/**
- * Maps the stored lower-case language identifier to the capitalised form
- * expected by the question service.
- */
-function capitaliseLanguage(lang: string): string {
-  return lang.charAt(0).toUpperCase() + lang.slice(1);
-}
-
 export async function endSession(
   sessionId: string,
   cleanupTimers: Map<string, NodeJS.Timeout>
@@ -69,7 +61,7 @@ export async function endSession(
     user_ids: [p0.id, p1.id] as [string, string],
     user_names: [p0.username, p1.username] as [string, string],
     slug: session.questionId,          // questionId IS the slug in our naming convention
-    language: capitaliseLanguage(session.selectedLanguage),
+    language: session.selectedLanguage,
     code: Buffer.from(code).toString("base64"),
   };
 

@@ -6,7 +6,10 @@ import { NavBar } from '@/components/ui/navBar';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { HistoryListItem } from '@/app/history/types';
+import { PaginationControls } from '@/app/questions/_components/PaginationControls';
+import type { HistoryListItem, HistoryListResponse } from '@/app/history/types';
+
+const PAGE_SIZE = 5;
 
 const actionCards = [
   {
@@ -59,24 +62,46 @@ export default function DashboardPage() {
   const { user, isLoading } = useRequireAuth();
   const [history, setHistory] = useState<HistoryListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const userId = user?.id;
 
   useEffect(() => {
     if (!userId) return;
+    const currentUserId = userId;
     async function fetchHistory() {
+      setHistoryLoading(true);
       try {
-        const res = await fetch(`/api/history?user_id=${encodeURIComponent(userId!)}`);
+        const params = new URLSearchParams({
+          user_id: currentUserId,
+          page: String(page),
+          pageSize: String(PAGE_SIZE),
+        });
+        const res = await fetch(`/api/history?${params.toString()}`);
         if (res.ok) {
-          const data: HistoryListItem[] = await res.json();
-          setHistory(data);
+          const data: HistoryListResponse = await res.json();
+          setHistory(data.data);
+          setTotal(data.total);
+          setTotalPages(data.totalPages);
+        } else {
+          setHistory([]);
+          setTotal(0);
+          setTotalPages(0);
         }
       } catch {
-        // silently fail — section will show empty state
+        setHistory([]);
+        setTotal(0);
+        setTotalPages(0);
       } finally {
         setHistoryLoading(false);
       }
     }
-    fetchHistory();
+    void fetchHistory();
+  }, [page, userId]);
+
+  useEffect(() => {
+    setPage(1);
   }, [userId]);
 
   if (isLoading || !user) return <Skeleton />;
@@ -164,10 +189,10 @@ export default function DashboardPage() {
           style={{ animationDelay: '300ms' }}
         >
           <p className="text-[13px] font-semibold text-foreground mb-2.5">Question History</p>
-          <Card className="border-border shadow-sm overflow-hidden">
-            <CardContent className="pt-3 pb-2 grid gap-1">
+          <Card className="border-border shadow-sm overflow-hidden py-2">
+            <CardContent className="px-3 pt-1 pb-1 grid gap-1">
               {historyLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
+                Array.from({ length: PAGE_SIZE }).map((_, i) => (
                   <div
                     key={i}
                     className="flex items-center justify-between gap-4 px-4 py-2.5 rounded-lg bg-secondary/30"
@@ -239,6 +264,16 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+          {!historyLoading && history.length > 0 ? (
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              itemLabel="history entries"
+              onPageChange={setPage}
+            />
+          ) : null}
         </div>
       </div>
     </div>

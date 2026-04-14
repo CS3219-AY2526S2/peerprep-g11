@@ -257,7 +257,7 @@ assert_port_free "matching-service" "8080"
 assert_port_free "frontend" "3000"
 
 start_service "question-service" "question-service" "source .venv/bin/activate && export REDIS_URI='$LOCAL_REDIS_URI'; python main.py"
-start_service "collaboration-service" "collaboration-service" "npm run dev"
+start_service "collaboration-service" "collaboration-service" "export QUESTION_SERVICE_URL='$LOCAL_QUESTION_SERVICE_URL'; export MATCHING_SERVICE_URL='$LOCAL_MATCHING_SERVICE_URL'; npm run dev"
 start_service "user-service" "user-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
 start_service "ai-assistant-service" "ai-assistant-service" "export FRONTEND_ORIGIN='$LOCAL_FRONTEND_ORIGIN'; npm run dev"
 start_service "format-service" "format-service" "npm run dev"

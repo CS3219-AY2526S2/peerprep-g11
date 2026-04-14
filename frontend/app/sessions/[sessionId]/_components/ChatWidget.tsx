@@ -120,6 +120,20 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
   }, [isOpen, markAllAsRead, messages]);
 
   useEffect(() => {
+    if (!sessionId || !ticket || !currentUserId) {
+      setMessages([]);
+      setUnreadCount(0);
+      yProviderRef.current?.destroy();
+      yDocRef.current?.destroy();
+      yProviderRef.current = null;
+      yDocRef.current = null;
+      yArrayRef.current = null;
+      yMessagesRef.current = null;
+      hasCompletedInitialSyncRef.current = false;
+      lastReadMessageIdRef.current = null;
+      return;
+    }
+
     let cancelled = false;
 
     async function initYjs(): Promise<void> {
@@ -137,7 +151,7 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
 
         const provider = new WebsocketProvider(
           COLLAB_SERVICE_URL,
-          `${sessionId}-chat`,
+          sessionId,
           yDocument,
           { params: { ticket: ticket! } },
         );
@@ -219,6 +233,8 @@ export function ChatWidget({ participants, sessionId, ticket }: ChatWidgetProps)
       yDocRef.current?.destroy();
       yProviderRef.current = null;
       yDocRef.current = null;
+      yArrayRef.current = null;
+      yMessagesRef.current = null;
       hasCompletedInitialSyncRef.current = false;
       lastReadMessageIdRef.current = null;
     };

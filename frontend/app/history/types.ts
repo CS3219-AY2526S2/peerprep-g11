@@ -1,4 +1,5 @@
 import type { Question } from '@/app/questions/types';
+import type { PaginatedResponse } from '@/lib/types';
 
 export interface HistoryListItem {
   _id: string;
@@ -18,3 +19,5 @@ export interface HistoryDetail {
   code: string;
   timestamp: string;
 }
+
+export type HistoryListResponse = PaginatedResponse<HistoryListItem>;

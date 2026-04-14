@@ -24,13 +24,6 @@ const utils_1 = require("@y/websocket-server/utils");
 const Session_1 = require("../model/Session");
 const questionServiceClient_1 = require("../clients/questionServiceClient");
 const matchingServiceClient_1 = require("../clients/matchingServiceClient");
-/**
- * Maps the stored lower-case language identifier to the capitalised form
- * expected by the question service.
- */
-function capitaliseLanguage(lang) {
-    return lang.charAt(0).toUpperCase() + lang.slice(1);
-}
 async function endSession(sessionId, cleanupTimers) {
     // ── 1. Cancel any pending zombie timer to prevent double-execution ────────
     const existing = cleanupTimers.get(sessionId);
@@ -61,8 +54,8 @@ async function endSession(sessionId, cleanupTimers) {
         user_ids: [p0.id, p1.id],
         user_names: [p0.username, p1.username],
         slug: session.questionId, // questionId IS the slug in our naming convention
-        language: capitaliseLanguage(session.selectedLanguage),
-        code,
+        language: session.selectedLanguage,
+        code: Buffer.from(code).toString("base64"),
     };
     const results = await Promise.allSettled([
         (0, questionServiceClient_1.insertHistory)(historyPayload),

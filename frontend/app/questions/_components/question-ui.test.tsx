@@ -87,6 +87,23 @@ describe("question display components", () => {
     expect(onPageChange).toHaveBeenNthCalledWith(2, 3);
   });
 
+  it("supports custom pagination labels", () => {
+    render(
+      <PaginationControls
+        page={1}
+        totalPages={2}
+        total={12}
+        pageSize={5}
+        itemLabel="history entries"
+        onPageChange={jest.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText("Showing 1–5 of 12 history entries")
+    ).toBeInTheDocument();
+  });
+
   it("renders an empty state when there are no questions", () => {
     render(<QuestionTable questions={[]} />);
 
