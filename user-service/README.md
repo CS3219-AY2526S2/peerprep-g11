@@ -1,4 +1,4 @@
- # User Service
+# User Service
 
 Handles user registration, authentication, profile management, and role-based access control for PeerPrep. Built with Node.js, Express, TypeScript, and MongoDB.
 
@@ -14,6 +14,8 @@ Handles user registration, authentication, profile management, and role-based ac
 - [API Reference](#api-reference)
   - [Authentication](#authentication)
   - [Users](#users)
+- [Key Design Decisions](#key-design-decisions)
+- [Implementation Comparisons](#implementation-comparisons)
 - [Authentication and Authorization](#authentication-and-authorization)
 - [Roles](#roles)
 - [Audit Logging](#audit-logging)
@@ -244,6 +246,43 @@ Delete a user by ID. **Admin only.**
 
 ---
 
+## Key Design Decisions
+
+### 1. Dual-Mode Authentication (JWT + Cookies)
+- **Implementation:** Supports both `Authorization: Bearer <token>` headers and `HttpOnly` cookies.
+- **Rationale:** 
+    - **Header-based** is standard for machine-to-machine or mobile clients.
+    - **Cookie-based (HttpOnly)** is critical for the browser-based frontend to mitigate XSS (Cross-Site Scripting) attacks, as the JavaScript runtime cannot access the token.
+
+### 2. Forced Token Invalidation
+- **Implementation:** A `tokenInvalidatedAt` timestamp is stored on the User model and compared against the JWT's `iat` (issued-at) claim during every request.
+- **Rationale:** Standard JWTs are "stateless" and cannot be easily revoked before they expire. This hybrid approach gives us the ability to **immediately** boot a user (e.g., after an admin demotion or security breach) without the overhead of a full session database like Redis.
+
+### 3. Passive Audit Logging
+- **Implementation:** A middleware that hooks into the Express `res.on('finish')` event to log all state-changing requests (POST, PUT, DELETE).
+- **Rationale:** 
+    - **Non-blocking:** The audit log is created after the response is sent to the user, ensuring zero latency impact.
+    - **Implicit:** Developers don't have to remember to call `logAction()` in every controller; the system captures it automatically based on the HTTP method and route.
+
+### 4. Consensus-Based Admin Governance
+- **Implementation:** Critical administrative actions, like demoting another admin, require a majority vote (`(n-1)/2 + 1`) rather than a single click.
+- **Rationale:** 
+    - **Prevents "God Mode":** Ensures no single rogue admin can dismantle the system.
+    - **Software Integrity:** Demonstrates distributed system principles applied to human governance.
+
+---
+
+## Implementation Comparisons
+
+| Choice | Selected Implementation | Alternative Options | Rationale |
+| :--- | :--- | :--- | :--- |
+| **Persistence** | **MongoDB / Mongoose** | PostgreSQL / Sequelize | MongoDB's flexible schema is ideal for evolving user profiles. While relational databases excel at complex joins, our user model is relatively flat and benefits from NoSQL speed. |
+| **Auth Strategy** | **Stateless JWT + Invalidation Check** | Full Session (Redis) | Redis adds operational complexity (a new infrastructure dependency). Our "Invalidation Check" provides 95% of the benefits of sessions with 10% of the architectural cost. |
+| **Audit Logs** | **Internal Collection** | External ELK Stack | Keeping logs in-house (same DB) simplifies development and deployment. For our scale, a separate ELK stack would be over-engineering. |
+| **Governance** | **Custom Voting Logic** | Superuser/Owner Role | Most systems use a hierarchical "Owner" role. By using a voting mechanism, we foster a more collaborative and secure environment suitable for a community-driven platform. |
+
+---
+
 ## Authentication and Authorization
 
 - On login, a signed JWT is issued and stored in an HTTP-only `SameSite=Strict` cookie. It is not accessible to JavaScript on the client.
@@ -310,10 +349,6 @@ Audit log records are immutable once written.
 user-service/
 ├── src/
 │   ├── __tests__/              # Unit tests
-│   │   └── auth.controller.test.ts # Auth controller tests
-│   │   └── middleware.test.ts  # Middleware tests
-│   │   └── setup.ts            # Build up and tear down after each test
-│   │   └── user.controller.ts  # User controller tests
 │   ├── config/
 │   │   └── db.ts               # MongoDB connection
 │   ├── controllers/
