@@ -22,6 +22,11 @@ COPY . .
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# NEXT_PUBLIC_* vars are inlined at build time by Next.js — they cannot be
+# injected at container runtime. Pass the value via --build-arg in CI/CD.
+ARG NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=ws://localhost:1234
+ENV NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=${NEXT_PUBLIC_COLLAB_SERVICE_WS_URL}
+
 RUN npm run build
 
 # ---------- Stage 3: Production image ----------
