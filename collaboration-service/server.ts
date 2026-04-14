@@ -1,31 +1,63 @@
 import "dotenv/config";
 import { connectDB } from "./app/config/db";
-
-const PORT = process.env.PORT || 1234;
-import { setupWSConnection } from "@y/websocket-server/utils";
+import { setupWSConnection, docs } from "@y/websocket-server/utils";
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
 import jwt from "jsonwebtoken";
-import app from "./app/app";
+import { createApp } from "./app/app";
+import { endSession } from "./app/services/endSession";
+
+const PORT = process.env.PORT || 1234;
+
+/**
+ * How long (ms) an empty room is kept alive before zombie cleanup fires.
+ * Defaults to 30 minutes. Override via ZOMBIE_TIMEOUT_MS env var.
+ */
+const ZOMBIE_TIMEOUT_MS = parseInt(process.env.ZOMBIE_TIMEOUT_MS ?? "1800000", 10);
+
+/**
+ * Per-room debounce timers.
+ * Key:   sessionId / docName (URL path, e.g. "abc-123")
+ * Value: NodeJS.Timeout that will fire endSession() if no one reconnects in time.
+ *
+ * This Map is shared with the Express app so the DELETE handler can cancel a
+ * timer when a user explicitly ends a session before the timeout fires.
+ */
+const cleanupTimers = new Map<string, NodeJS.Timeout>();
+
+/** Derive the Yjs doc name from a WebSocket upgrade URL — mirrors setupWSConnection internals. */
+function docNameFromUrl(url: string | undefined): string {
+  return (url ?? "").slice(1).split("?")[0];
+}
 
 async function main() {
   await connectDB();
 
-  const httpServer = createServer(app);
+  const httpServer = createServer(createApp(cleanupTimers));
   const wss = new WebSocketServer({ noServer: true });
 
-  // auth gate — runs during HTTP upgrade, before WebSocket is accepted
+  // ── Auth gate — runs during HTTP upgrade, before WebSocket is accepted ────
   httpServer.on("upgrade", (req, socket, head) => {
-    console.log("Upgrade request received:");
     const url = new URL(req.url!, "http://localhost");
     const ticket = url.searchParams.get("ticket");
     try {
-      //verify the short term ticket from frontend BFF
       const payload = jwt.verify(ticket!, process.env.JWT_SECRET!) as {
         userId: string;
         roomId: string;
       };
-      console.log("ticket verified");
+
+      // Enforce that the room the ticket was issued for matches the URL path.
+      const docName = docNameFromUrl(req.url);
+      if (payload.roomId !== docName) {
+        console.warn(
+          `[WS] Ticket roomId "${payload.roomId}" does not match URL path "${docName}" — rejecting`
+        );
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+
+      console.log(`[WS] Ticket verified for room "${docName}"`);
       (req as any).user = payload;
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
@@ -36,12 +68,50 @@ async function main() {
     }
   });
 
-  // Yjs handler — all the sync/awareness protocol is inside setupWSConnection
+  // ── Yjs handler + zombie-cleanup tracking ─────────────────────────────────
   wss.on("connection", (ws, req) => {
+    const sessionId = docNameFromUrl(req.url);
+
+    // Cancel any pending cleanup timer — this is a reconnect.
+    const pendingTimer = cleanupTimers.get(sessionId);
+    if (pendingTimer !== undefined) {
+      clearTimeout(pendingTimer);
+      cleanupTimers.delete(sessionId);
+      console.log(`[zombie] Reconnect detected for "${sessionId}" — cleanup timer cancelled`);
+    }
+
+    // Hand off to Yjs: this registers the connection in doc.conns and sets up
+    // all sync/awareness protocol handling.
     setupWSConnection(ws, req);
+
+    // When this specific connection closes, check if the room is now empty.
+    // closeConn() (internal to @y/websocket-server) runs synchronously before
+    // the 'close' event fires, so doc.conns is already updated by the time we
+    // reach this callback.
+    ws.on("close", () => {
+      const doc = docs.get(sessionId);
+
+      // doc is undefined if it was already destroyed (e.g. by a concurrent REST delete).
+      if (!doc || doc.conns.size === 0) {
+        console.log(
+          `[zombie] Room "${sessionId}" is empty — scheduling cleanup in ${ZOMBIE_TIMEOUT_MS}ms`
+        );
+        const timer = setTimeout(() => {
+          cleanupTimers.delete(sessionId);
+          console.log(`[zombie] Cleanup firing for abandoned room "${sessionId}"`);
+          endSession(sessionId, cleanupTimers).catch((err) =>
+            console.error(`[zombie] endSession failed for "${sessionId}":`, err)
+          );
+        }, ZOMBIE_TIMEOUT_MS);
+
+        cleanupTimers.set(sessionId, timer);
+      }
+    });
   });
 
-  httpServer.listen(PORT);
+  httpServer.listen(PORT, () => {
+    console.log(`Collaboration service listening on port ${PORT}`);
+  });
 }
 
 main().catch((err) => {
