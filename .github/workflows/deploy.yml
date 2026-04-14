@@ -3,6 +3,12 @@ name: Deploy to AWS ECS
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: 'Deploy all services regardless of changes (use for first deploy)'
+        type: boolean
+        default: false
 
 permissions:
   id-token: write   # needed for OIDC token to authenticate with AWS
@@ -17,18 +23,19 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      frontend:             ${{ steps.filter.outputs.frontend }}
-      user-service:         ${{ steps.filter.outputs.user-service }}
-      question-service:     ${{ steps.filter.outputs.question-service }}
-      matching-service:     ${{ steps.filter.outputs.matching-service }}
-      collaboration-service: ${{ steps.filter.outputs.collaboration-service }}
-      ai-assistant-service: ${{ steps.filter.outputs.ai-assistant-service }}
-      format-service:       ${{ steps.filter.outputs.format-service }}
+      frontend:              ${{ steps.filter.outputs.frontend == 'true' || inputs.force_all == true }}
+      user-service:          ${{ steps.filter.outputs.user-service == 'true' || inputs.force_all == true }}
+      question-service:      ${{ steps.filter.outputs.question-service == 'true' || inputs.force_all == true }}
+      matching-service:      ${{ steps.filter.outputs.matching-service == 'true' || inputs.force_all == true }}
+      collaboration-service: ${{ steps.filter.outputs.collaboration-service == 'true' || inputs.force_all == true }}
+      ai-assistant-service:  ${{ steps.filter.outputs.ai-assistant-service == 'true' || inputs.force_all == true }}
+      format-service:        ${{ steps.filter.outputs.format-service == 'true' || inputs.force_all == true }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: ${{ github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD' }}
           filters: |
             frontend:
               - 'frontend/**'
