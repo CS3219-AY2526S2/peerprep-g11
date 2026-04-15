@@ -1,0 +1,5 @@
+dotenv
+fastapi[standard]
+pyjwt[crypto]
+pymongo[srv]
+redis

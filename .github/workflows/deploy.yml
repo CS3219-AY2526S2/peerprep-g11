@@ -1,0 +1,123 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: 'Deploy all services regardless of changes (use for first deploy)'
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write   # needed for OIDC token to authenticate with AWS
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REGISTRY: 842983351604.dkr.ecr.ap-southeast-1.amazonaws.com
+  ECS_CLUSTER: peerprep
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend:              ${{ steps.filter.outputs.frontend == 'true' || inputs.force_all == true }}
+      user-service:          ${{ steps.filter.outputs.user-service == 'true' || inputs.force_all == true }}
+      question-service:      ${{ steps.filter.outputs.question-service == 'true' || inputs.force_all == true }}
+      matching-service:      ${{ steps.filter.outputs.matching-service == 'true' || inputs.force_all == true }}
+      collaboration-service: ${{ steps.filter.outputs.collaboration-service == 'true' || inputs.force_all == true }}
+      ai-assistant-service:  ${{ steps.filter.outputs.ai-assistant-service == 'true' || inputs.force_all == true }}
+      format-service:        ${{ steps.filter.outputs.format-service == 'true' || inputs.force_all == true }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD' }}
+          filters: |
+            frontend:
+              - 'frontend/**'
+            user-service:
+              - 'user-service/**'
+            question-service:
+              - 'question-service/**'
+            matching-service:
+              - 'matching-service/**'
+            collaboration-service:
+              - 'collaboration-service/**'
+            ai-assistant-service:
+              - 'ai-assistant-service/**'
+            format-service:
+              - 'format-service/**'
+
+  build-and-deploy:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            changed: ${{ needs.detect-changes.outputs.frontend }}
+          - service: user-service
+            changed: ${{ needs.detect-changes.outputs.user-service }}
+          - service: question-service
+            changed: ${{ needs.detect-changes.outputs.question-service }}
+          - service: matching-service
+            changed: ${{ needs.detect-changes.outputs.matching-service }}
+          - service: collaboration-service
+            changed: ${{ needs.detect-changes.outputs.collaboration-service }}
+          - service: ai-assistant-service
+            changed: ${{ needs.detect-changes.outputs.ai-assistant-service }}
+          - service: format-service
+            changed: ${{ needs.detect-changes.outputs.format-service }}
+
+    steps:
+      - name: Skip if service unchanged
+        if: matrix.changed != 'true'
+        run: echo "No changes in ${{ matrix.service }}, skipping."
+
+      - uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - name: Configure AWS credentials via OIDC
+        if: matrix.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::842983351604:role/peerprep-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        if: matrix.changed == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image (frontend)
+        if: matrix.changed == 'true' && matrix.service == 'frontend'
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://collab.peerprep-g11.online \
+            -t $ECR_REGISTRY/peerprep/frontend:${{ github.sha }} \
+            -t $ECR_REGISTRY/peerprep/frontend:latest \
+            ./frontend
+          docker push $ECR_REGISTRY/peerprep/frontend:${{ github.sha }}
+          docker push $ECR_REGISTRY/peerprep/frontend:latest
+
+      - name: Build and push image (other services)
+        if: matrix.changed == 'true' && matrix.service != 'frontend'
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/peerprep/${{ matrix.service }}:${{ github.sha }} \
+            -t $ECR_REGISTRY/peerprep/${{ matrix.service }}:latest \
+            ./${{ matrix.service }}
+          docker push $ECR_REGISTRY/peerprep/${{ matrix.service }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/peerprep/${{ matrix.service }}:latest
+
+      - name: Force ECS service redeployment
+        if: matrix.changed == 'true'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ matrix.service }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
