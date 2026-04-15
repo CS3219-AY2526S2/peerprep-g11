@@ -117,6 +117,8 @@ describe("question display components", () => {
 
     expect(screen.getByText("Two Sum")).toBeInTheDocument();
     expect(screen.getByText("Arrays, Hash Map")).toBeInTheDocument();
+    expect(screen.queryByText("Status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Completed")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /view/i })).toHaveAttribute(
       "href",
       "/questions/two-sum"

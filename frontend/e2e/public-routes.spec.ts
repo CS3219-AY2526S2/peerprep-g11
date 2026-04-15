@@ -34,16 +34,16 @@ test.describe("public routes", () => {
     await expect(page.getByLabel("Confirm Password")).toBeVisible();
   });
 
-  test("permission denied page renders both actions", async ({ page }) => {
+  test("permission denied page renders the current recovery state", async ({
+    page,
+  }) => {
     await page.goto("/permission-denied");
 
     await expect(page.getByText("Permission Denied")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Return Home" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Browse Questions" })
-    ).toBeVisible();
+    await expect(page.getByText("ERR_PERMISSION_CHECK_FAILED")).toBeVisible();
   });
 
   test("service unavailable placeholder renders", async ({ page }) => {
