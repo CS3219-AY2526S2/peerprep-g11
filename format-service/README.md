@@ -48,6 +48,12 @@ The service does exactly one thing: it takes raw code and returns formatted code
 ### 2. Adapter Pattern
 The service provides a unified interface (`POST /format`) for wildly different tools. The consumer doesn't need to know if the formatter is a native Node library or an external CLI tool; the internal logic handles the translation and execution details.
 
+#### Why Adapter over other patterns?
+| Pattern | Comparison | Why Adapter is better here? |
+| :--- | :--- | :--- |
+| **Monolithic Switch** | Putting all logic in one big `if/else` block in the route handler. | **Separation of Concerns:** The Monolithic approach creates a "God Object" that is hard to test and maintain. Adapter keeps each language's logic isolated. |
+| **Strategy Pattern** | Switching between different algorithms for the same task. | **Interoperability:** Strategy assumes the interfaces are already compatible. Adapter is specifically designed to wrap *incompatible* interfaces (CLI vs. Library) into a single standard. |
+
 ### 3. Resource Management & Cleanup
 When executing CLI-based formatters (Python/Java), the service:
 1. Generates a unique temporary file.

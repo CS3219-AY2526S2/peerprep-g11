@@ -1,21 +1,28 @@
 import express from "express";
 import type { Request, Response } from "express";
-import { execFile } from "child_process";
-import { writeFile, readFile, unlink } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { randomUUID } from "crypto";
+import { Formatter } from "./formatters";
+import { BlackFormatter } from "./formatters/black";
+import { PrettierFormatter } from "./formatters/prettier";
+import { GoogleJavaFormatter } from "./formatters/google-java-format";
 
 const app = express();
 app.use(express.json());
+
+// Registry of adapters
+const formatters: Record<string, Formatter> = {
+  python: new BlackFormatter(),
+  javascript: new PrettierFormatter("babel"),
+  typescript: new PrettierFormatter("typescript"),
+  css: new PrettierFormatter("css"),
+  html: new PrettierFormatter("html"),
+  json: new PrettierFormatter("json"),
+  java: new GoogleJavaFormatter(),
+};
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
-// POST /format
-// Accepts { code: string, language: string }
-// Returns { formatted: string }
 app.post("/format", async (req: Request, res: Response) => {
   const { code, language } = req.body ?? {};
 
@@ -24,26 +31,17 @@ app.post("/format", async (req: Request, res: Response) => {
     return;
   }
 
+  const formatter = formatters[language];
+
+  if (!formatter) {
+    res
+      .status(400)
+      .json({ error: `Formatting not supported for language: ${language}` });
+    return;
+  }
+
   try {
-    let formatted: string;
-
-    switch (language) {
-      case "python":
-        formatted = await formatPython(code);
-        break;
-      case "javascript":
-        formatted = await formatJavaScript(code);
-        break;
-      case "java":
-        formatted = await formatJava(code);
-        break;
-      default:
-        res
-          .status(400)
-          .json({ error: `Formatting not supported for language: ${language}` });
-        return;
-    }
-
+    const formatted = await formatter.format(code);
     res.json({ formatted });
   } catch (err: any) {
     if (err.killed) {
@@ -55,56 +53,5 @@ app.post("/format", async (req: Request, res: Response) => {
     }
   }
 });
-
-async function formatPython(code: string): Promise<string> {
-  const tmpPath = join(tmpdir(), `fmt-${randomUUID()}.py`);
-  try {
-    await writeFile(tmpPath, code, "utf-8");
-    await new Promise<void>((resolve, reject) => {
-      execFile(
-        "python3",
-        ["-m", "black", "--quiet", "--fast", "--preview", tmpPath],
-        { timeout: 10_000 },
-        (err) => (err ? reject(err) : resolve()),
-      );
-    });
-    return await readFile(tmpPath, "utf-8");
-  } finally {
-    unlink(tmpPath).catch(() => {});
-  }
-}
-
-async function formatJavaScript(code: string): Promise<string> {
-  const prettier = await import("prettier");
-  return prettier.format(code, {
-    parser: "babel",
-    semi: true,
-    singleQuote: false,
-    tabWidth: 2,
-    trailingComma: "all",
-    printWidth: 80,
-  });
-}
-
-const GJF_JAR =
-  process.env.GJF_JAR_PATH || "/opt/google-java-format.jar";
-
-async function formatJava(code: string): Promise<string> {
-  const tmpPath = join(tmpdir(), `fmt-${randomUUID()}.java`);
-  try {
-    await writeFile(tmpPath, code, "utf-8");
-    await new Promise<void>((resolve, reject) => {
-      execFile(
-        "java",
-        ["-jar", GJF_JAR, "--replace", tmpPath],
-        { timeout: 10_000 },
-        (err) => (err ? reject(err) : resolve()),
-      );
-    });
-    return await readFile(tmpPath, "utf-8");
-  } finally {
-    unlink(tmpPath).catch(() => {});
-  }
-}
 
 export default app;
