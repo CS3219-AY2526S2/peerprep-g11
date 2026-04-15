@@ -2,7 +2,7 @@
 
 A stateless microservice that provides a unified API for code formatting across multiple programming languages (JavaScript, Python, Java).
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -40,7 +40,7 @@ The `format-service` is designed as a **stateless utility worker**. It abstracts
     - **Python:** Spawns a subprocess to run `black`.
     - **Java:** Spawns a subprocess to run `google-java-format` (GJF) via the JVM.
 
-## 🛠️ Software Engineering Principles
+## Software Engineering Principles
 
 ### 1. Single Responsibility Principle (SRP)
 The service does exactly one thing: it takes raw code and returns formatted code. By isolating formatting logic into its own service, we avoid "runtime bloat" in other services (e.g., the `collaboration-service` doesn't need to have Python or Java installed).
@@ -57,7 +57,7 @@ When executing CLI-based formatters (Python/Java), the service:
 ### 4. Statelessness
 The service maintains no database or session state. This makes it horizontally scalable; you can run multiple instances behind a load balancer without any coordination or data syncing.
 
-## 📊 Design Decisions: Why this implementation?
+## Design Decisions: Why this implementation?
 
 | Choice | Rationale |
 | :--- | :--- |
@@ -65,7 +65,7 @@ The service maintains no database or session state. This makes it horizontally s
 | **Subprocesses (execFile) vs. Native Bindings** | Using `execFile` allows us to leverage the **official** formatting tools directly. While Wasm or native bindings might be faster, they are complex to maintain and often lag behind the official releases. |
 | **Synchronous HTTP vs. Async Queue** | Code formatting is typically a sub-second task. Synchronous Request-Response is significantly simpler to implement and consume than an asynchronous message queue or polling system. |
 
-## 📚 Library Selection Rationale
+## Library Selection Rationale
 
 In building the `format-service`, we prioritized **opinionated** tools over **highly configurable** ones. This reduces "bikeshedding" (endless debates over code style) and ensures a consistent codebase regardless of who is writing the code.
 
@@ -90,7 +90,7 @@ In building the `format-service`, we prioritized **opinionated** tools over **hi
     *   **vs. Checkstyle:** Checkstyle is a linter that *reports* errors but doesn't automatically *fix* them in a deterministic way. GJF is an active formatter that ensures 100% compliance automatically.
     *   **vs. IDE Formatters:** Relying on IDEs leads to "diff wars" when an Eclipse user and an IntelliJ user edit the same file. GJF provides a **Single Source of Truth** that is independent of the developer's local environment.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### API Endpoint
 `POST /format`
