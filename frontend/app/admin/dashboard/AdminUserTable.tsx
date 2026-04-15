@@ -26,7 +26,7 @@ interface AdminUserTableProps {
   demotionVotes: DemotionVoteItem[];
   onDelete: (id: string) => void;
   onStartVote: (targetUserId: string) => void;
-  onVoteCast: () => void;
+  onVoteCast: (demoted?: boolean) => void;
 }
 
 export function AdminUserTable({

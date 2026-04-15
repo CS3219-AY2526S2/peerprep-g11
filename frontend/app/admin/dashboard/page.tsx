@@ -29,7 +29,6 @@ export default function AdminDashboardPage() {
   const [demotionVotes, setDemotionVotes] = useState<DemotionVoteItem[]>([]);
 
   const getAllUsers = async () => {
-
     try {
       const res = await fetch('/api/users/all', {
         method: 'GET',
@@ -40,12 +39,12 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         return data;
       } else {
-        setFetchError(true);;
+        setFetchError(true);
         return [];
       }
     } catch {
       setFetchError(true);
-    } finally {
+      return [];
     }
   };
 
@@ -78,8 +77,7 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         setAdminRequests(data);
       }
-    } catch {
-    }
+    } catch {}
   };
 
   const fetchDemotionVotes = async () => {
@@ -89,8 +87,7 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         setDemotionVotes(data);
       }
-    } catch {
-    }
+    } catch {}
   };
 
   const handleStartVote = async (targetUserId: string) => {
@@ -104,7 +101,11 @@ export default function AdminDashboardPage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         fetchDemotionVotes();
+        if (data.demoted) {
+          getAllUsers().then(setUsers).catch(() => {});
+        }
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to start demotion vote');
@@ -125,7 +126,6 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         setAdminRequests((prev) => prev.filter((r) => r._id !== id));
         if (status === 'approved') {
-          // Refresh user list to reflect role change
           getAllUsers().then(setUsers).catch(() => {});
         }
       } else {
@@ -138,16 +138,15 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    // Don't fetch until auth is resolved
     if (isLoading || !user) return;
 
-    getAllUsers()
-      .then(setUsers)
-      .catch(() => setFetchError(true))
-      .finally(() => setUsersLoading(false));
+    const fetchData = async () => {
+      getAllUsers().then(setUsers).catch(() => setFetchError(true));
+      fetchAdminRequests();
+      fetchDemotionVotes();
+    };
 
-    fetchAdminRequests();
-    fetchDemotionVotes();
+    fetchData().finally(() => setUsersLoading(false));
   }, [isLoading, user]);
 
   if (isLoading || !user) {
@@ -234,7 +233,12 @@ export default function AdminDashboardPage() {
               demotionVotes={demotionVotes}
               onDelete={deleteUser}
               onStartVote={handleStartVote}
-              onVoteCast={fetchDemotionVotes}
+              onVoteCast={(demoted) => {
+                fetchDemotionVotes();
+                if (demoted) {
+                  getAllUsers().then(setUsers).catch(() => {});
+                }
+              }}
             />
           </CardContent>
         </Card>

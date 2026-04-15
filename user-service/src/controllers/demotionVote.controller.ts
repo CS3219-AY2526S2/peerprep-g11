@@ -68,15 +68,16 @@ export async function createDemotionVote(req: AuthRequest, res: Response): Promi
       votes: [{ voterId: initiatorId, vote: 'yes', votedAt: new Date() }],
     });
 
-    await resolveVote(vote);
+    const demoted = await resolveVote(vote);
 
     // Reload to get populated fields and updated status
     const createdVote = await DemotionVote.findById(vote._id)
       .populate('targetUserId', 'username email')
       .populate('initiatorId', 'username email')
-      .populate('votes.voterId', 'username email');
+      .populate('votes.voterId', 'username email')
+      .lean();
 
-    res.status(201).json(createdVote);
+    res.status(201).json({ ...createdVote, demoted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -101,7 +102,7 @@ export async function getDemotionVotes(req: AuthRequest, res: Response): Promise
   }
 }
 
-async function resolveVote(vote: any): Promise<void> {
+async function resolveVote(vote: any): Promise<boolean> {
   const yesCount = vote.votes.filter((v: any) => v.vote === 'yes').length;
   const noCount = vote.votes.filter((v: any) => v.vote === 'no').length;
 
@@ -118,7 +119,7 @@ async function resolveVote(vote: any): Promise<void> {
       role: 'user',
       tokenInvalidatedAt: new Date(),
     });
-    return;
+    return true;
   }
 
   // If enough 'no' votes that 'yes' can never reach threshold
@@ -126,8 +127,10 @@ async function resolveVote(vote: any): Promise<void> {
   if (yesCount + remainingVoters < vote.requiredVotes) {
     vote.status = 'rejected';
     await vote.save();
-    return;
+    return false;
   }
+
+  return false;
 }
 
 export async function castVote(req: AuthRequest, res: Response): Promise<void> {
@@ -171,15 +174,16 @@ export async function castVote(req: AuthRequest, res: Response): Promise<void> {
     }
 
     await demotionVote.save();
-    await resolveVote(demotionVote);
+    const demoted = await resolveVote(demotionVote);
 
     // Reload to get final state
     const updated = await DemotionVote.findById(id)
       .populate('targetUserId', 'username email')
       .populate('initiatorId', 'username email')
-      .populate('votes.voterId', 'username email');
+      .populate('votes.voterId', 'username email')
+      .lean();
 
-    res.json(updated);
+    res.json({ ...updated, demoted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -213,14 +217,15 @@ export async function withdrawVote(req: AuthRequest, res: Response): Promise<voi
 
     demotionVote.votes.splice(existingIdx, 1);
     await demotionVote.save();
-    await resolveVote(demotionVote);
+    const demoted = await resolveVote(demotionVote);
 
     const updated = await DemotionVote.findById(id)
       .populate('targetUserId', 'username email')
       .populate('initiatorId', 'username email')
-      .populate('votes.voterId', 'username email');
+      .populate('votes.voterId', 'username email')
+      .lean();
 
-    res.json(updated);
+    res.json({ ...updated, demoted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

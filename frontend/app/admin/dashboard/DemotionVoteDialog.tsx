@@ -30,7 +30,7 @@ export interface DemotionVoteItem {
 interface DemotionVoteDialogProps {
   vote: DemotionVoteItem;
   currentUserId: string;
-  onVoteCast: () => void;
+  onVoteCast: (demoted?: boolean) => void;
 }
 
 export function DemotionVoteDialog({ vote, currentUserId, onVoteCast }: DemotionVoteDialogProps) {
@@ -53,7 +53,8 @@ export function DemotionVoteDialog({ vote, currentUserId, onVoteCast }: Demotion
         body: JSON.stringify({ vote: voteValue }),
       });
       if (res.ok) {
-        onVoteCast();
+        const data = await res.json();
+        onVoteCast(data.demoted);
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to cast vote');
@@ -72,7 +73,8 @@ export function DemotionVoteDialog({ vote, currentUserId, onVoteCast }: Demotion
         method: 'DELETE',
       });
       if (res.ok) {
-        onVoteCast();
+        const data = await res.json();
+        onVoteCast(data.demoted);
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to withdraw vote');
