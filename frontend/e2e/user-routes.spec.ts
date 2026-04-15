@@ -35,11 +35,9 @@ test.describe("user routes", () => {
   test("matching page can enter the waiting state", async ({ page }) => {
     await page.goto("/matching");
 
-    await expect(
-      page.getByRole("heading", { name: "Matching Preferences" })
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Find a Peer" })).toBeVisible();
     await page.getByRole("button", { name: "Start Matching" }).click();
-    await expect(page.getByText("Searching for a peer…")).toBeVisible();
+    await expect(page.getByText("Searching for a peer")).toBeVisible();
   });
 
   test("faq page renders the request card for normal users", async ({ page }) => {

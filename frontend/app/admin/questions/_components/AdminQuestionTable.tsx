@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { StatusPill } from '@/app/questions/_components/StatusPill';
 import { DifficultyBadge } from '@/app/questions/_components/DifficultyBadge';
 import type { QuestionListElement } from '@/app/questions/types';
 
@@ -57,9 +56,6 @@ export function AdminQuestionTable({
             <TableHead className="text-[11.5px] uppercase tracking-wide text-muted-foreground font-semibold">
               Difficulty
             </TableHead>
-            <TableHead className="text-[11.5px] uppercase tracking-wide text-muted-foreground font-semibold">
-              Status
-            </TableHead>
             <TableHead className="w-[100px]" />
           </TableRow>
         </TableHeader>
@@ -91,9 +87,6 @@ export function AdminQuestionTable({
                 </TableCell>
                 <TableCell>
                   <DifficultyBadge difficulty={question.difficulty} />
-                </TableCell>
-                <TableCell>
-                  <StatusPill status={question.status} />
                 </TableCell>
                 <TableCell className="w-[100px]">
                   <Link

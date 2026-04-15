@@ -78,15 +78,21 @@ export async function stubApiPersona(page: Page, persona: Persona) {
     }
 
     if (pathname === "/api/history" && request.method() === "GET") {
-      return json(route, [
-        {
-          _id: "history-1",
-          partner_id: "partner-1",
-          partner_username: "Taylor",
-          question: questionDetail,
-          timestamp: "2026-04-05T10:00:00.000Z",
-        },
-      ]);
+      return json(route, {
+        data: [
+          {
+            _id: "history-1",
+            partner_id: "partner-1",
+            partner_username: "Taylor",
+            question: questionDetail,
+            timestamp: "2026-04-05T10:00:00.000Z",
+          },
+        ],
+        total: 1,
+        page: Number(searchParams.get("page") ?? "1"),
+        pageSize: Number(searchParams.get("pageSize") ?? "5"),
+        totalPages: 1,
+      });
     }
 
     if (pathname === "/api/users/admin-requests/mine") {

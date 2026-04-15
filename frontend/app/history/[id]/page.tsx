@@ -25,7 +25,7 @@ type MonacoInstance = typeof import('monaco-editor');
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
-  loading: () => <Skeleton className="h-[480px] w-full rounded-lg" />,
+  loading: () => <Skeleton className="min-h-[480px] h-full w-full rounded-lg" />,
 });
 
 function handleEditorWillMount(monaco: typeof import('monaco-editor')) {
@@ -506,11 +506,11 @@ export default function HistoryDetailPage() {
                       )}
                     </div>
                   </div>
-                  <CardContent className="relative p-0 flex-1 min-h-0">
+                  <CardContent className="relative p-0 flex-1 min-h-[480px]">
                     {entry.code ? (
                       <>
                         <MonacoEditor
-                          height="480px"
+                          height="100%"
                           language={monacoLanguage(entry.language)}
                           value={entry.code}
                           theme="peerprep-light"
@@ -584,7 +584,7 @@ export default function HistoryDetailPage() {
                         )}
                       </>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-[480px] text-center px-6">
+                      <div className="flex flex-col items-center justify-center h-full text-center px-6">
                         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" className="text-muted-foreground/30 mb-2">
                           <path d="M8 17l-5-5 5-5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
